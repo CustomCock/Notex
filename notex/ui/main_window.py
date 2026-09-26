@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QSplitter, QStackedWidget, QVBoxLayout, QWidget
 
@@ -27,6 +27,7 @@ from notex.theme.manager import theme_manager
 from notex.core import fileops
 from notex.core import text_ops as ops
 from notex.core.recent import add_recent, prune_recent
+from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe
 from notex.ui.about_dialog import AboutDialog
 from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
@@ -85,9 +86,11 @@ class MainWindow(QMainWindow):
         self.splitter.setCollapsible(1, False)
         self.setCentralWidget(self.splitter)
 
+        self.association = build_association()   # None im Dev-Modus oder außerhalb von Windows
         self._connect_signals()
         self._build_menu()
         self._build_editor_actions()
+        QTimer.singleShot(1500, self._check_association_path)
         self._restore_window_state()
         theme_manager().changed.connect(self.retheme)
 
@@ -339,6 +342,120 @@ class MainWindow(QMainWindow):
         page.note("Achtung: Bei der öffentlichen API wird der Text jedes geprüften Absatzes an einen externen "
                   "Server von LanguageTool geschickt. Standard ist ein lokaler Server (siehe README), "
                   "dann bleibt alles auf deinem Rechner.")
+
+    # ---- Windows-Dateizuordnung ----------------------------------------------------
+    def _check_association_path(self) -> None:
+        """Wurde der Notex-Ordner verschoben, zeigt die Registrierung noch auf die alte EXE."""
+        if self.association is None:
+            return
+        try:
+            status = self.association.status()
+        except Exception:  # noqa: BLE001 – Registry-Zugriff darf den Start nie stören
+            return
+        if status.registered and not status.matches(self.association.exe_path):
+            self.toast.show_message("Notex-Ordner verschoben – Einstellungen > System > „Pfad aktualisieren“", "triangle-alert")
+
+    def build_system_settings(self, page) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+        from notex.ui.widgets import Chip
+
+        page.section("Windows-Dateizuordnung")
+        status_label = QLabel()
+        status_label.setObjectName("SettingsNote")
+        status_label.setWordWrap(True)
+        page.add(status_label)
+
+        chips_row = QHBoxLayout()
+        chips_row.setContentsMargins(0, 0, 0, 0)
+        chosen = set(self.config.get("association_extensions", [".txt"]))
+        for ext in SUPPORTED_EXTENSIONS:
+            chip = Chip(ext, f"{ext}-Dateien mit Notex öffnen")
+            chip.setChecked(ext in chosen)
+
+            def toggled(on: bool, e=ext) -> None:
+                exts = set(self.config.get("association_extensions", []))
+                exts.add(e) if on else exts.discard(e)
+                self.config["association_extensions"] = [x for x in SUPPORTED_EXTENSIONS if x in exts]
+
+            chip.toggled.connect(toggled)
+            chips_row.addWidget(chip)
+        chips_row.addStretch(1)
+        chips = QWidget()
+        chips.setLayout(chips_row)
+        page.row("Dateitypen", chips)
+
+        register = QPushButton("Notex für Dateitypen registrieren")
+        update = QPushButton("Pfad aktualisieren")
+        remove = QPushButton("Registrierung entfernen")
+        defaults = QPushButton("Windows-Standard-Apps öffnen")
+        defaults.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("ms-settings:defaultapps")))
+        buttons = QHBoxLayout()
+        buttons.setContentsMargins(0, 0, 0, 0)
+        for button in (register, update, remove, defaults):
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        row = QWidget()
+        row.setLayout(buttons)
+        page.add(row)
+
+        def refresh() -> None:
+            if self.association is None:
+                reason = ("Nur aus der gebauten Notex.exe möglich, nicht im Dev-Modus." if current_exe() is None
+                          else "Nur unter Windows verfügbar.")
+                status_label.setText(f"Nicht verfügbar: {reason}")
+                for button in (register, update, remove):
+                    button.setEnabled(False)
+                    button.setToolTip(reason)
+                return
+            status = self.association.status()
+            if status.registered:
+                same = status.matches(self.association.exe_path)
+                status_label.setText(f"Registriert: ja · Endungen: {', '.join(status.extensions) or '–'}\n"
+                                     f"Pfad: {status.exe_path}" + ("" if same else "\nAchtung: zeigt auf eine andere Notex.exe (Ordner verschoben?)"))
+            else:
+                status_label.setText("Registriert: nein. Die Registrierung schreibt nur in HKCU (kein Admin) und "
+                                     "überschreibt keine bestehende Zuordnung – Notex erscheint unter „Öffnen mit“ "
+                                     "und in den Standard-Apps.")
+            update.setEnabled(status.registered and not status.matches(self.association.exe_path))
+            remove.setEnabled(status.registered)
+
+        def do_register() -> None:
+            try:
+                self.association.register(self.config.get("association_extensions", [".txt"]))
+            except OSError as error:
+                dialogs.warn(self, "Registrierung", str(error))
+                return
+            refresh()
+            if dialogs.confirm(self, "Registriert",
+                               "Notex ist jetzt bei Windows bekannt und erscheint unter „Öffnen mit“ sowie im "
+                               "Kontextmenü („Mit Notex öffnen“).",
+                               yes="Standard-Apps öffnen", no="Später",
+                               informative="Damit ein Doppelklick Notex startet, wähle es in den Windows-Einstellungen "
+                                           "unter Standard-Apps für .txt (und die anderen Endungen) aus. Windows lässt "
+                                           "das nur dich selbst festlegen."):
+                QDesktopServices.openUrl(QUrl("ms-settings:defaultapps"))
+
+        def do_remove() -> None:
+            if dialogs.confirm(self, "Registrierung entfernen", "Alle Notex-Einträge aus der Registry entfernen?",
+                               yes="Entfernen", danger=True):
+                self.association.unregister()
+                refresh()
+                self.toast.show_message("Registrierung entfernt", "check")
+
+        def do_update() -> None:
+            self.association.update_path()
+            refresh()
+            self.toast.show_message("Pfad aktualisiert", "check")
+
+        register.clicked.connect(do_register)
+        remove.clicked.connect(do_remove)
+        update.clicked.connect(do_update)
+        refresh()
+        page.note("Der Kontextmenü-Eintrag „Mit Notex öffnen“ erscheint unter Windows 11 im klassischen Menü "
+                  "(„Weitere Optionen anzeigen“). Notex bleibt portabel: Wird der Ordner verschoben, meldet sich "
+                  "beim Start ein Hinweis, und „Pfad aktualisieren“ schreibt den neuen Pfad.")
 
     def open_settings(self, category: str | None = None) -> None:
         dialog = SettingsDialog(self, self.theme_store)

@@ -33,6 +33,7 @@ DEFAULTS: dict[str, Any] = {
     "expanded_folders": [],   # relative Pfade unter data/, z. B. "Projekte/2026"
     "open_tabs": [],          # Pfade der offenen Dateien: relativ zu data/ oder absolut (externe)
     "recent_files": [],       # zuletzt geöffnet, absolute Pfade, neueste zuerst (max. 15)
+    "association_extensions": [".txt"],   # Auswahl auf der Einstellungsseite „System“
     "active_tab": 0,
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)

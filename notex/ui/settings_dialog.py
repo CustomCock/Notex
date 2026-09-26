@@ -79,8 +79,8 @@ class SettingsPage(QWidget):
 
 
 class SettingsDialog(QDialog):
-    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Tastenkürzel"]
-    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "keyboard"]
+    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "System", "Tastenkürzel"]
+    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "sliders-horizontal", "keyboard"]
 
     def __init__(self, window, store: ThemeStore) -> None:
         super().__init__(window)
@@ -110,7 +110,7 @@ class SettingsDialog(QDialog):
             self.categories.addItem(QListWidgetItem(icon(icon_name), name))
         self.pages = QStackedWidget()
         for builder in (self._build_appearance, self._build_paper, self._build_font, self._build_editor,
-                        self._build_spelling, self._build_shortcuts):
+                        self._build_spelling, self._build_system, self._build_shortcuts):
             page = builder()
             page.finish()
             scroll = QScrollArea()
@@ -343,6 +343,12 @@ class SettingsDialog(QDialog):
         else:
             page.section("Rechtschreibung")
             page.note("Noch nicht verfügbar.")
+        return page
+
+    def _build_system(self) -> SettingsPage:
+        page = SettingsPage()
+        if hasattr(self.window_, "build_system_settings"):
+            self.window_.build_system_settings(page)
         return page
 
     def _build_shortcuts(self) -> SettingsPage:

@@ -22,6 +22,8 @@ def test_register_creates_progid_openwith_and_capabilities() -> None:
     assert reg.get_value(r"Software\Notex\Capabilities\FileAssociations", ".txt") == PROG_ID
     assert reg.get_value(r"Software\RegisteredApplications", "Notex") == r"Notex\Capabilities"
     assert reg.get_value(r"Software\Classes\.txt", None) == "txtfile"   # unangetastet
+    assert reg.get_value(r"Software\Classes\SystemFileAssociations\.txt\shell\Notex", None) == "Mit Notex öffnen"
+    assert reg.get_value(r"Software\Classes\SystemFileAssociations\.md\shell\Notex\command", None) == f'"{EXE}" "%1"'
 
 
 def test_status_and_reregister_changes_extensions() -> None:
@@ -35,6 +37,7 @@ def test_status_and_reregister_changes_extensions() -> None:
     assoc.register([".md"])
     assert assoc.status().extensions == [".md"]
     assert reg.get_value(r"Software\Classes\.txt\OpenWithProgids", PROG_ID) is None
+    assert not reg.exists(r"Software\Classes\SystemFileAssociations\.txt\shell\Notex")
 
 
 def test_unregister_removes_everything_but_foreign_keys() -> None:

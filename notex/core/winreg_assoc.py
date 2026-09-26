@@ -8,6 +8,8 @@ frei wählbaren Präfix (Standard: HKCU\\Software):
   Classes\\Applications\\Notex.exe             FriendlyAppName, SupportedTypes, shell\\open\\command
   Notex\\Capabilities (+ FileAssociations)     für die Windows-Standard-Apps
   RegisteredApplications\\Notex                zeigt auf Capabilities
+  Classes\\SystemFileAssociations\\.txt\\shell\\Notex  Kontextmenü „Mit Notex öffnen“ (Windows 11:
+                                               im klassischen Menü unter „Weitere Optionen“)
 Nichts davon berührt UserChoice; den Standard wählt der Nutzer selbst in den Windows-Einstellungen.
 
 Die Registry steckt hinter einem kleinen Backend-Protokoll, damit die Logik ohne Windows
@@ -196,9 +198,17 @@ class FileAssociation:
             reg.set_value(f"{self.classes}\\{ext}\\OpenWithProgids", PROG_ID, "")
             reg.set_value(f"{self.app_key}\\SupportedTypes", ext, "")
             reg.set_value(f"{self.capabilities_key}\\FileAssociations", ext, PROG_ID)
+            # Kontextmenü-Verb für die Endung, unabhängig vom Standardprogramm
+            reg.set_value(self._verb_key(ext), None, f"Mit {APP_NAME} öffnen")
+            reg.set_value(self._verb_key(ext), "Icon", f"{self.exe_path},0")
+            reg.set_value(f"{self._verb_key(ext)}\\command", None, self._command())
         self._notify()
 
+    def _verb_key(self, ext: str) -> str:
+        return f"{self.classes}\\SystemFileAssociations\\{ext}\\shell\\{APP_NAME}"
+
     def _unlink_extension(self, ext: str) -> None:
+        self.reg.delete_tree(self._verb_key(ext))
         self.reg.delete_value(f"{self.classes}\\{ext}\\OpenWithProgids", PROG_ID)
         self.reg.delete_value(f"{self.app_key}\\SupportedTypes", ext)
         self.reg.delete_value(f"{self.capabilities_key}\\FileAssociations", ext)
@@ -206,7 +216,7 @@ class FileAssociation:
     def unregister(self) -> None:
         """Räumt restlos auf, was register() angelegt hat – fremde Zuordnungen bleiben."""
         for ext in SUPPORTED_EXTENSIONS:
-            self.reg.delete_value(f"{self.classes}\\{ext}\\OpenWithProgids", PROG_ID)
+            self._unlink_extension(ext)
         self.reg.delete_tree(self.progid_key)
         self.reg.delete_tree(self.app_key)
         self.reg.delete_tree(f"{self.prefix}\\{APP_NAME}")
@@ -246,3 +256,19 @@ def real_registry() -> Registry | None:
     if sys.platform != "win32":
         return None
     return WinRegistry()
+
+
+def current_exe() -> str | None:
+    """Pfad der gebauten Notex.exe – None im Dev-Modus (dort wird nicht registriert)."""
+    if getattr(sys, "frozen", False):
+        return sys.executable
+    return None
+
+
+def build_association() -> FileAssociation | None:
+    """FileAssociation für die laufende Notex.exe, oder None (Dev-Modus / kein Windows)."""
+    exe = current_exe()
+    registry = real_registry()
+    if exe is None or registry is None:
+        return None
+    return FileAssociation(registry, exe)
