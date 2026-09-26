@@ -119,6 +119,15 @@ class MainWindow(QMainWindow):
         self.history = History(history_folder(app_root()), max_bytes=int(hist_cfg.get("max_mb", 200)) * 1024 * 1024)
         self._snapshots_since_limit = 0
         QTimer.singleShot(5000, self._enforce_history_limit)
+        # Verschlüsselte Notizen nach Inaktivität sperren
+        import time as _time
+        self._last_activity = _time.monotonic()
+        self._lock_timer = QTimer(self)
+        self._lock_timer.setInterval(15_000)
+        self._lock_timer.timeout.connect(self._check_auto_lock)
+        self._lock_timer.start()
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().installEventFilter(self)
         self.registry = ActionRegistry()
         self.registry.recent = list(config.get("recent_commands", []))
         self.file_index = FileIndexService(root, config)
@@ -203,6 +212,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Datei öffnen …", "Ctrl+O", self.open_file_dialog))
         file_menu.addAction(self._action("Zuletzt geöffnet …", "Ctrl+R", self.show_recent))
         file_menu.addAction(self._action("Versionsverlauf …", "Ctrl+Shift+Y", self.show_history))
+        file_menu.addSeparator()
+        file_menu.addAction(self._action("Neue verschlüsselte Notiz …", "Ctrl+Shift+Alt+N", self.new_encrypted_note))
+        file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
+        file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
+        file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
@@ -686,6 +700,9 @@ class MainWindow(QMainWindow):
         editor = self.tabs.editor_for(path)
         if editor is None:
             return
+        if editor.encrypted:
+            self._on_external_change_encrypted(editor)
+            return
         hint = "Achtung: Deine ungespeicherten Änderungen gehen dabei verloren." if editor.is_dirty else ""
         reload = dialogs.confirm(
             self, "Datei extern geändert",
@@ -700,6 +717,32 @@ class MainWindow(QMainWindow):
                 dialogs.warn(self, "Neu laden fehlgeschlagen", str(error))
         else:
             editor.document().setModified(True)  # Inhalt weicht jetzt von der Platte ab
+        self._update_status()
+
+    def _on_external_change_encrypted(self, editor) -> None:
+        """Verschlüsselte Datei wurde von außen geändert: gesperrt → nichts zu tun; entsperrt → mit Schlüssel neu laden."""
+        from notex.core import crypto_notes
+        group = self.tabs.group_of(editor)
+        if editor.locked or group is None:
+            if group is not None:
+                page = group.page_for(editor)
+                if page is not None:
+                    group._show_locked(page)
+            return
+        if not dialogs.confirm(self, "Datei extern geändert",
+                               f"„{editor.path.name}“ wurde außerhalb von {APP_NAME} geändert. Neu laden?",
+                               yes="Neu laden", no="Behalten", danger=editor.is_dirty,
+                               informative="Achtung: Deine ungespeicherten Änderungen gehen dabei verloren." if editor.is_dirty else ""):
+            editor.document().setModified(True)
+            return
+        try:
+            text = crypto_notes.open_with_key(editor.path.read_bytes(), editor.key)
+        except (OSError, crypto_notes.NtxError) as error:
+            editor.document().setModified(False)
+            group.lock(editor, message=f"Neu laden mit dem bisherigen Schlüssel nicht möglich: {error}")
+            return
+        from notex.core.encoding import TextFile
+        editor.replace_content(TextFile(text, "utf-8", "\n"))
         self._update_status()
 
     def _on_external_remove(self, path: Path) -> None:
@@ -776,6 +819,135 @@ class MainWindow(QMainWindow):
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
 
+    # ---- Verschlüsselte Notizen ------------------------------------------------------------
+    def eventFilter(self, watched, event) -> bool:
+        from PySide6.QtCore import QEvent
+        if event.type() in (QEvent.Type.KeyPress, QEvent.Type.MouseButtonPress, QEvent.Type.Wheel):
+            import time as _time
+            self._last_activity = _time.monotonic()
+        return False
+
+    def _check_auto_lock(self) -> None:
+        import time as _time
+        minutes = int(self.config.get("encryption", {}).get("auto_lock_minutes", 5))
+        if minutes > 0 and _time.monotonic() - self._last_activity >= minutes * 60:
+            if self.lock_all():
+                self._last_activity = _time.monotonic()   # fehlgeschlagen: erst nach dem nächsten Intervall erneut (keine Warnflut)
+
+    def lock_all(self, manual: bool = False) -> list[str]:
+        """Alle entsperrten .ntx sperren. Gibt die Namen zurück, die nicht gesperrt werden konnten."""
+        unlocked = [e for e in self.tabs.editors() if e.encrypted and not e.locked]
+        failed = [e.path.name for e in unlocked if not self.tabs.group_of(e).lock(e)]
+        if manual or (unlocked and not failed):
+            if unlocked:
+                self.toast.show_message(f"{len(unlocked) - len(failed)} verschlüsselte Notiz(en) gesperrt", "lock")
+            elif manual:
+                self.toast.show_message("Keine entsperrte verschlüsselte Notiz offen", "lock")
+        if failed:
+            dialogs.warn(self, "Sperren", "Nicht gesperrt, weil das Speichern fehlschlug: " + ", ".join(failed))
+        return failed
+
+    def new_encrypted_note(self) -> None:
+        from notex.core import crypto_notes
+        from notex.ui.lock_overlay import PasswordDialog
+        tree = self.sidebar.tree
+        folder = tree.folder_for(tree.selected_path())
+        name = dialogs.ask_text(self, "Neue verschlüsselte Notiz", "Name:", fileops.unique_path(folder, "Geheim", ".ntx").name)
+        if not name:
+            return
+        if not name.lower().endswith(".ntx"):
+            name += ".ntx"
+        path = folder / name
+        if path.exists():
+            dialogs.warn(self, "Neue verschlüsselte Notiz", f"„{name}“ gibt es schon.")
+            return
+        dialog = PasswordDialog(self, "Passwort festlegen", f"Passwort für „{name}“. Ohne dieses Passwort kommt niemand "
+                                "an den Inhalt – auch Notex nicht. Es gibt keine Wiederherstellung.")
+        if not dialog.exec():
+            return
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            key = crypto_notes.new_key(dialog.password)
+            fileops.atomic_write_bytes(path, crypto_notes.seal("", key))
+        except OSError as error:
+            QApplication.restoreOverrideCursor()
+            dialogs.warn(self, "Neue verschlüsselte Notiz", str(error))
+            return
+        QApplication.restoreOverrideCursor()
+        editor = self.tabs.open_file(path)
+        if editor is not None:
+            self.tabs.group_of(editor).unlock_with_key(editor, "", key)
+        self.file_index.request_rescan()
+        tree.select_path(path)
+
+    def encrypt_current_file(self) -> None:
+        """Aktuelle Klartext-Datei als .ntx verschlüsseln; Verlauf des Originals löschen, Original auf Wunsch in den Papierkorb."""
+        from notex.core import crypto_notes
+        from notex.ui.lock_overlay import PasswordDialog
+        editor = self.tabs.current_editor()
+        if editor is None or editor.encrypted:
+            self.toast.show_message("Erst eine unverschlüsselte Datei öffnen", "lock")
+            return
+        source = editor.path
+        target = fileops.unique_path(source.parent, source.stem, ".ntx")
+        dialog = PasswordDialog(self, "Datei verschlüsseln", f"„{source.name}“ wird als „{target.name}“ verschlüsselt "
+                                "gespeichert. Ohne das Passwort gibt es keinen Weg zurück.")
+        if not dialog.exec():
+            return
+        text = editor.toPlainText()
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            key = crypto_notes.new_key(dialog.password)
+            fileops.atomic_write_bytes(target, crypto_notes.seal(text, key))
+        except OSError as error:
+            QApplication.restoreOverrideCursor()
+            dialogs.warn(self, "Datei verschlüsseln", str(error))
+            return
+        QApplication.restoreOverrideCursor()
+        if not self.tabs.is_external(source):
+            self.history.forget(self.tabs.relative(source))   # Klartext-Versionen des Originals entfernen
+        for view in self.tabs.views_of(source):
+            view.document().setModified(False)
+            self.tabs.group_of(view).remove_page(self.tabs.group_of(view).page_for(view), ask=False)
+        new_editor = self.tabs.open_file(target)
+        if new_editor is not None:
+            self.tabs.group_of(new_editor).unlock_with_key(new_editor, text, key)
+        if dialogs.confirm(self, "Original entfernen?", f"„{source.name}“ liegt noch unverschlüsselt auf der Platte.",
+                           yes="In den Papierkorb", no="Behalten",
+                           informative="Danach den Papierkorb leeren. Auf SSDs und in Backups können Reste "
+                                       "des Klartexts trotzdem noch eine Weile existieren."):
+            try:
+                fileops.move_to_trash(source)
+                self.tabs.close_paths_under(source)
+                self.links.remove(self.tabs.relative(source))
+            except Exception as error:  # noqa: BLE001 – send2trash hat eigene Fehlertypen
+                dialogs.warn(self, "Original entfernen", str(error))
+        self.file_index.request_rescan()
+        self.sidebar.tree.select_path(target)
+
+    def change_note_password(self) -> None:
+        from notex.ui.lock_overlay import PasswordDialog
+        editor = self.tabs.current_editor()
+        if editor is None or not editor.encrypted:
+            self.toast.show_message("Erst eine verschlüsselte Notiz öffnen", "lock")
+            return
+        if editor.locked:
+            self.toast.show_message("Erst entsperren", "lock")
+            return
+        dialog = PasswordDialog(self, "Passwort ändern", f"Neues Passwort für „{editor.path.name}“.", ask_current=True)
+        if not dialog.exec():
+            return
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        error = self.tabs.group_of(editor).change_password(editor, dialog.current_password, dialog.password)
+        QApplication.restoreOverrideCursor()
+        if error:
+            dialogs.warn(self, "Passwort ändern", error)
+        else:
+            self.toast.show_message("Passwort geändert", "key-round")
+
     # ---- Versionshistorie ----------------------------------------------------------------
     def _history_enabled(self) -> bool:
         return bool(self.config.get("history", {}).get("enabled", True))
@@ -842,7 +1014,7 @@ class MainWindow(QMainWindow):
             self._replace_dialog = dialog
         # offene, ungespeicherte Dateien: den Editor-Text nehmen, nicht die Platte
         dialog.overrides = {e.path: e.toPlainText() for e in self.tabs.editors()
-                            if e.is_dirty and not self.tabs.is_external(e.path)}
+                            if e.is_dirty and not e.encrypted and not self.tabs.is_external(e.path)}
         query = self.sidebar.search_field.text() if self.sidebar.search_field.text().strip() else dialog.find_field.text()
         dialog.prefill(query, self.sidebar.regex.isChecked(), self.sidebar.whole_word.isChecked())
         dialog.show()
@@ -979,7 +1151,7 @@ class MainWindow(QMainWindow):
         name = link_name(rel)
         result = []
         for other in self.file_index.index.files[:limit_files]:
-            if other == rel:
+            if other == rel or fileops.is_encrypted_path(other):
                 continue
             editor = self.tabs.editor_for(self.root / other)
             try:

@@ -43,6 +43,8 @@ class TreeDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
         if self.view.model_.isDir(index):
             option.icon = icon("folder-open" if self.view.isExpanded(index) else "folder")
+        elif fileops.is_encrypted_path(self.view.model_.fileName(index)):
+            option.icon = icon("lock")
 
 
 class FileTree(QTreeView):
@@ -372,7 +374,19 @@ class FileTree(QTreeView):
             self.edit(index)  # Inline-Editor; das Modell benennt um und feuert fileRenamed
 
     def _on_model_renamed(self, folder: str, old_name: str, new_name: str) -> None:
-        self.path_renamed.emit(Path(folder) / old_name, Path(folder) / new_name)
+        old, new = Path(folder) / old_name, Path(folder) / new_name
+        if new.is_file() and fileops.is_encrypted_path(old) != fileops.is_encrypted_path(new):
+            # Umbenennen ändert den Inhalt nicht: aus Klartext würde eine kaputte .ntx, aus einer .ntx Datenmüll
+            try:
+                import os
+                os.replace(new, old)
+            except OSError:
+                pass
+            dialogs.warn(self, "Umbenennen", "Die Endung .ntx lässt sich nicht per Umbenennen setzen oder entfernen.",
+                         informative="Zum Verschlüsseln „Datei → Datei verschlüsseln …“ benutzen; eine verschlüsselte "
+                                     "Notiz bleibt eine .ntx-Datei.")
+            return
+        self.path_renamed.emit(old, new)
 
     def delete_selected(self) -> None:
         path = self.selected_path()

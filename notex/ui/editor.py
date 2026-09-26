@@ -61,6 +61,9 @@ class Editor(QTextEdit):
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
         self.read_only = False
         self.shared = share_with is not None
+        self.encrypted = str(path).lower().endswith(".ntx")   # verschlüsselte Notiz: Klartext nur im Speicher
+        self.key = None          # KeyState, solange entsperrt
+        self.locked = self.encrypted
         self.highlighter: SpellHighlighter | None = None
         if share_with is not None:
             self.setDocument(share_with.document())
@@ -623,9 +626,10 @@ class Editor(QTextEdit):
                 action = QAction(suggestion, menu)
                 action.triggered.connect(lambda _c=False, s=suggestion: self._replace_issue(cursor, issue, s))
                 menu.insertAction(before, action)
-            add = QAction(icon("plus"), "Zum Wörterbuch hinzufügen", menu)
-            add.triggered.connect(lambda: (checker.add_to_dictionary(issue.word), self.highlighter.reset()))
-            menu.insertAction(before, add)
+            if not self.encrypted:   # user_dictionary.txt ist Klartext auf der Platte – nie aus .ntx-Notizen
+                add = QAction(icon("plus"), "Zum Wörterbuch hinzufügen", menu)
+                add.triggered.connect(lambda: (checker.add_to_dictionary(issue.word), self.highlighter.reset()))
+                menu.insertAction(before, add)
             ignore = QAction("In dieser Sitzung ignorieren", menu)
             ignore.triggered.connect(lambda: (checker.ignore_for_session(issue.word), self.highlighter.reset()))
             menu.insertAction(before, ignore)

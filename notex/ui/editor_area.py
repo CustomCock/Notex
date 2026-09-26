@@ -156,7 +156,7 @@ class EditorArea(QWidget):
             self.splitter.setStretchFactor(index, 1)
         QTimer.singleShot(0, self._equalize)
         editor = source.current_editor()
-        if share_current and editor is not None:
+        if share_current and editor is not None and not editor.encrypted:
             group.open_file(editor.path, share_from=editor)
         self.set_active(group)
         self.split_changed.emit(True)
@@ -245,7 +245,7 @@ class EditorArea(QWidget):
     def open_in_other_group(self) -> None:
         """Aktuelle Datei als zweite Ansicht in der anderen Gruppe (gleiches Dokument)."""
         editor = self.active.current_editor()
-        if editor is None:
+        if editor is None or editor.encrypted:   # Sperren müsste sonst zwei Ansichten gleichzeitig räumen
             return
         if not self.is_split:
             self.split(share_current=True)
@@ -408,7 +408,7 @@ class EditorArea(QWidget):
             second = self.split(share_current=False)
             for entry in state.groups[1]:
                 path = second.resolve_saved(entry)
-                if not path.is_file():
+                if not path.is_file() or (path.suffix.lower() == ".ntx" and self.groups[0].editor_for(path)):
                     continue
                 shared = self.groups[0].editor_for(path)
                 second.open_file(path, share_from=shared)

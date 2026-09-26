@@ -157,6 +157,27 @@ Undo-Schritt und speichert nicht.
 
 ![Versionsverlauf](docs/29-history.png)
 
+## Verschlüsselte Notizen
+
+Dateien mit der Endung `.ntx` sind mit einem Passwort verschlüsselt: AES-256-GCM, der Schlüssel entsteht
+per Argon2id aus dem Passwort, alles über die Bibliothek `cryptography`, keine eigene Kryptografie. Beim
+Öffnen zeigt der Tab einen Sperrbildschirm, nach dem Passwort erscheint der Text. Gespeichert wird nur
+Chiffretext, jedes Mal mit neuer Nonce.
+
+- **Neue verschlüsselte Notiz** (Ctrl+Shift+Alt+N) oder im Baum eine Datei `name.ntx` anlegen
+- **Datei verschlüsseln …** macht aus einer offenen Datei eine `.ntx`, löscht ihren Verlauf und bietet
+  an, das Original in den Papierkorb zu legen
+- **Ctrl+Shift+L** sperrt alle offenen `.ntx` sofort, automatisch nach 5 Minuten ohne Eingabe
+  (einstellbar); ungespeicherte Änderungen werden vorher verschlüsselt gesichert
+- **Passwort ändern …** im Menü Datei
+- Klartext kommt nie auf die Platte: kein Verlauf, keine Volltextsuche, kein Link-Index, keine
+  Grammatikprüfung, kein Wörterbuch-Eintrag. Dateinamen sind **nicht** verschlüsselt.
+
+Ohne Passwort gibt es keinen Weg zurück. Format, Parameter und Grenzen stehen in
+[docs/ENCRYPTION.md](docs/ENCRYPTION.md).
+
+![Verschlüsselte Notiz, gesperrt](docs/30-encrypted-locked.png)
+
 ## Markdown-Vorschau
 
 `Ctrl+Shift+V` wechselt bei `.md`-Dateien zwischen Bearbeiten, Vorschau und geteilter Ansicht (Blatt links,
@@ -339,6 +360,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
+| Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
+| Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |

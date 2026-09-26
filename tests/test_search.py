@@ -166,3 +166,12 @@ def test_replace_preview_and_apply() -> None:
     assert apply_replace("a1 a2", parse_query(r"a(\d)", regex=True), r"b\1")[0] == "b1 b2"
     q_word = parse_query("apfel", whole_word=True)
     assert apply_replace("apfelkuchen apfel", q_word, "birne")[0] == "apfelkuchen birne"
+
+
+def test_encrypted_notes_never_searched_in_full_text(tmp_path: Path) -> None:
+    (tmp_path / "geheim.ntx").write_bytes(b"NOTEXENC apfel im Chiffretext")
+    (tmp_path / "offen.txt").write_text("apfel\n", encoding="utf-8")
+    result = search(tmp_path, "apfel ext:ntx,txt", SearchOptions(by_name=False, full_text=True, extensions=(".txt", ".ntx")))
+    assert [m.relative for m in result.files] == ["offen.txt"]
+    result = search(tmp_path, "geheim", SearchOptions(by_name=True, full_text=False, extensions=(".ntx",)))
+    assert [m.relative for m in result.names] == ["geheim.ntx"]      # Dateiname bleibt auffindbar

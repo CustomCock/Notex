@@ -418,6 +418,18 @@ class SettingsDialog(QDialog):
                   "ausgedünnt (24 h alles, dann stündlich, täglich, wöchentlich). Verschlüsselte Notizen (.ntx) "
                   "bekommen nie einen Verlauf.")
 
+        page.section("Verschlüsselte Notizen")
+        self.autolock_spin = QSpinBox()
+        self.autolock_spin.setRange(0, 240)
+        self.autolock_spin.setSuffix(" min")
+        self.autolock_spin.setSpecialValueText("nie")
+        self.autolock_spin.valueChanged.connect(
+            lambda v: self.config.setdefault("encryption", {}).__setitem__("auto_lock_minutes", v) if not self._loading else None)
+        page.row("Automatisch sperren nach", self.autolock_spin)
+        page.note(".ntx-Dateien sind mit AES-256-GCM verschlüsselt, der Schlüssel entsteht per Argon2id aus dem "
+                  "Passwort. Klartext liegt nie auf der Platte: kein Verlauf, keine Suche, keine Grammatikprüfung, "
+                  "kein Wörterbuch-Eintrag. Ctrl+Shift+L sperrt sofort. Details: docs/ENCRYPTION.md")
+
         page.section("Geteilter Editor")
         self.split_box = QComboBox()
         self.split_box.addItem("Nebeneinander", "horizontal")
@@ -505,6 +517,7 @@ class SettingsDialog(QDialog):
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
         self.markdown_view_box.setCurrentIndex(max(0, self.markdown_view_box.findData(cfg.get("markdown_view", "edit"))))
+        self.autolock_spin.setValue(int(cfg.get("encryption", {}).get("auto_lock_minutes", 5)))
         hist = cfg.get("history", {})
         self.history_box.setChecked(bool(hist.get("enabled", True)))
         self.history_spin.setValue(int(hist.get("max_mb", 200)))

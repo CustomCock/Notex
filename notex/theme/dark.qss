@@ -797,3 +797,45 @@ QListWidget#CompletionPopup::item {
 QListWidget#CompletionPopup::item:selected {
     background: @selection;
 }
+
+/* ---------- Verschlüsselte Notizen: Sperrbildschirm ---------- */
+QFrame#LockOverlay {
+    background: @bg;
+}
+QFrame#LockCard {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_panelpx;
+}
+QFrame#LockCard QWidget {
+    background: transparent;
+}
+QFrame#LockCard QLineEdit {
+    background: @bg;
+    border: 1px solid @border;
+    border-radius: @r_controlpx;
+    padding: @sp_smpx @sp_mdpx;
+    color: @text;
+}
+QFrame#LockCard QLineEdit:focus {
+    border: 1px solid @accent;
+}
+QFrame#LockCard QPushButton#Primary {
+    background: @accent;
+    color: @bg;
+    border: none;
+    border-radius: @r_controlpx;
+    padding: @sp_smpx @sp_lgpx;
+    font-weight: 600;
+}
+QFrame#LockCard QPushButton#Primary:hover {
+    background: @text;
+}
+QLabel#LockTitle {
+    color: @text;
+    font-size: @fs_editorpx;
+    font-weight: 600;
+}
+QLabel#LockError {
+    color: @danger;
+}

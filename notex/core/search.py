@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 from notex.core.encoding import decode_bytes
+from notex.core.fileops import is_encrypted_path
 
 try:   # `regex` kennt ein Timeout pro Aufruf – das einzige Mittel gegen katastrophales Backtracking
     import regex as _regex
@@ -273,7 +274,7 @@ def search(
                     if on_name:
                         on_name(name_match)
 
-            if options.full_text:
+            if options.full_text and not is_encrypted_path(path):   # .ntx: Chiffretext, nie durchsuchen
                 try:
                     if path.stat().st_size > options.max_bytes:
                         result.skipped_large += 1

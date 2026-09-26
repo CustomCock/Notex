@@ -11,6 +11,13 @@ from pathlib import Path
 from notex.core.encoding import encode_text
 
 
+ENCRYPTED_SUFFIXES = (".ntx",)   # verschlüsselte Notizen: Inhalte nie lesen, indexieren oder sichern
+
+
+def is_encrypted_path(path: Path | str) -> bool:
+    return str(path).lower().endswith(ENCRYPTED_SUFFIXES)
+
+
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     """Schreibt erst eine Temp-Datei im selben Ordner und tauscht sie dann per os.replace ein.
 

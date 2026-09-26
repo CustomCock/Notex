@@ -63,6 +63,9 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "encryption": {           # verschlüsselte Notizen (.ntx)
+        "auto_lock_minutes": 5,   # nach so vielen Minuten ohne Eingabe sperren (0 = nie)
+    },
     "history": {              # lokale Versionshistorie in history/ neben der App
         "enabled": True,
         "max_mb": 200,        # Obergrenze für die komprimierten Schnappschüsse
@@ -74,8 +77,8 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
-                   ".xml", ".html", ".css", ".js", ".sql"],
-    "extensions_version": 2,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
+                   ".xml", ".html", ".css", ".js", ".sql", ".ntx"],
+    "extensions_version": 3,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
     "syntax_highlighting": True,
     "syntax_extensions": [".py", ".json", ".ini", ".log", ".sh", ".ps1", ".bat", ".yaml", ".yml", ".xml",
                           ".html", ".css", ".js", ".sql", ".md"],
@@ -156,6 +159,10 @@ def migrate(config: dict[str, Any], raw: Any) -> dict[str, Any]:
             if ext not in existing:
                 existing.append(ext)
         config["extensions"] = existing
+    elif isinstance(raw, dict) and "extensions" in raw and raw_version < 3:
+        # v1.3: verschlüsselte Notizen im Baum anzeigen
+        if ".ntx" not in config["extensions"]:
+            config["extensions"] = list(config["extensions"]) + [".ntx"]
     config["extensions_version"] = DEFAULTS["extensions_version"]
     return config
 

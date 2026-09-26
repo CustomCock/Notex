@@ -27,10 +27,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from notex.core.fileops import atomic_write_bytes
+from notex.core.fileops import ENCRYPTED_SUFFIXES, atomic_write_bytes
 
 INDEX_VERSION = 1
-EXCLUDED_SUFFIXES = (".ntx",)
+EXCLUDED_SUFFIXES = ENCRYPTED_SUFFIXES
 DEFAULT_MAX_BYTES = 200 * 1024 * 1024     # komprimierte Objekte insgesamt
 DEFAULT_MAX_FILE_BYTES = 5 * 1024 * 1024  # größere Dateien bekommen keine Schnappschüsse
 

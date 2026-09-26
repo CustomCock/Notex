@@ -8,9 +8,19 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Versionsverlauf (Ctrl+Shift+Y): Schnappschüsse in `history/` bei Speichern, Öffnen, Neuladen, Ersetzen in
   Dateien und Link-Anpassung; zlib-komprimiert und dedupliziert, folgt Umbenennungen, Ausdünnung nach Alter,
   Größenlimit (Einstellungen → Editor), Diff zum aktuellen Text, Wiederherstellen als Undo-Schritt
+- Verschlüsselte Notizen (.ntx): AES-256-GCM mit Argon2id-Schlüssel (Fallback scrypt) über `cryptography`,
+  Header als Associated Data, neue Nonce bei jedem Speichern, Sperrbildschirm im Tab, automatisches Sperren
+  nach Inaktivität, Ctrl+Shift+L, Neue verschlüsselte Notiz, Datei verschlüsseln, Passwort ändern, Schloss-Symbole
+  in Baum und Tabs; Klartext nie auf der Platte (kein Verlauf, keine Suche, kein Link-Index, keine Grammatik,
+  kein Wörterbuch-Eintrag). Format und Grenzen: docs/ENCRYPTION.md
+- `.ntx` wird bestehenden Configs einmalig als Baum-Endung hinzugefügt
 
 ### Geändert
 - Ein fehlendes Icon bricht keine Aktion mehr ab (Ersatzsymbol statt Fehler)
+- Umbenennen im Baum kann die Endung .ntx weder setzen noch entfernen
+
+### Abhängigkeiten
+- cryptography (Apache-2.0/BSD, bringt cffi und pycparser mit); Lizenztexte in `licenses/`
 
 ## [1.2.0] – 2026-09-26
 

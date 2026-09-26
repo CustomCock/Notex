@@ -330,8 +330,17 @@ def main() -> int:
             window._shot_history.show()
         later(5100, open_history)
         later(5700, lambda: save(window._shot_history, "29-history"))
-        later(5800, lambda: (window._shot_history.close(), window.tabs.current_editor().document().setModified(False),
-                             window.close(), app.quit()))
+        def open_locked():
+            from notex.core import crypto_notes
+            window._shot_history.close()
+            window.tabs.current_editor().document().setModified(False)
+            target = data / "Security/zugangsdaten.ntx"
+            key = crypto_notes.new_key("screenshot", crypto_notes.KDF_SCRYPT, (10, 8, 1))
+            target.write_bytes(crypto_notes.seal("nur ein Beispiel", key))
+            window.tabs.open_file(target)
+        later(5800, open_locked)
+        later(6400, lambda: save(window, "30-encrypted-locked"))
+        later(6500, lambda: (window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)

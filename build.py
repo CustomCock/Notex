@@ -52,7 +52,7 @@ VSVersionInfo(
 def check_dependencies() -> None:
     """PyInstaller baut auch ohne PySide6 stumm weiter – dann startet die Exe mit „No module named 'PySide6'“."""
     missing = []
-    for module in ("PySide6", "pygments", "enchant", "spylls", "send2trash", "markdown_it", "regex"):
+    for module in ("PySide6", "pygments", "enchant", "spylls", "send2trash", "markdown_it", "regex", "cryptography"):
         try:
             __import__(module)
         except ImportError:
@@ -88,7 +88,7 @@ def main() -> None:
         *[f"--hidden-import=pygments.lexers.{m}" for m in ("python", "data", "configs", "shell", "html", "css",
                                                           "javascript", "sql", "markup", "textfmts", "special")],
         "--hidden-import=pygments.formatters",
-        "--hidden-import=markdown_it", "--hidden-import=mdurl", "--hidden-import=regex",
+        "--hidden-import=markdown_it", "--hidden-import=mdurl", "--hidden-import=regex", "--hidden-import=cryptography.hazmat.primitives.kdf.argon2",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",
@@ -106,6 +106,8 @@ def main() -> None:
     for name in ("LICENSE", "THIRD_PARTY_LICENSES.md", "CHANGELOG.md"):
         shutil.copyfile(ROOT / name, target / name)
     shutil.copytree(ROOT / "licenses", target / "licenses", dirs_exist_ok=True)
+    (target / "docs").mkdir(exist_ok=True)
+    shutil.copyfile(ROOT / "docs" / "ENCRYPTION.md", target / "docs" / "ENCRYPTION.md")
     print(f"\nFertig: {target}")
 
 

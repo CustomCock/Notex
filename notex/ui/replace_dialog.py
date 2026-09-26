@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit, QPushBut
 
 from notex.core import search as core_search
 from notex.core.encoding import decode_bytes
+from notex.core.fileops import is_encrypted_path
 from notex.core.search import Query, RegexTimeout, ReplaceLine, iter_files, parse_query, replace_query_ok
 from notex.theme.tokens import SPACING
 from notex.ui.widgets import Chip
@@ -52,7 +53,7 @@ class _Scanner(QThread):
                 if self.cancel.is_set():
                     return
                 relative = path.relative_to(self.root).as_posix()
-                if not self.query.allows_path(relative):
+                if not self.query.allows_path(relative) or is_encrypted_path(path):
                     continue
                 text = self.overrides.get(path)
                 if text is None:

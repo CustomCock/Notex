@@ -241,6 +241,25 @@ class EditorPage(QWidget):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._fit_padding()
+        if self.lock_overlay is not None:
+            self.lock_overlay.setGeometry(self.rect())
+
+    # ---- Sperrbildschirm (verschlüsselte Notizen) -------------------------------------
+    lock_overlay = None
+
+    def show_lock(self, mode: str = "unlock", message: str = "", info: str = "") -> None:
+        from notex.ui.lock_overlay import LockOverlay
+        if self.lock_overlay is None:
+            self.lock_overlay = LockOverlay(self, self.editor.path.name)
+        self.lock_overlay.set_mode(mode, message, info)
+        self.lock_overlay.setGeometry(self.rect())
+        self.lock_overlay.raise_()
+        self.lock_overlay.show()
+        self.lock_overlay.focus_password()
+
+    def hide_lock(self) -> None:
+        if self.lock_overlay is not None:
+            self.lock_overlay.hide()
 
     def _fit_padding(self) -> None:
         """Bei wenig Platz Innenabstand und Rand herunterskalieren (Minimum 16 px innen, 8 px außen)."""

@@ -5,3 +5,4 @@ send2trash>=1.8
 Pygments>=2.17,<3
 markdown-it-py>=3.0,<5   # Markdown-Vorschau (CommonMark + Tabellen), reines Python, MIT
 regex>=2024.5.15   # Suche: Timeout pro Regex-Match gegen katastrophales Backtracking (Apache-2.0)
+cryptography>=44,<52   # verschlüsselte Notizen: AES-256-GCM + Argon2id (Apache-2.0/BSD)

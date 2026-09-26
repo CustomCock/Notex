@@ -178,6 +178,13 @@ class EditorTabs(QTabWidget):
                 from notex.core.encoding import TextFile
                 text_file = TextFile("", share_from.encoding, share_from.eol)
                 editor = Editor(path, text_file, self.font_size, checker=self.checker, share_with=share_from)
+            elif fileops.is_encrypted_path(path):
+                # verschlüsselt: gesperrt öffnen, Inhalt erst nach Passwort (nie als Text von der Platte lesen)
+                from notex.core.encoding import TextFile
+                if not path.is_file():
+                    QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\nDatei nicht gefunden")
+                    return None
+                editor = Editor(path, TextFile("", "utf-8", "\n"), self.font_size, checker=self.checker)
             else:
                 try:
                     text_file = read_text_file(path)
@@ -211,13 +218,21 @@ class EditorTabs(QTabWidget):
             index = self.addTab(page, path.name)
             if page.supports_preview and self.config.get("markdown_view", "edit") != "edit":
                 page.set_view_mode(self.config.get("markdown_view", "edit"))
+            if editor.encrypted:
+                self._show_locked(page)
             self.setTabToolTip(index, self.relative(path))
-            if self.is_external(path):
+            if editor.encrypted:
+                self.setTabIcon(index, icon("lock"))
+            elif self.is_external(path):
                 self.setTabIcon(index, icon("external-link"))   # dezentes Kennzeichen: außerhalb von data/
             editor.read_only = self.is_read_only(path)
             self.file_opened.emit(path)
         self.setCurrentWidget(self.page_for(editor))
-        if line is not None:
+        if editor.locked:
+            page = self.page_for(editor)
+            if page is not None and page.lock_overlay is not None:
+                page.lock_overlay.focus_password()
+        elif line is not None:
             editor.goto_line(line, column, length)
         else:
             editor.setFocus()
@@ -300,6 +315,8 @@ class EditorTabs(QTabWidget):
 
     # ---- Speichern ---------------------------------------------------------
     def save_editor(self, editor: Editor) -> bool:
+        if editor.encrypted:
+            return self._save_encrypted(editor, editor.path)
         if getattr(editor, "read_only", False) or self.is_read_only(editor.path):
             return self.save_editor_as(editor, reason="Die Datei ist schreibgeschützt.")
         try:
@@ -332,8 +349,19 @@ class EditorTabs(QTabWidget):
         if not target:
             return False
         new_path = Path(target)
+        if editor.encrypted:
+            if not fileops.is_encrypted_path(new_path):
+                new_path = new_path.with_name(new_path.name + ".ntx")   # verschlüsselt bleibt verschlüsselt
+            if not self._save_encrypted(editor, new_path, emit=False):
+                return False
+        elif fileops.is_encrypted_path(new_path):
+            from notex.ui import dialogs
+            dialogs.warn(self, "Speichern unter", "Unter .ntx speichern verschlüsselt nicht.",
+                         informative="Zum Verschlüsseln „Datei → Datei verschlüsseln …“ benutzen.")
+            return False
         try:
-            save_text_file(new_path, editor.toPlainText(), editor.encoding, editor.eol)
+            if not editor.encrypted:
+                save_text_file(new_path, editor.toPlainText(), editor.encoding, editor.eol)
         except OSError as error:
             QMessageBox.critical(self, "Speichern fehlgeschlagen", f"{new_path}\n\n{error}")
             return False
@@ -344,7 +372,7 @@ class EditorTabs(QTabWidget):
         editor.document().setModified(False)
         self._refresh_title(editor)
         index = self.indexOf(self.page_for(editor))
-        self.setTabIcon(index, icon("external-link") if self.is_external(new_path) else QIcon())
+        self.refresh_icon(editor)
         self.file_opened.emit(new_path)
         self.file_saved.emit(new_path)
         self.status_changed.emit()
@@ -405,8 +433,129 @@ class EditorTabs(QTabWidget):
 
     def refresh_icon(self, editor: Editor) -> None:
         page = self.page_for(editor)
-        if page is not None:
+        if page is None:
+            return
+        if editor.encrypted:
+            self.setTabIcon(self.indexOf(page), icon("lock" if editor.locked else "lock-open"))
+        else:
             self.setTabIcon(self.indexOf(page), icon("external-link") if self.is_external(editor.path) else QIcon())
+
+    # ---- Verschlüsselte Notizen (.ntx) --------------------------------------------------------
+    def _save_encrypted(self, editor: Editor, path: Path, emit: bool = True) -> bool:
+        """Text mit dem Sitzungsschlüssel verschlüsseln und atomar schreiben – neue Nonce bei jedem Speichern."""
+        from notex.core import crypto_notes
+        if editor.locked or editor.key is None:
+            QMessageBox.warning(self, "Speichern", f"„{editor.path.name}“ ist gesperrt – erst entsperren.")
+            return False
+        try:
+            fileops.atomic_write_bytes(path, crypto_notes.seal(editor.toPlainText(), editor.key))
+        except OSError as error:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
+            return False
+        if emit:
+            editor.document().setModified(False)
+            self.file_saved.emit(path)
+            self.status_changed.emit()
+        return True
+
+    def _show_locked(self, page: EditorPage, message: str = "") -> None:
+        from notex.core import crypto_notes
+        editor = page.editor
+        info = ""
+        try:
+            data = editor.path.read_bytes()
+        except OSError as error:
+            data, message = b"", message or str(error)
+        mode = "set" if not data else "unlock"
+        if data:
+            try:
+                info = crypto_notes.describe(crypto_notes.parse_header(data))
+            except crypto_notes.NtxError as error:
+                message = message or str(error)
+        page.show_lock(mode, message, info)
+        overlay = page.lock_overlay
+        if overlay is not None and not getattr(overlay, "_wired", False):
+            # Die Seite kann beim Verschieben in die andere Gruppe den Besitzer wechseln – immer die aktuelle Gruppe fragen
+            overlay.submitted.connect(lambda password, pg=page: self._unlock_via_owner(pg, password))
+            overlay._wired = True
+
+    def _unlock_via_owner(self, page: EditorPage, password: str) -> None:
+        owner = self.area.group_of(page.editor) if self.area is not None else self
+        (owner or self).unlock(page, password)
+
+    def unlock(self, page: EditorPage, password: str) -> bool:
+        """Passwort prüfen, entschlüsseln, Text in den Editor. Bei leerer Datei: Passwort festlegen."""
+        from PySide6.QtWidgets import QApplication
+        from notex.core import crypto_notes
+        from notex.core.encoding import TextFile
+        editor = page.editor
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)   # Argon2id braucht einen Moment
+        try:
+            data = editor.path.read_bytes()
+            if not data:
+                key, text = crypto_notes.new_key(password), ""
+                fileops.atomic_write_bytes(editor.path, crypto_notes.seal(text, key))
+            else:
+                text, key = crypto_notes.open_note(data, password)
+        except crypto_notes.NtxError as error:
+            QApplication.restoreOverrideCursor()
+            page.lock_overlay.show_error(str(error))
+            return False
+        except (OSError, ValueError) as error:
+            QApplication.restoreOverrideCursor()
+            page.lock_overlay.show_error(str(error))
+            return False
+        finally:
+            password = ""   # noqa: F841 – Referenz so früh wie möglich loslassen
+        QApplication.restoreOverrideCursor()
+        self.unlock_with_key(editor, text, key)
+        return True
+
+    def unlock_with_key(self, editor: Editor, text: str, key) -> None:
+        from notex.core.encoding import TextFile
+        page = self.page_for(editor)
+        editor.key = key
+        editor.locked = False
+        editor.load(TextFile(text, "utf-8", "\n"))
+        editor.setReadOnly(False)
+        if page is not None:
+            page.hide_lock()
+        self.refresh_icon(editor)
+        editor.setFocus()
+        self.status_changed.emit()
+
+    def lock(self, editor: Editor, message: str = "") -> bool:
+        """Sperren: ungespeicherte Änderungen verschlüsselt sichern, dann Klartext und Schlüssel verwerfen."""
+        from notex.core.encoding import TextFile
+        if not editor.encrypted or editor.locked:
+            return True
+        if editor.is_dirty and not self._save_encrypted(editor, editor.path):
+            return False
+        editor.key = None
+        editor.locked = True
+        editor.set_search_highlight("", False)
+        editor.load(TextFile("", "utf-8", "\n"))   # leert Text und Undo-Stack
+        editor.setReadOnly(True)
+        page = self.page_for(editor)
+        if page is not None:
+            self._show_locked(page, message)
+        self.refresh_icon(editor)
+        self.status_changed.emit()
+        return True
+
+    def change_password(self, editor: Editor, current: str, new: str) -> str | None:
+        """Passwort wechseln: aktuelles prüfen, neues Salt, neu verschlüsseln. Gibt Fehlertext oder None zurück."""
+        from notex.core import crypto_notes
+        if editor.locked or editor.key is None:
+            return "Die Notiz ist gesperrt."
+        try:
+            check = crypto_notes.derive_key(current, editor.key.kdf, editor.key.params, editor.key.salt)
+        except (crypto_notes.NtxError, ValueError) as error:
+            return str(error)
+        if check.key != editor.key.key:
+            return "Das aktuelle Passwort stimmt nicht."
+        editor.key = crypto_notes.new_key(new)
+        return None if self._save_encrypted(editor, editor.path) else "Speichern fehlgeschlagen."
 
     # ---- Tabs per Drag zwischen Gruppen -------------------------------------------------------
     def dragEnterEvent(self, event) -> None:
@@ -477,6 +626,8 @@ class EditorTabs(QTabWidget):
         return bool(cfg.get("enabled", True)) and path.suffix.lower() in cfg.get("extensions", [])
 
     def grammar_enabled_for(self, path: Path) -> bool:
+        if fileops.is_encrypted_path(path):
+            return False   # LanguageTool bekäme den Klartext übers Netz
         cfg = self.config.get("grammar", {})
         return bool(cfg.get("enabled", False)) and path.suffix.lower() in self.config.get("spellcheck", {}).get("extensions", [])
 
