@@ -12,6 +12,12 @@ der Repo-Besitzer pushen.
 Release. Versionen werden weiter hochgezählt, CHANGELOG gepflegt und lokal getaggt; nach jedem Block
 wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, wenn der Besitzer es sagt.
 
+**Planwechsel (26.09.2026, Besitzer):** Der bisherige Plan „Blöcke F–I“ (Dateitypen, Werkzeuge, Lernen,
+Sicherung) ist **verworfen** und durch den Plan „Blöcke F–K“ ersetzt (F Modul-System + Variablen, G Forensik-Basis,
+H Forensik & CTF, I Netzwerk-Infos, J Netzwerk-Scanner, K Log-Auswertung + PCAP). Vom alten Plan war Block F zum
+Zeitpunkt des Wechsels bereits vollständig umgesetzt (Commits `8c4a3db`–`7882924`, lokal getaggt `v1.6.0`) – nichts
+davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe „Nächster Schritt“).
+
 ## Stand
 
 | Version | Inhalt | Status |
@@ -23,7 +29,9 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
-| 1.6.0 | Block F: Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün (Tests + Builds Win/Linux), lokal getaggt, kein Release (Besitzer) |
+| 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün, lokal getaggt, bleibt (Besitzer) |
+| 1.7.0 | Neuer Block F: Modul-System, Variablen | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
+| 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -164,6 +172,60 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   Resolver zu einem Durchlauf zusammen, hängende Einrückung nur bei geänderter Schriftmetrik). 100k Zeilen:
   Öffnen ~2 s + ~1 s Einfärben (vorher ~12 s), Tabelle 0,5 s, Sortieren 0,2 s, Filtern 0,05 s.
 
+### 1.7.0 – neuer Block F
+- F1 Module: `core/modules.py` – MODULES (15 Einträge mit Name, Beschreibung, Abhängigkeit, Standard, Block),
+  ModuleRegistry mit Aktivator-Muster: `contribute(key, activate)`; activate hängt ein und gibt einen Rückbau zurück;
+  läuft nur, wenn das Modul an ist; set_enabled baut ohne Neustart auf/ab; has_contributions → „folgt in Block …“.
+  Config `modules` (Standard an: variables, hex, ports, ioc). Hex & Dateianalyse ist das erste Modul:
+  Viewer-Registrierung, Menü-/Palette-Einträge, Kürzel und Baum-Kontextmenü (`FileTree.menu_providers`) hängen am
+  Aktivator; beim Abschalten werden offene Hex-Tabs geschlossen. Einstellungen → Module; Abbrechen dreht Module über
+  die Registry zurück. Nebenbei: Latin-1 als letzte Encoding-Stufe (cp1252 kennt 5 Bytes nicht).
+- F2 Variablen: `core/variables.py` (find_tokens: ganzer \w-Lauf muss definiert sein → längster Name gewinnt,
+  „§23a“ bleibt Text; Escape `\§name` nur für definierte Namen; resolve/resolve_with_line_map, escape/unescape,
+  replace_all, escape_all, completions, typed_name_before, JSON laden/atomar speichern), `ui/variables_service.py`,
+  `ui/variable_render.py`, `ui/variables_dialog.py`, Highlighter-Ebene, Editor-Hooks, Vorschau, Suche (Chip „§“).
+  **Entscheidung Anzeige:** Wert statt Token im Lesefluss. Umsetzung ohne Eingriff in den Dokumenttext: der
+  Highlighter macht die Token-Zeichen unsichtbar und gibt ihnen per absolutem Zeichenabstand genau die Breite des
+  Werts (+ Rand), der Editor zeichnet den Wert in die Lücke (paintEvent). Vorher gemessen: Breite stimmt auf < 0,5 px,
+  Zwischenpositionen im Token sind unsortiert – deshalb rastet der Cursor an den Token-Rändern ein
+  (cursorPositionChanged, Richtung bei ←/→), Entf/Rücktaste löschen das ganze Token, Auswahlen wachsen nach außen.
+  Vorteil gegenüber Objekt-Ersetzungszeichen (U+FFFC): Undo, Suche, Speichern, Verlauf, Wiki-Links sehen weiter das
+  Token, die Datei bleibt byte-identisch. Grenzen: Token in anderer Schriftgröße (z. B. Überschrift mit eigener
+  Schrift) → Breite leicht ungenau; Werte über 80 Zeichen werden in der Anzeige gekürzt (Hover zeigt alles),
+  mehrzeilige Werte einzeilig mit „⏎“. Kopieren: eigenes QMimeData, weil QTextEditMimeData setText ignoriert.
+- Nebenbei behoben: Split View – beim Verschieben zwischen Gruppen blieben Signale/Leiste an der alten Gruppe
+  (nach Aufheben der Teilung gelöscht). Jetzt `EditorTabs.wire_page/unwire_page`, aufgerufen in `_move_page` und
+  beim Verschieben von Viewern.
+- Build-Größe: keine neuen Abhängigkeiten, build.py unverändert → Build-Check lief nicht; Stand wie nach 1.6.0
+  (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
+- Screenshots 46–49 (Module, Variablen im Editor, Vorschläge, Einstellungen → Variablen).
+
+### 1.8.0 – Block G
+- G1 (Lücken, Rest stammt aus 1.6.0/F4): hexdata.to_base64/to_c_array/interpret/selection_value, Signaturen TAR
+  (ustar @257), PCAP (4 Magics), PCAPNG, EVTX; Hex-Kontextmenü mit Kopierformaten, Werte-Zeile „HexInspector“,
+  Auswahlwert in der Statusleiste; HexPage.select_range + MainWindow.show_in_hex/_analysis_target für G2–G4.
+- G2 Strings: `core/strings.py` (_scan über Blöcke mit Übertrag: Treffer am Blockende bzw. halbes UTF-16-Paar werden
+  mitgenommen, sonst die letzten 2·min+2 Bytes – aber nie Bytes eines ausgegebenen Treffers → keine Duplikate;
+  Grenze 200 000 Treffer; classify mit ipaddress-Prüfung, Base64 nur bei gemischten Zeichen), `ui/analysis_dialog.py`
+  (gemeinsame Basis: AnalysisWorker-QThread, Fortschritt, Abbrechen, nicht modal), `ui/strings_dialog.py`.
+  MainWindow._activate_analysis: gemeinsamer Modul-Aktivator (Menü, Palette, Kürzel, Baum); beim Abschalten werden
+  offene Analysefenster geschlossen. 50 MB Zufallsdaten: 0,6 s bis zur Grenze.
+- G3 Eingebettete Dateien: `core/carve.py` – Scan per bytes.find je Signatur (Überlappung für Grenzen), Kandidaten
+  erst danach geprüft (eigene Prüfer je Format, Größe aus Format; gzip/bzip2/xz: Dekomprimieren mit 1-MB-Schritten
+  und max. 1 GB Ausgabe gegen Bomben, Grenze 256 MB Eingabe je Fund), `_trailers` (Daten hinter dem Ende, außer
+  Nullen/FF und außer wenn ein umschließender Fund bis Dateiende reicht). Bewusst NICHT gesucht (keine prüfbaren
+  Köpfe, zu viele Falsch-Positive): ICO, TIFF, Mach-O-Fat/Java-Class, WASM, MP3/OGG/FLAC. Extrahieren mit open("xb").
+  Tests mit selbst erzeugten Dateien (14 Formate in einem Container, JPEG+ZIP, PNG+Anhang, Füllbytes, Blockgrenze,
+  docx-Erkennung, gzip-Länge, Falsch-Positive). 64 MB Zufallsdaten: 0 Funde, 1,1 s. `ui/embedded_dialog.py`.
+- G4 Entropie: `core/entropy.py` (Counter je Block, Gesamtwert aus summierten Häufigkeiten; Blockgröße ≥ 1 KB und
+  **Miller–Madow-Korrektur** je Block – Entscheidung: ohne sie erreichen 256-B-Blöcke aus Zufallsdaten nur ~7,1 und
+  die Schwelle 7,5 wäre wertlos; assess() mit Anteilen hoch/niedrig; regions()), `ui/entropy_dialog.py`
+  (QPainter-Diagramm nach den Visualisierungsregeln: eine Serie, eine Achse, 2-px-Linie, Raster zurückhaltend,
+  Schwelle gestrichelt, Bänder mit Legende, Fadenkreuz-Hover, Bereichsliste als Tabellenansicht). 64 MB: 1,5 s.
+- Build-Größe: keine neuen Abhängigkeiten (bz2/lzma/zlib aus der Standardbibliothek), build.py unverändert → kein
+  Build-Check; Stand wie nach 1.6.0 (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
+- Screenshots 50–53 (Hex mit Werte-Zeile + Kopiermenü, Strings, Eingebettete Dateien, Entropie).
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -211,13 +273,11 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 
 ## Nächster Schritt
 
-Blöcke A–F sind umgesetzt (1.6.0 lokal getaggt, kein Release). **Gestoppt nach Block F** – weiter mit Block G
-(1.7.0: Umwandeln-Menü, Snippets, ▶ Python-Blöcke, Regex-Tester), sobald der Besitzer „weiter“ schreibt.
-Danach H (1.8.0: Karteikarten, Aufgaben, Gliederung, Fokus/Pomodoro) und I (1.9.0: Git-Backup, Export).
+Block G (1.8.0) fertig, lokal getaggt. **Gestoppt** – weiter mit Block H (1.9.0: Metadaten, YARA, Zeitleiste &
+Beweismittel, IOC entschärfen), sobald der Besitzer „weiter“ schreibt. Vorab zu klären in H2: yara-python nur, wenn
+es sich sauber in beide Builds integrieren lässt – sonst melden, bevor Alternativen gebaut werden.
 
-Offen beim Besitzer:
+Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
    (Tags ab v1.2.0 existieren nur lokal in der Arbeitsumgebung.)
 2. Aufräumen auf GitHub: Release/Tag „main“ löschen, Repo-Beschreibung „Textdateien“.
-3. Ideen für später (nicht beauftragt): Kürzel für Split View auf deutscher Tastatur prüfen (Ctrl+\ = Ctrl+AltGr+ß),
-   Tab-Überlauf der Bearbeitungsleiste im Blatt-Modus, Mermaid/Fußnoten in der Vorschau.

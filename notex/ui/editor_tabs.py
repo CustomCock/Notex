@@ -195,9 +195,7 @@ class EditorTabs(QTabWidget):
             except OSError as error:
                 QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
                 return None
-            page.status_changed.connect(self.status_changed.emit)
-            if hasattr(page, "quote_requested"):
-                page.quote_requested.connect(lambda text, pg=page: self.pdf_quote.emit(pg, text))
+            self.wire_page(page)
             index = self.addTab(page, path.name)
             self.setTabToolTip(index, self.relative(path))
             self.setTabIcon(index, icon(page.icon_name))
@@ -205,6 +203,49 @@ class EditorTabs(QTabWidget):
         self.setCurrentWidget(page)
         self.status_changed.emit()
         return page
+
+    # ---- Verdrahtung: Signale einer Seite hängen an der Gruppe, in der sie gerade liegt ------------------
+    def wire_page(self, page) -> None:
+        """Signale von Seite, Editor und Leiste mit DIESER Gruppe verbinden. Beim Verschieben in eine andere Gruppe
+        (Split View) erst unwire_page in der alten, dann wire_page in der neuen – sonst zeigen sie auf eine
+        womöglich gelöschte Gruppe."""
+        links = []
+
+        def connect(signal, slot) -> None:
+            signal.connect(slot)
+            links.append((signal, slot))
+
+        if isinstance(page, EditorPage):
+            editor = page.editor
+            connect(editor.document().modificationChanged, lambda _m, e=editor: self._refresh_title(e))
+            connect(editor.cursorPositionChanged, self.status_changed.emit)
+            connect(editor.textChanged, self.status_changed.emit)
+            connect(editor.zoom_requested, self.zoom)
+            connect(editor.files_dropped, self.files_dropped)
+            connect(editor.link_activated, lambda span, e=editor: self.link_activated.emit(e, span))
+            connect(editor.completion_requested, lambda kind, text, e=editor: self.completion_requested.emit(e, kind, text))
+            connect(page.link_requested, lambda target, e=editor: self.preview_link.emit(e, target))
+            connect(page.view_mode_changed,
+                    lambda mode, pg=page: self.view_mode_changed.emit(mode) if pg is self.currentWidget() else None)
+            connect(page.data_status_changed,
+                    lambda pg=page: self.status_changed.emit() if pg is self.currentWidget() else None)
+            connect(page.reencode_requested, lambda encoding, pg=page: self._reencode(pg, encoding))
+            if page.toolbar is not None:
+                page.toolbar.tabs = self
+                connect(page.toolbar.visibility_changed, self._on_toolbar_toggled)
+        else:
+            connect(page.status_changed, self.status_changed.emit)
+            if hasattr(page, "quote_requested"):
+                connect(page.quote_requested, lambda text, pg=page: self.pdf_quote.emit(pg, text))
+        page._wiring = links
+
+    def unwire_page(self, page) -> None:
+        for signal, slot in getattr(page, "_wiring", []):
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+        page._wiring = []
 
     def _remove_viewer(self, page) -> None:
         index = self.indexOf(page)
@@ -282,13 +323,6 @@ class EditorTabs(QTabWidget):
             editor.set_text_font(self.font_family_for(path))
             self.grammar.attach(editor)
             self._apply_spell_to(editor)
-            editor.document().modificationChanged.connect(lambda _m, e=editor: self._refresh_title(e))
-            editor.cursorPositionChanged.connect(self.status_changed.emit)
-            editor.textChanged.connect(self.status_changed.emit)
-            editor.zoom_requested.connect(self.zoom)
-            editor.files_dropped.connect(self.files_dropped)
-            editor.link_activated.connect(lambda span, e=editor: self.link_activated.emit(e, span))
-            editor.completion_requested.connect(lambda kind, text, e=editor: self.completion_requested.emit(e, kind, text))
             editor.context_menu_hook = self.context_menu_hook
             editor.image_hook = self.image_hook
             if editor.highlighter is not None:
@@ -298,14 +332,10 @@ class EditorTabs(QTabWidget):
                 editor.highlighter.schedule_reset()   # Resolver und Lexer gelten ab dem (einen) Durchlauf nach dem Laden
             toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
             toolbar.set_expanded(self.toolbar_visible, animate=False)
-            toolbar.visibility_changed.connect(self._on_toolbar_toggled)
             editor.set_line_numbers(self.line_numbers)
             page = EditorPage(editor, self.paper_mode, toolbar, root=self.root)
             page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
-            page.link_requested.connect(lambda target, e=editor: self.preview_link.emit(e, target))
-            page.view_mode_changed.connect(lambda mode, pg=page: self.view_mode_changed.emit(mode) if pg is self.currentWidget() else None)
-            page.data_status_changed.connect(lambda pg=page: self.status_changed.emit() if pg is self.currentWidget() else None)
-            page.reencode_requested.connect(lambda encoding, pg=page: self._reencode(pg, encoding))
+            self.wire_page(page)
             index = self.addTab(page, path.name)
             if page.supports_preview and self.config.get("markdown_view", "edit") != "edit":
                 page.set_view_mode(self.config.get("markdown_view", "edit"))

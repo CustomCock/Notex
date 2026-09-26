@@ -190,11 +190,31 @@ class _HexArea(QAbstractScrollArea):
     def focusNextPrevChild(self, _next: bool) -> bool:     # Tab wechselt die Spalte statt den Fokus
         return False
 
-    def copy(self, as_text: bool = False) -> None:
+    def copy(self, as_text: bool = False, fmt: str | None = None) -> None:
+        """Auswahl kopieren: "hex" (DE AD …), "text" (ASCII, Unlesbares als Punkt), "base64", "c" (C-Array)."""
         data = self.selected_bytes()
         if not data:
             return
-        QApplication.clipboard().setText(hexdata.ascii_line(data) if as_text else hexdata.to_hex_string(data))
+        fmt = fmt or ("text" if as_text else "hex")
+        converters = {"hex": hexdata.to_hex_string, "text": hexdata.ascii_line, "base64": hexdata.to_base64,
+                      "c": hexdata.to_c_array}
+        QApplication.clipboard().setText(converters[fmt](data))
+
+    def contextMenuEvent(self, event) -> None:
+        from PySide6.QtWidgets import QMenu
+        from notex.theme.icons import icon
+        from notex.theme.theme import style_menu
+        start, length = self.selection()
+        menu = style_menu(QMenu(self))
+        menu.addAction(icon("copy"), f"Kopieren als Hex  ({length} Bytes)", lambda: self.copy(fmt="hex"))
+        menu.addAction("Kopieren als Text (ASCII)", lambda: self.copy(fmt="text"))
+        menu.addAction("Kopieren als Base64", lambda: self.copy(fmt="base64"))
+        menu.addAction("Kopieren als C-Array", lambda: self.copy(fmt="c"))
+        if length > COPY_LIMIT:
+            menu.addSeparator()
+            note = menu.addAction(f"(kopiert werden höchstens {COPY_LIMIT // (1024 * 1024)} MB)")
+            note.setEnabled(False)
+        menu.exec(event.globalPos())
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self.viewport())
@@ -310,6 +330,12 @@ class HexPage(ViewerPage):
         frame_layout.setSpacing(0)
         frame_layout.addWidget(strip)
         frame_layout.addWidget(self.area, 1)
+        self.inspector = QLabel()
+        self.inspector.setObjectName("HexInspector")
+        self.inspector.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.inspector.setToolTip("Werte der Bytes ab dem Cursor (Little Endian / Big Endian)")
+        frame_layout.addWidget(self.inspector)
+        self.area.cursor_changed.connect(self._update_inspector)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(SPACING.lg, SPACING.md, SPACING.lg, SPACING.lg)
         layout.addWidget(frame)
@@ -318,6 +344,7 @@ class HexPage(ViewerPage):
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(slot)
         self.search_field.setMinimumWidth(200)
+        self._update_inspector()
         if self.warning:                          # ausführlich steht es in der Statusleiste
             self.info.setText("⚠ Endung passt nicht zum Inhalt")
             self.info.setToolTip(self.warning)
@@ -399,11 +426,33 @@ class HexPage(ViewerPage):
         self.status_changed.emit()
 
     # ---- ViewerPage ---------------------------------------------------------------------------------
+    def select_range(self, offset: int, length: int = 1) -> None:
+        """Von außen (Strings, Eingebettete Dateien, Entropie): Bereich markieren und hinscrollen."""
+        if not self.paged.size:
+            return
+        offset = max(0, min(offset, self.paged.size - 1))
+        self.area.set_cursor(offset)
+        if length > 1:
+            self.area.set_cursor(offset, extend=True, length=length)
+            self.area.anchor = offset
+        self.area.ensure_visible(offset)
+        self.area.viewport().update()
+        self.area.setFocus()
+        self.status_changed.emit()
+
+    def _update_inspector(self) -> None:
+        data = self.paged.read(self.area.cursor, 8)
+        fmt = lambda v: "–" if v is None else f"{v:,}".replace(",", ".")
+        parts = [f"{name} {fmt(le)}" if name == "u8" else f"{name} LE {fmt(le)} · BE {fmt(be)}"
+                 for name, le, be in hexdata.interpret(data)]
+        self.inspector.setText("     ".join(parts))
+
     def status_parts(self) -> list[str]:
         start, length = self.area.selection()
         cursor = self.area.cursor
         position = f"Offset 0x{cursor:X} ({cursor:,})".replace(",", ".") if self.paged.size else "–"
-        selection = f"Auswahl {length:,} Bytes".replace(",", ".") if length > 1 else "nur lesen"
+        value = hexdata.selection_value(self.paged.read(start, length)) if length in (1, 2, 4, 8) else ""
+        selection = f"Auswahl {length:,} Bytes".replace(",", ".") + (f" · {value}" if value else "")
         return [position, human_size(self.paged.size), self.ftype.name, selection]
 
     def rename(self, new_path: Path) -> None:

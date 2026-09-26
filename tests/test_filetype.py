@@ -77,3 +77,15 @@ def test_detect_file(tmp_path: Path) -> None:
     (tmp_path / "a.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
     assert detect_file(tmp_path / "a.png").key == "png"
     assert detect_file(tmp_path / "fehlt").key == "binary"
+
+
+def test_block_g_signatures() -> None:
+    tar = bytearray(512)
+    tar[0:8] = b"datei.tx"
+    tar[257:263] = b"ustar\x00"
+    assert detect(bytes(tar), "archiv.tar").key == "tar"
+    assert detect(b"\xd4\xc3\xb2\xa1\x02\x00\x04\x00" + b"\x00" * 16, "a.pcap").key == "pcap"
+    assert detect(b"\xa1\xb2\x3c\x4d\x00\x02\x00\x04" + b"\x00" * 16, "a.pcap").key == "pcap"   # Nanosekunden, BE
+    assert detect(b"\x0a\x0d\x0d\x0a\x1c\x00\x00\x00\x4d\x3c\x2b\x1a", "a.pcapng").key == "pcapng"
+    assert detect(b"ElfFile\x00" + b"\x00" * 40, "System.evtx").key == "evtx"
+    assert mismatch("mitschnitt.txt", ft.PCAP) is not None and mismatch("a.cap", ft.PCAP) is None

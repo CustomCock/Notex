@@ -134,6 +134,42 @@ def to_hex_string(data: bytes) -> str:
     return " ".join(hex_cells(data))
 
 
+def to_base64(data: bytes) -> str:
+    import base64
+    return base64.b64encode(data).decode("ascii")
+
+
+def to_c_array(data: bytes, name: str = "data", per_line: int = 12) -> str:
+    """unsigned char data[] = { 0x4D, 0x5A, … }; mit Länge – zum Einfügen in C/C++-Code."""
+    lines = []
+    for start in range(0, len(data), per_line):
+        lines.append("    " + ", ".join(f"0x{b:02X}" for b in data[start:start + per_line]))
+    body = ",\n".join(lines)
+    return f"unsigned char {name}[{len(data)}] = {{\n{body}\n}};\n"
+
+
+def interpret(data: bytes) -> list[tuple[str, int | None, int | None]]:
+    """Werte ab Cursor: (Typ, Little Endian, Big Endian) für u8/u16/u32/u64 – None, wenn die Bytes nicht reichen."""
+    rows = []
+    for name, size in (("u8", 1), ("u16", 2), ("u32", 4), ("u64", 8)):
+        chunk = data[:size]
+        if len(chunk) < size:
+            rows.append((name, None, None))
+        else:
+            rows.append((name, int.from_bytes(chunk, "little"), int.from_bytes(chunk, "big")))
+    return rows
+
+
+def selection_value(data: bytes) -> str:
+    """Kurzform für die Statusleiste bei Auswahl von 1/2/4/8 Bytes: „u32 LE 1.234 · BE 3.523.215.360“."""
+    names = {1: "u8", 2: "u16", 4: "u32", 8: "u64"}
+    if len(data) not in names:
+        return ""
+    le, be = int.from_bytes(data, "little"), int.from_bytes(data, "big")
+    fmt = lambda v: f"{v:,}".replace(",", ".")
+    return f"{names[len(data)]} {fmt(le)}" if len(data) == 1 else f"{names[len(data)]} LE {fmt(le)} · BE {fmt(be)}"
+
+
 # ---- Suchen ------------------------------------------------------------------------------------
 def search_file(path: Path | str, pattern: bytes, start: int = 0, *, ignore_case: bool = False, wrap: bool = True,
                 progress: Callable[[int, int], None] | None = None,

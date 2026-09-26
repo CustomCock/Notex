@@ -45,6 +45,10 @@ class Sidebar(QWidget):
         self.full_text = Chip("Volltext", "Inhalte durchsuchen")
         self.regex = Chip(".*", "Regulärer Ausdruck (Python-Syntax, Groß/Klein egal)")
         self.whole_word = Chip("Wort", "Nur ganze Wörter")
+        self.in_values = Chip("§", "Auch in Variablenwerten suchen (Modul Variablen)")
+        self.in_values.setChecked(bool(config["search"].get("variable_values", False)))
+        self.in_values.setVisible(False)       # nur sichtbar, solange das Modul Variablen an ist
+        self.variable_source = None            # Callable[[], VariableService | None] – setzt das Modul
         self.by_name.setChecked(config["search"]["by_name"])
         self.full_text.setChecked(config["search"]["full_text"])
         self.regex.setChecked(bool(config["search"].get("regex", False)))
@@ -59,6 +63,7 @@ class Sidebar(QWidget):
         checks.addWidget(self.full_text)
         checks.addWidget(self.regex)
         checks.addWidget(self.whole_word)
+        checks.addWidget(self.in_values)
         checks.addStretch()
 
         self.open_files = OpenFilesSection()
@@ -100,7 +105,7 @@ class Sidebar(QWidget):
         self._workers: list[SearchWorker] = []   # laufende Threads am Leben halten, bis sie fertig sind
 
         self.search_field.textChanged.connect(self._on_text_changed)
-        for chip in (self.by_name, self.full_text, self.regex, self.whole_word):
+        for chip in (self.by_name, self.full_text, self.regex, self.whole_word, self.in_values):
             chip.toggled.connect(self._on_option_changed)
         self.tree.file_activated.connect(lambda path: self.open_requested.emit(path, None))
         self.results.open_requested.connect(self.open_requested)
@@ -131,7 +136,11 @@ class Sidebar(QWidget):
         self.tree.setFocus()
 
     def search_options(self) -> SearchOptions:
+        service = self.variable_source() if self.variable_source is not None else None
+        use_values = service is not None and self.in_values.isChecked()
         return SearchOptions(
+            variable_values=dict(service.values) if use_values else None,
+            variable_prefix=service.prefix if service is not None else "§",
             by_name=self.by_name.isChecked(),
             full_text=self.full_text.isChecked(),
             extensions=tuple(self.config["extensions"]),
@@ -170,6 +179,7 @@ class Sidebar(QWidget):
         self.config["search"]["full_text"] = self.full_text.isChecked()
         self.config["search"]["regex"] = self.regex.isChecked()
         self.config["search"]["whole_word"] = self.whole_word.isChecked()
+        self.config["search"]["variable_values"] = self.in_values.isChecked()
         if self.search_field.text().strip():
             self._debounce.start()
 

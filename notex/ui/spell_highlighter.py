@@ -230,6 +230,18 @@ class SpellHighlighter(QSyntaxHighlighter):
     def highlightBlock(self, text: str) -> None:
         if self.suspended:
             return
+        service = getattr(self.editor, "variables", None)
+        self._variable_spans = [(t.start, t.end) for t in service.tokens(text)] if service is not None else []
+        self._highlight(text)
+        if service is not None and self._variable_spans:
+            # Letzte Ebene: Tokens unsichtbar mit der Breite des Werts (den zeichnet der Editor), Escapes ohne Backslash
+            from notex.ui.variable_render import token_formats
+            for start, length, fmt in token_formats(service, self.editor.font(), text):
+                self.setFormat(start, length, fmt)
+
+    _variable_spans: list = []
+
+    def _highlight(self, text: str) -> None:
         block = self.currentBlock()
         previous_state = max(0, self.previousBlockState())
         if self.lexer is not None:
@@ -321,6 +333,8 @@ class SpellHighlighter(QSyntaxHighlighter):
         for token in tokenize(text, self.markdown):
             if skip_at >= 0 and token.start <= skip_at <= token.end:
                 continue
+            if any(start <= token.start < end or start < token.end <= end for start, end in self._variable_spans):
+                continue                    # Variablen-Tokens (und ihre Namen) nie als Rechtschreibfehler
             if not self.checker.is_correct(token.text, self.language):
                 issues.append(Issue(token.start, token.end - token.start, "spelling", word=token.text))
         return issues

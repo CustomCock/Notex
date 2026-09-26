@@ -57,6 +57,7 @@ class FileTree(QTreeView):
 
     def __init__(self, root: Path, extensions: list[str]) -> None:
         super().__init__()
+        self.menu_providers: list = []    # Callable[[QMenu, Path], None] – Module hängen Einträge ein
         self.root = Path(root)
         self._expanded: set[str] = set()
         self._hover_row = QModelIndex()
@@ -343,8 +344,8 @@ class FileTree(QTreeView):
             if path.is_file():
                 if not fileops.is_encrypted_path(path):
                     menu.addAction(icon("activity"), "Live verfolgen", lambda: self.follow_requested.emit(path))
-                menu.addAction(icon("binary"), "Als Hex öffnen", lambda: self.open_hex_requested.emit(path))
-                menu.addAction(icon("hash"), "Prüfsummen …", lambda: self.checksums_requested.emit(path))
+                for provider in self.menu_providers:      # Module (z. B. Hex & Dateianalyse) hängen sich hier ein
+                    provider(menu, path)
                 menu.addSeparator()
             menu.addAction(icon("pencil"), "Umbenennen\tF2", self.rename_selected)
             menu.addAction(icon("trash"), "In den Papierkorb\tEntf", self.delete_selected)

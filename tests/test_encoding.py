@@ -74,3 +74,14 @@ def test_utf16_with_bom_is_detected_and_roundtrips(tmp_path: Path) -> None:
     save_text_file(path, tf.text, tf.encoding, tf.eol)
     assert path.read_bytes() == data
     assert encode_text("€ 😀", "latin-1", "\n") == b"&#8364; &#128512;"
+
+
+def test_bytes_undefined_in_cp1252_fall_back_to_latin1(tmp_path: Path) -> None:
+    from notex.core.fileops import save_text_file
+    data = bytes(b for b in range(256) if b != 0x0D)   # enthält 0x81, 0x8D, 0x8F, 0x90, 0x9D; ohne CR (Zeilenenden)
+    tf = decode_bytes(data)
+    assert tf.encoding == "latin-1"
+    path = tmp_path / "blob.bin"
+    save_text_file(path, tf.text, tf.encoding, tf.eol)
+    assert path.read_bytes() == data                 # öffnen + speichern ändert kein Byte
+    assert detect_encoding("Grüße".encode("cp1252")) == "cp1252"

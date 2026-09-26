@@ -218,6 +218,64 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 ![Bild-Tab](docs/38-image-tab.png)
 
 
+## Module
+
+Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der Command Palette) schaltet Funktionen
+einzeln an und aus – sofort, ohne Neustart. Ein ausgeschaltetes Modul hat keine Menüeinträge, Befehle,
+Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken nicht.
+
+| Modul | Standard | Zusätzlich nötig |
+|---|---|---|
+| Variablen | an | – |
+| Hex & Dateianalyse (Hex-Ansicht, Dateityp, Prüfsummen) | an | – |
+| Strings, Eingebettete Dateien, Entropie | aus | – |
+| Metadaten | aus | Pillow, pypdf |
+| YARA | aus | yara-python |
+| Zeitleiste & Beweismittel | aus | – |
+| IOC entschärfen | an | – |
+| Port-Infos | an | – |
+| IP-Konflikte | aus | – |
+| RDAP/ASN | aus | Netzwerk (nur auf Klick) |
+| Netzwerk-Scanner | aus | – |
+| Log-Auswertung | aus | python-evtx |
+| PCAP-Übersicht | aus | dpkt |
+
+Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
+öffnen Binärdateien wieder im Texteditor.
+
+![Einstellungen → Module](docs/46-settings-modules.png)
+
+
+## Variablen
+
+Textbausteine mit Verknüpfung (Modul „Variablen“, Standard an). Einstellungen → **Variablen** (`Ctrl+Shift+Alt+V`):
+Tabelle mit Name, Wert (auch mehrzeilig) und Beschreibung, Suche, Import/Export als JSON. Gespeichert wird in
+`variables.json` neben der App – **unverschlüsselt, also keine Passwörter oder Geheimnisse als Variablen**.
+
+- Schreibst du `§gruss`, steht in der Datei genau das. Notex zeigt im Editor den **Wert** im Lesefluss (dezent
+  hinterlegt); Hover zeigt Name und Wert. Ändert sich ein Wert, ändert sich die Anzeige überall sofort.
+- Namen: Buchstaben (auch Umlaute), Ziffern, Unterstrich – z. B. `§23`, `§gruss`, `§firma_tel`. Das Token endet am
+  ersten anderen Zeichen und zählt nur, wenn genau dieser Name definiert ist (`§23a` bleibt normaler Text, `§234`
+  ist §234 und nicht §23 + „4“). Nicht definierte Tokens sind normaler Text. Präfix einstellbar (Standard `§`).
+- Die Variable verhält sich wie **ein Zeichen**: Pfeiltasten springen darüber, Entf/Rücktaste löschen sie ganz.
+- Nach dem Präfix schlägt Notex passende Variablen vor (Enter übernimmt, Esc lässt den Text, wie er ist);
+  `Ctrl+Alt+V` fügt das Präfix ein und öffnet die Vorschläge.
+- **Rechtsklick** auf eine Variable: „Variable entfernen (als normalen Text behalten)“ – gespeichert als `\§23`,
+  angezeigt als normales „§23“ –, „Durch Wert ersetzen“, „Variable bearbeiten …“. Auf einem entfernten Vorkommen:
+  „Wieder als Variable verwenden“. Palette: „Alle Variablen in dieser Datei durch Werte ersetzen“, „Variablen in
+  Auswahl entfernen“. Alles mit Undo.
+- `Ctrl+C` kopiert die Werte (einstellbar: Werte oder Tokens). Die Markdown-Vorschau zeigt Werte, entfernte
+  Vorkommen als normales §name. Die Rechtschreibprüfung ignoriert Tokens.
+- Die Volltextsuche findet Tokens; der Chip „§“ sucht zusätzlich in den Werten.
+- Keine Rekursion: Variablen in Variablenwerten werden nicht aufgelöst. Funktioniert in allen Textdateien, auch in
+  `.ntx` (aufgelöst wird nur im Speicher). Ist das Modul aus, erscheinen Tokens als normaler Text; Dateien bleiben
+  unverändert – auch bloßes Öffnen und Speichern ändert kein Byte.
+
+| Im Editor | Vorschläge | Verwalten |
+|---|---|---|
+| ![Variablen im Editor](docs/47-variables-editor.png) | ![Vorschläge](docs/48-variables-completion.png) | ![Einstellungen → Variablen](docs/49-settings-variables.png) |
+
+
 ## CSV als Tabelle
 
 `.csv`- und `.tsv`-Dateien lassen sich mit `Ctrl+Shift+V` (oder „CSV/TSV: Als Tabelle anzeigen“ in der Command
@@ -288,6 +346,59 @@ PDFs öffnen als eigener Tab (nur lesen):
 ![PDF mit Zitat](docs/45-pdf-quote.png)
 
 
+## Strings
+
+Modul „Strings“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Strings extrahieren …**, Menü Datei oder
+`Ctrl+Alt+S` (aktuelle Datei):
+
+- Findet druckbare Zeichenketten in ASCII und UTF-16LE (optional UTF-16BE) mit Offset; Mindestlänge einstellbar
+  (Standard 4). Die Datei wird im Hintergrund gestreamt – auch mehrere GB, mit Fortschritt und Abbrechen.
+- Liste mit Filter (Text oder Regex) und Kategorie. Interessante Treffer sind hervorgehoben: URLs, E-Mails,
+  IP-Adressen, Pfade (Windows/UNC/Unix), Registry-Schlüssel, Base64-verdächtige Blöcke.
+- Doppelklick springt in die Hex-Ansicht (Treffer markiert), „Als .txt exportieren“ speichert die gefilterte Liste.
+- Mehr als 200 000 Treffer werden abgeschnitten (Hinweis in der Statuszeile).
+
+![Strings](docs/51-strings.png)
+
+
+## Eingebettete Dateien
+
+Modul „Eingebettete Dateien“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Eingebettete Dateien finden …**,
+Menü Datei oder `Ctrl+Alt+F`:
+
+- Durchsucht die Datei an jedem Offset nach bekannten Signaturen (dieselbe Tabelle wie die Dateityp-Erkennung):
+  PNG, JPEG, GIF, BMP, WEBP, WAV, PDF, ZIP (docx/xlsx/pptx/jar/apk erkannt), GZIP, BZIP2, XZ, 7z, RAR, ELF, PE,
+  SQLite, PCAP, PCAPNG, EVTX, TAR, .ntx. Jeder Kandidat muss eine Kopfprüfung bestehen – zufällige Bytefolgen wie
+  „MZ“ oder „BM“ zählen nicht.
+- **Größe**, wo das Format es hergibt (Blöcke durchlaufen, Verzeichnisende, Sektionstabellen, Stream-Ende beim
+  Dekomprimieren); sonst „unbekannt“.
+- **Daten hinter dem Ende** einer Datei werden eigens gemeldet (z. B. ZIP hinter einem JPEG, Text hinter PNG-IEND,
+  PE-Overlay). Reine Füllbytes (Nullen) zählen nicht.
+- Doppelklick springt in die Hex-Ansicht. **Extrahieren** (markierte oder alle) legt Kopien in
+  `<Datei>_extrahiert/` neben der Datei ab – nie überschreiben (`-2`, `-3` …), nie öffnen oder ausführen. Bei
+  unbekannter Größe wird bis zum nächsten Fund bzw. Dateiende kopiert.
+- Läuft gestreamt im Hintergrund mit Fortschritt und Abbrechen; höchstens 10 000 Funde.
+
+![Eingebettete Dateien](docs/52-embedded-files.png)
+
+
+## Entropie
+
+Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Entropie anzeigen …**, Menü Datei oder
+`Ctrl+Alt+E`:
+
+- Kurve der Shannon-Entropie je Block (0–8 Bit pro Byte) über die ganze Datei; Blockgröße automatisch oder 1 KB bis
+  1 MB. Bereiche ≥ 7,5 (komprimiert/verschlüsselt) und < 2 (leer/Füllbytes) sind farbig hinterlegt und darunter
+  aufgelistet. Hover zeigt Offset und Wert, Klick springt in die Hex-Ansicht.
+- Gesamtentropie mit Einschätzung: Text, gemischt/strukturiert, komprimiert oder verschlüsselt – oder „gemischt“
+  mit Anteil, wenn nur Teile der Datei hohe Entropie haben (Hinweis auf eingebettete oder verschlüsselte Daten).
+- Kleine Blöcke unterschätzen die Entropie systematisch; Notex korrigiert das je Block (Miller–Madow), damit auch
+  1-KB-Blöcke aus Zufallsdaten über 7,5 liegen.
+- Gestreamt im Hintergrund mit Fortschritt und Abbrechen – auch für mehrere GB.
+
+![Entropie](docs/53-entropy.png)
+
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -313,12 +424,15 @@ Textdatei:
   nur lesend. Unbekannte Binärdateien öffnen automatisch so. Auswahl ist in beiden Spalten synchron (Klick, Ziehen,
   Shift+Pfeile), `Tab` wechselt die Spalte, `Ctrl+C` kopiert als Hex (in der ASCII-Spalte als Text).
 - **Gehe zu Offset** (`Ctrl+G`): dezimal (`1234`) oder hex (`0x4D2`, `4D2h`, `$4D2`).
+- **Rechtsklick** in der Hex-Ansicht: Auswahl kopieren als Hex, Text, Base64 oder C-Array. Unter der Ansicht stehen
+  die Werte ab dem Cursor als u8/u16/u32/u64 (Little und Big Endian); bei einer Auswahl von 1, 2, 4 oder 8 Bytes
+  zeigt die Statusleiste zusätzlich deren Wert.
 - **Suchen** (`Ctrl+F`, `F3` weiter, `Esc` bricht ab): Hex-Bytes (`DE AD BE EF`) oder Text, wahlweise ohne
   Groß/klein. Die Suche läuft im Hintergrund mit Fortschritt; auch über mehrere GB bleibt die Oberfläche bedienbar.
 - Gelesen wird seitenweise (64 KB, kleiner Cache), die Datei bleibt nicht geöffnet – mehrere GB öffnen sofort, und
   Umbenennen/Verschieben/Löschen funktioniert auch unter Windows, während der Tab offen ist.
 - **Dateityp** über Magic Bytes (eigene Tabelle: PNG, JPEG, GIF, PDF, ZIP inkl. docx/xlsx/jar/apk, RAR, 7z, GZIP,
-  ELF, PE/EXE, Mach-O, SQLite, .ntx u. a.) steht in der Statusleiste; passt die Endung nicht zum Inhalt (z. B. eine
+  ELF, PE/EXE, Mach-O, SQLite, TAR, PCAP, PCAPNG, EVTX, .ntx u. a.) steht in der Statusleiste; passt die Endung nicht zum Inhalt (z. B. eine
   „rechnung.pdf“, die ein Windows-Programm ist), erscheint rechts eine Warnung.
 - **Prüfsummen …** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+C`): MD5, SHA-1, SHA-256, SHA-512 in einem
   Lesedurchgang im Hintergrund, jede mit Kopierknopf. „Vergleichen mit …“ nimmt auch `SHA256: …`, Doppelpunkt-
@@ -328,6 +442,9 @@ Textdatei:
 | Hex + Typwarnung | Prüfsummen |
 |---|---|
 | ![Hex](docs/42-hex-view.png) | ![Prüfsummen](docs/43-checksums.png) |
+
+
+![Hex mit Werte-Zeile und Kopiermenü](docs/50-hex-copy-inspector.png)
 
 
 ## Nachschlagen
@@ -598,9 +715,14 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle; JSON/YAML: Text ↔ Baum |
 | Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
 | Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
+| Ctrl+Alt+V | Variable einfügen (Präfix + Vorschläge) |
+| Ctrl+Shift+Alt+V | Variablen verwalten |
 | Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
-| Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen |
-| Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei |
+| Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen (Modul Hex & Dateianalyse) |
+| Ctrl+Alt+S | Strings extrahieren (Modul Strings) |
+| Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
+| Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
+| Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
 | Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |

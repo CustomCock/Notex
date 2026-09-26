@@ -4,7 +4,8 @@ Erkennung (in dieser Reihenfolge):
 1. UTF-8 mit BOM  (die 3 Bytes EF BB BF am Anfang)     -> "utf-8-sig"
 2. UTF-16 mit BOM (FF FE / FE FF)                     -> "utf-16"
 3. UTF-8 ohne BOM (Bytes lassen sich strikt dekodieren) -> "utf-8"
-4. Fallback cp1252 (Windows-Westeuropa, kann jedes Byte dekodieren) -> "cp1252"
+4. Fallback cp1252 (Windows-Westeuropa)                -> "cp1252"
+5. Sonst Latin-1 (jedes Byte gültig, z. B. Binärdateien)  -> "latin-1"
 
 Intern arbeitet der Editor immer mit "\n". Beim Speichern werden die
 Zeilenenden wieder in das Original-Format (CRLF oder LF) gewandelt.
@@ -35,7 +36,12 @@ def detect_encoding(data: bytes) -> str:
         data.decode("utf-8")
         return "utf-8"
     except UnicodeDecodeError:
+        pass
+    try:
+        data.decode("cp1252")
         return "cp1252"
+    except UnicodeDecodeError:
+        return "latin-1"     # cp1252 kennt 0x81/0x8D/0x8F/0x90/0x9D nicht; Latin-1 dekodiert jedes Byte verlustfrei
 
 
 def detect_eol(text: str) -> str:

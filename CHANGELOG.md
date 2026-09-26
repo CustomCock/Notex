@@ -2,6 +2,39 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.8.0] – 2026-09-26
+
+### Hinzugefügt
+- Hex-Ansicht: Auswahl kopieren als Hex, Text, Base64 oder C-Array (Rechtsklick); Werte-Zeile u8/u16/u32/u64 LE/BE
+  ab Cursor; Wert der Auswahl (1/2/4/8 Bytes) in der Statusleiste
+- Dateityp-Erkennung: TAR, PCAP (µs/ns, LE/BE), PCAPNG, EVTX
+- Modul Strings (Ctrl+Alt+S): ASCII/UTF-16LE/-BE mit Offset, Mindestlänge einstellbar, gestreamt im Hintergrund,
+  Filter/Regex/Kategorie, interessante Treffer hervorgehoben (URL, E-Mail, IP, Pfad, Registry, Base64), Doppelklick
+  → Hex-Ansicht, Export als .txt
+- Modul Eingebettete Dateien (Ctrl+Alt+F): Signaturen an jedem Offset mit Kopfprüfung, Größe aus dem Format,
+  Daten hinter Dateiende-Markern, Sprung in die Hex-Ansicht, Extrahieren in <Datei>_extrahiert/ ohne Überschreiben
+- Modul Entropie (Ctrl+Alt+E): Kurve je Block (einstellbar), Bereiche ≥ 7,5 / < 2 markiert, Gesamtentropie mit
+  Einschätzung, Hover und Klick in die Hex-Ansicht
+
+## [1.7.0] – 2026-09-26
+
+### Hinzugefügt
+- Module: Einstellungen → Module schaltet Funktionen einzeln an/aus, sofort und ohne Neustart; ausgeschaltete Module
+  hängen nichts ein (Menü, Palette, Kürzel, Panels) und laden keine Bibliotheken. Hex-Ansicht und Prüfsummen sind
+  jetzt das Modul „Hex & Dateianalyse“ (Standard an)
+- Variablen: Textbausteine wie §gruss aus variables.json; im Editor erscheint der Wert im Lesefluss (Datei behält das
+  Token), Token verhält sich wie ein Zeichen, Hover, Vorschläge nach dem Präfix (Ctrl+Alt+V), Rechtsklick: entfernen
+  (\§gruss), durch Wert ersetzen, bearbeiten, wieder als Variable verwenden; Palette: alle ersetzen / in Auswahl
+  entfernen; Kopieren setzt Werte ein (einstellbar), Vorschau zeigt Werte, Rechtschreibung ignoriert Tokens, Suche
+  optional auch in Werten; Einstellungen → Variablen mit Import/Export und einstellbarem Präfix
+
+### Behoben
+- Split View: Nach dem Aufheben der Teilung zeigten Signale und Bearbeitungsleiste verschobener Tabs noch auf die
+  gelöschte Gruppe (Fehlermeldungen, Schriftgröße in der Leiste ohne Wirkung); Tabs werden beim Verschieben jetzt
+  neu verdrahtet
+- Dateien mit Bytes, die cp1252 nicht kennt (0x81, 0x8D, 0x8F, 0x90, 0x9D), ließen sich im Editor nicht öffnen;
+  jetzt Latin-1 als letzte Stufe (Speichern bleibt byte-identisch)
+
 ## [1.6.0] – 2026-09-26
 
 ### Hinzugefügt

@@ -63,6 +63,11 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "modules": {              # Module an/aus (siehe core/modules.py) – Standard: Variablen, Hex, Ports, IOC an
+        "variables": True, "hex": True, "strings": False, "embedded": False, "entropy": False, "metadata": False,
+        "yara": False, "timeline": False, "ioc": True, "ports": True, "ip_conflicts": False, "rdap": False,
+        "scanner": False, "logs": False, "pcap": False,
+    },
     "images": {               # Bilder in Notizen (Einfügen per Ctrl+V / Drag & Drop in .md)
         "assets_folder": "assets",   # Ordner neben der Notiz
     },
@@ -100,6 +105,15 @@ DEFAULTS: dict[str, Any] = {
         "full_text": False,
         "regex": False,       # Chip „.*“: regulärer Ausdruck
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
+        "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
+    },
+    "strings": {              # Modul Strings: letzte Einstellungen des Dialogs
+        "min_len": 4,
+        "encodings": ["ascii", "utf16le"],
+    },
+    "variables": {            # Modul Variablen – Definitionen liegen in variables.json neben der App
+        "prefix": "§",
+        "copy": "values",     # Ctrl+C: "values" (Werte einsetzen) oder "tokens"
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
                    ".xml", ".html", ".css", ".js", ".sql", ".ntx", ".tsv",
