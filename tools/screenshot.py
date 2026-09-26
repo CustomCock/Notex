@@ -112,9 +112,8 @@ SAMPLE = {
         "1. Nummerierte Listen genauso, damit die Struktur beim Lesen erkennbar bleibt, egal wie schmal das Fenster gerade ist.\n"
     ),
     "Projekte/Notex/README.md": "# Notex\n\nPortabler Explorer + Editor für Textdateien.\n\n## Ziele\n\n- portabel\n- schnell\n- ruhig im Design\n",
-    "Projekte/Notex/todo.txt": "[ ] Suche testen\n[x] Encoding-Erkennung\n[ ] Release v0.1.0 taggen\n[ ] Screenshot für README\n",
+    "Projekte/Notex/todo.txt": "[ ] Suche testen\n[x] Encoding-Erkennung\n[ ] Release taggen, siehe [[wiki]]\n[ ] Screenshot für README (wiki-Seite prüfen)\n",
     "Projekte/Python/notizen.md": "# Python-Notizen\n\n## Dataclasses\n\nEin `@dataclass` erzeugt __init__, __repr__ und __eq__ automatisch.\nFrozen dataclasses sind unveränderlich – gut für Design-Tokens.\n\n## Pathlib\n\n`Path(__file__).resolve().parent` liefert den Ordner der Datei.\nDas ist die Grundlage für portable Apps: Root relativ zur EXE ermitteln.\n\n## Threads\n\nEin `threading.Event` ist die einfachste Art, einen Worker sauber abzubrechen.\nDie Suche in Notex prüft das Event einmal pro Datei.\n",
-    "Projekte/Python/snippets.py": "from pathlib import Path\n\n\ndef app_root() -> Path:\n    return Path(__file__).resolve().parent\n\n\nif __name__ == \"__main__\":\n    print(app_root())\n",
     "Security/osint-checkliste.md": "# OSINT-Checkliste\n\n1. Domain: whois, DNS, Subdomains\n2. Personen: Usernames, Profile, Leaks\n3. Infrastruktur: Ports, Banner, Zertifikate\n\nImmer dokumentieren, welche Quelle welchen Fund geliefert hat.\n",
     "Security/lpic1-lernplan.md": "# LPIC-1 Lernplan\n\nWoche 1: Dateisystem, Pfade, Rechte\nWoche 2: Prozesse, Threads, Signale\nWoche 3: Shell, Pipes, Textwerkzeuge\nWoche 4: Pakete, Dienste, Logs\n",
     "Tagebuch/2026-09.txt": "26.09. Design-Phase gestartet. Tokens, Typografie, das Blatt.\n27.09. Komponenten: Baum, Tabs, Suche.\n",

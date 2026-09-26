@@ -94,6 +94,8 @@ class Editor(QTextEdit):
         self.setPlainText(text_file.text)
         self._apply_line_height()
         self._apply_hanging_indents()
+        self._indent_timer.stop()          # das Laden selbst ist keine Tipp-Änderung
+        self._indent_pending.clear()
         self.document().clearUndoRedoStacks()
         self.document().setModified(False)
         self._update_margins()
@@ -153,6 +155,22 @@ class Editor(QTextEdit):
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
         self._update_margins()
         self.line_numbers.update()
+        self.refresh_indents()
+
+    def refresh_indents(self) -> None:
+        """Einrückungsbreiten hängen von der Schrift ab: nach Schriftwechsel neu setzen,
+        ohne die Datei als geändert zu markieren (bei ungeänderter Datei bleibt auch Undo leer)."""
+        if not self.document().blockCount() or not self.document().firstBlock().isValid():
+            return
+        modified = self.document().isModified()
+        self._indent_timer.stop()
+        self._indent_pending.clear()
+        self._apply_hanging_indents()
+        if not modified:
+            # Reihenfolge wichtig: erst Undo leeren, dann „unverändert“ setzen – sonst gilt jeder
+            # spätere (auch leere) Edit-Block als Änderung
+            self.document().clearUndoRedoStacks()
+        self.document().setModified(modified)
 
     def _number_font(self):
         """Zeilennummern in der UI-Schrift mit tabellarischen Ziffern, etwas kleiner als der Text."""
