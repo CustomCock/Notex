@@ -58,10 +58,18 @@ DEFAULTS: dict[str, Any] = {
         "by_name": True,
         "full_text": False,
     },
-    "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini"],
+    "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
+                   ".xml", ".html", ".css", ".js", ".sql"],
+    "extensions_version": 2,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
+    "syntax_highlighting": True,
+    "syntax_extensions": [".py", ".json", ".ini", ".log", ".sh", ".ps1", ".bat", ".yaml", ".yml", ".xml",
+                          ".html", ".css", ".js", ".sql", ".md"],
     # Textschrift je Dateiendung ("" = Standardschrift des Themes). Offene Zuordnung: eigene Endungen erlaubt.
     "font_by_extension": {".py": "JetBrains Mono", ".json": "JetBrains Mono", ".csv": "JetBrains Mono",
-                          ".log": "JetBrains Mono", ".ini": "JetBrains Mono"},
+                          ".log": "JetBrains Mono", ".ini": "JetBrains Mono", ".sh": "JetBrains Mono",
+                          ".ps1": "JetBrains Mono", ".bat": "JetBrains Mono", ".yaml": "JetBrains Mono",
+                          ".yml": "JetBrains Mono", ".xml": "JetBrains Mono", ".html": "JetBrains Mono",
+                          ".css": "JetBrains Mono", ".js": "JetBrains Mono", ".sql": "JetBrains Mono"},
     "fulltext_max_mb": 5,     # größere Dateien überspringt die Volltextsuche
 }
 
@@ -120,7 +128,21 @@ def load_config(path: Path) -> dict[str, Any]:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return default_config()
-    return _merge(DEFAULTS, raw)
+    return migrate(_merge(DEFAULTS, raw), raw)
+
+
+def migrate(config: dict[str, Any], raw: Any) -> dict[str, Any]:
+    """Einmalige Anpassungen alter Configs, ohne eigene Einstellungen zu überschreiben."""
+    raw_version = raw.get("extensions_version", 1) if isinstance(raw, dict) else 1
+    if isinstance(raw, dict) and "extensions" in raw and (not isinstance(raw_version, int) or raw_version < 2):
+        # v1.0: neue Standard-Endungen (Syntax-Highlighting) einmalig ergänzen, Reihenfolge und eigene behalten
+        existing = [e for e in config["extensions"]]
+        for ext in DEFAULTS["extensions"]:
+            if ext not in existing:
+                existing.append(ext)
+        config["extensions"] = existing
+    config["extensions_version"] = DEFAULTS["extensions_version"]
+    return config
 
 
 def save_config(path: Path, config: dict[str, Any]) -> None:

@@ -21,6 +21,7 @@ def test_wrong_types_fall_back_per_key(tmp_path: Path) -> None:
         "font_size": "gross",
         "open_tabs": "nur ein String",
         "extensions": [".txt"],
+        "extensions_version": 2,
         "unbekannt": 123,
     }), encoding="utf-8")
     cfg = load_config(path)
@@ -73,3 +74,15 @@ def test_config_digest_changes_with_content() -> None:
     assert config_digest(a) == config_digest(b)
     b["font_size"] = 20
     assert config_digest(a) != config_digest(b)
+
+
+def test_migration_adds_new_default_extensions_once(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"extensions": [".txt", ".eigene"]}), encoding="utf-8")   # v1.0 ohne Version
+    cfg = load_config(path)
+    assert cfg["extensions"][:2] == [".txt", ".eigene"]          # eigene Reihenfolge/Einträge bleiben
+    assert ".py" in cfg["extensions"] and ".sql" in cfg["extensions"]
+    assert cfg["extensions_version"] == 2
+    # v2: bewusst entfernte Endung bleibt entfernt
+    path.write_text(json.dumps({"extensions": [".txt"], "extensions_version": 2}), encoding="utf-8")
+    assert load_config(path)["extensions"] == [".txt"]

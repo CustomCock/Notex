@@ -85,6 +85,10 @@ Menüs, Toolbar, Einstellungsseiten, Theme-Presets und Blatt-Varianten, Toggles 
 Zustand. Zuletzt benutzte Befehle stehen oben. Neue Features melden sich an einer zentralen
 Registry an und tauchen automatisch auf.
 
+| Quick Open | Command Palette | Wiki-Links und Backlinks |
+|---|---|---|
+| ![Quick Open](docs/21-quick-open.png) | ![Command Palette](docs/22-command-palette.png) | ![Wiki-Links](docs/23-wikilinks-backlinks.png) |
+
 ## Wiki-Links und Backlinks
 
 In jeder Textdatei verlinkt `[[notizen]]` auf die Datei `notizen.*` irgendwo in `data/`
@@ -102,6 +106,21 @@ Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Tex
 „verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt Notex „X Links in Y
 Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
 offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
+
+## Syntax-Highlighting
+
+Code und Logs werden über [Pygments](https://pygments.org) farbig hervorgehoben: `.py`, `.json`,
+`.ini`, `.sh`, `.ps1`, `.bat`, `.yaml`/`.yml`, `.xml`, `.html`, `.css`, `.js`, `.sql`, `.md` sowie
+in Markdown die Codeblöcke mit Sprachangabe (```python usw.). In `.log`-Dateien werden Zeitstempel,
+Level (ERROR/WARN/INFO/DEBUG), IP-Adressen und Pfade markiert. Die Farben sind Theme-Tokens mit je
+einem Schema für helle Blätter (Weiß, Papier, Sepia) und für das dunkle Blatt, anpassbar unter
+Einstellungen → Blatt → Syntax-Farben. Pro Endung abschaltbar unter Einstellungen → Editor.
+Gefärbt wird zeilenweise mit Zustand über Zeilengrenzen (Docstrings, `/* */`, Codeblöcke); Dateien
+über 2 MB bleiben ohne Highlighting, damit das Öffnen flott bleibt.
+
+| Python | Log |
+|---|---|
+| ![Syntax Python](docs/24-syntax-python.png) | ![Syntax Log](docs/25-syntax-log.png) |
 
 ## Bearbeitungsleiste
 
@@ -267,7 +286,7 @@ Notex/
 ```
 
 Welche Dateiendungen im Baum erscheinen, steht in `config.json` unter `extensions`
-(Default: `.txt .md .log .csv .json .py .ini`). `fulltext_max_mb` begrenzt die Dateigröße
+(Default: `.txt .md .log .csv .json .py .ini .sh .ps1 .bat .yaml .yml .xml .html .css .js .sql`). `fulltext_max_mb` begrenzt die Dateigröße
 für die Volltextsuche (Default 5 MB).
 
 ## Bekannte Einschränkungen

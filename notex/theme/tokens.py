@@ -90,6 +90,7 @@ class Layout:
     editor_line_height: int = 150   # Prozent
 
 
+SYNTAX: dict[str, str] = {}   # aktive Syntax-Farben (hell oder dunkel, je nach Blattfarbe)
 COLORS = Colors()
 SPACING = Spacing()
 RADIUS = Radius()
@@ -136,6 +137,9 @@ def apply_theme(theme: dict[str, Any]) -> dict[str, Any]:
     COLORS.text_faint = _mix(colors["bg"], colors["text_muted"], 0.6)
     COLORS.accent_soft = _rgba(colors["accent"], 0.28)
     COLORS.paper_match_current = _mix(colors["paper_match"], colors["paper_text"], 0.18)
+    from notex.core.theme_model import relative_luminance
+    SYNTAX.clear()
+    SYNTAX.update(theme["syntax"]["dark" if relative_luminance(colors["paper"]) < 0.4 else "light"])
 
     factor = DENSITY_FACTORS[theme["shape"]["density"]]
     for key, base in vars(_BASE_SPACING).items():

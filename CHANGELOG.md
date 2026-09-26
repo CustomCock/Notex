@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.1.0] – unveröffentlicht
+## [1.1.0] – 2026-09-26
 
 ### Hinzugefügt
 - Quick Open (Ctrl+P): Fuzzy-Suche über alle Dateien, `:Zeile` und `Datei:Zeile`, Dateiindex im Hintergrund
@@ -11,6 +11,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   Anlegen fehlender Ziele, Autovervollständigung nach `[[` und `#`
 - Backlinks-Panel (Ctrl+Shift+K) mit unverlinkten Erwähnungen und „verlinken“; Links werden beim
   Umbenennen/Verschieben nach Rückfrage in allen Dateien angepasst
+- Syntax-Highlighting über Pygments für Code-Endungen und Markdown-Codeblöcke, Log-Hervorhebung
+  (Zeitstempel, Level, IPs, Pfade), Farbschemata hell/dunkel als Theme-Tokens, pro Endung abschaltbar
+- Neue Standard-Endungen im Baum (.sh .ps1 .bat .yaml .yml .xml .html .css .js .sql); bestehende
+  config.json wird einmalig ergänzt, ohne eigene Anpassungen zu überschreiben
 - LICENSE (MIT) und THIRD_PARTY_LICENSES.md, Lizenztexte im Build-Ordner
 
 ### Geändert

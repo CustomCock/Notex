@@ -21,9 +21,11 @@ from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextBlock, QTextBlockUser
 from notex.core.spell import SpellChecker
 from notex.core.spell_rules import is_code_fence, tokenize
 from notex.core.wikilinks import links_in_line
+from notex.core import syntax
+from notex.theme import tokens
 from notex.theme.tokens import COLORS
 
-STATE_NORMAL, STATE_IN_FENCE = 0, 1
+STATE_NORMAL, STATE_IN_FENCE = 0, 1   # STATE_IN_FENCE nur ohne Syntax-Lexer; sonst tragen die Syntax-Zustände den Fence
 TYPING_PAUSE_MS = 400
 SCROLL_CHECK_MS = 120
 VISIBLE_BUFFER = 20     # Blöcke über/unter dem sichtbaren Bereich mitprüfen
@@ -70,6 +72,7 @@ class SpellHighlighter(QSyntaxHighlighter):
         self.language: str | None = None          # None = globale Sprache des Checkers
         self.resolve_link = None                  # Callable[[str], str | None] – setzt das Hauptfenster
         self.links_enabled = True
+        self.lexer: str | None = None             # Pygments-Lexername oder None (kein Syntax-Highlighting)
         self._grammar: dict[int, list[Issue]] = {}  # Blocknummer -> Grammatik-Treffer
         self._full_pass = False
 
@@ -135,9 +138,6 @@ class SpellHighlighter(QSyntaxHighlighter):
         self._grammar.clear()
         self.reset()
 
-    def in_code_fence(self, block: QTextBlock) -> bool:
-        return self.markdown and (block.userState() == STATE_IN_FENCE or is_code_fence(block.text()))
-
     def link_at(self, block: QTextBlock, position_in_block: int) -> LinkSpan | None:
         data = block.userData()
         if not isinstance(data, BlockIssues):
@@ -191,16 +191,35 @@ class SpellHighlighter(QSyntaxHighlighter):
             self.rehighlightBlock(block)
 
     # ---- Das eigentliche Prüfen -------------------------------------------------------
+    def in_code_fence(self, block: QTextBlock) -> bool:
+        state = block.userState()
+        return self.markdown and (state == STATE_IN_FENCE or state >= syntax.STATE_FENCE or is_code_fence(block.text()))
+
     def highlightBlock(self, text: str) -> None:
         block = self.currentBlock()
-        previous_state = self.previousBlockState()
-        in_fence = previous_state == STATE_IN_FENCE
-        if self.markdown and is_code_fence(text):
-            in_fence = not in_fence
+        previous_state = max(0, self.previousBlockState())
+        if self.lexer is not None:
+            # Syntax zuerst: Farben als Grundformat, danach Links und Wellenlinien obendrauf
+            spans, state = syntax.lex_line(text, self.lexer, previous_state)
+            for span in spans:
+                color = tokens.SYNTAX.get(span.style)
+                if color:
+                    fmt = QTextCharFormat()
+                    fmt.setForeground(QColor(color))
+                    self.setFormat(span.start, span.end - span.start, fmt)
+            self.setCurrentBlockState(state)
+            in_fence = self.markdown and (state >= syntax.STATE_FENCE or previous_state >= syntax.STATE_FENCE)
+            if self.markdown and is_code_fence(text):
+                self._store(block, [])
+                return
+        else:
+            in_fence = previous_state == STATE_IN_FENCE
+            if self.markdown and is_code_fence(text):
+                in_fence = not in_fence
+                self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
+                self._store(block, [])
+                return
             self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
-            self._store(block, [])
-            return
-        self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
 
         links = self._link_spans(text, in_fence) if self.links_enabled else []
         self._paint_links(links)

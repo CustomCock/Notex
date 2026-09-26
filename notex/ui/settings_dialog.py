@@ -15,8 +15,9 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QF
                                QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
                                QScrollArea, QSlider, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
-from notex.core.theme_model import (DENSITIES, PAPER_VARIANTS, PRESETS, SPEEDS, contrast_warnings, default_theme,
-                                    theme_from_preset)
+from notex.core.theme_model import (DENSITIES, PAPER_VARIANTS, PRESETS, SPEEDS, SYNTAX_CLASSES, contrast_warnings,
+                                    default_theme, theme_from_preset)
+from notex.core.syntax import LEXERS
 from notex.core.theme_store import ThemeStore
 from notex.theme.fonts import STANDARD, STANDARD_LABEL, available_families, sf_available
 from notex.theme.icons import icon
@@ -247,6 +248,23 @@ class SettingsDialog(QDialog):
         self.padding_spin.valueChanged.connect(lambda v: self._set(("paper", "padding"), v))
         page.row("Innenabstand", self.padding_spin)
 
+        page.section("Syntax-Farben")
+        self.syntax_scheme_box = QComboBox()
+        self.syntax_scheme_box.addItem("Helles Blatt (Weiß, Papier, Sepia)", "light")
+        self.syntax_scheme_box.addItem("Dunkles Blatt", "dark")
+        self.syntax_scheme_box.currentIndexChanged.connect(lambda _i: self._load_syntax_fields())
+        page.row("Schema", self.syntax_scheme_box)
+        self.syntax_fields: dict[str, ColorField] = {}
+        labels = {"keyword": "Schlüsselwörter", "string": "Strings", "comment": "Kommentare", "number": "Zahlen",
+                  "function": "Funktionen/Klassen", "operator": "Operatoren", "tag": "Tags", "attribute": "Attribute",
+                  "log_error": "Log: Fehler", "log_warn": "Log: Warnung", "log_info": "Log: Info", "log_debug": "Log: Debug",
+                  "log_time": "Log: Zeitstempel", "log_ip": "Log: IP-Adresse", "log_path": "Log: Pfad"}
+        for key in SYNTAX_CLASSES:
+            field = ColorField(key, labels.get(key, key))
+            field.changed.connect(self._syntax_color_changed)
+            self.syntax_fields[key] = field
+            page.add(field)
+
         page.section("Breite")
         self.paper_mode_box = QCheckBox("Blatt zentrieren (Blatt-Modus)")
         self.paper_mode_box.setToolTip("Aus = volle Breite  Alt+P")
@@ -313,6 +331,14 @@ class SettingsDialog(QDialog):
         index = box.findData(family or STANDARD)
         box.setCurrentIndex(index if index >= 0 else 0)
 
+    def _syntax_ext_toggled(self, ext: str, on: bool) -> None:
+        if self._loading:
+            return
+        exts = set(self.config.get("syntax_extensions", []))
+        exts.add(ext) if on else exts.discard(ext)
+        self.config["syntax_extensions"] = [e for e in LEXERS if e in exts]
+        self.window_.tabs.relink_all()
+
     def _ext_font_changed(self, ext: str, family: str) -> None:
         if self._loading:
             return
@@ -329,6 +355,27 @@ class SettingsDialog(QDialog):
         page.section("Text")
         page.note("Zeilen werden immer an der Blattbreite umgebrochen, auch lange URLs oder Hashes. "
                   "Horizontal scrollen gibt es nicht – der Text ist immer vollständig sichtbar.")
+        page.section("Syntax-Highlighting")
+        self.syntax_box = QCheckBox("Code und Logs farbig hervorheben (Pygments)")
+        self.syntax_box.toggled.connect(lambda on: (self.config.__setitem__("syntax_highlighting", on),
+                                                    self.window_.tabs.relink_all()) if not self._loading else None)
+        page.row("", self.syntax_box)
+        syntax_row = QHBoxLayout()
+        syntax_row.setContentsMargins(0, 0, 0, 0)
+        self.syntax_chips = {}
+        from notex.ui.widgets import Chip
+        for ext in LEXERS:
+            chip = Chip(ext, f"Syntax-Highlighting für {ext}")
+            chip.toggled.connect(lambda on, e=ext: self._syntax_ext_toggled(e, on))
+            self.syntax_chips[ext] = chip
+            syntax_row.addWidget(chip)
+        syntax_row.addStretch(1)
+        syntax_widget = QWidget()
+        syntax_widget.setLayout(syntax_row)
+        page.row("Endungen", syntax_widget)
+        page.note("Nur sichtbare Blöcke werden gefärbt; Dateien über 2 MB bleiben ohne Highlighting. "
+                  "In .md-Dateien werden ```python-Blöcke usw. mit dem passenden Lexer gefärbt.")
+
         page.section("Wiki-Links")
         self.wiki_box = QCheckBox("[[Links]] hervorheben und auflösen (Ctrl+Klick öffnet)")
         self.wiki_box.toggled.connect(lambda on: (self.config.__setitem__("wiki_links", on), self.window_.tabs.relink_all()) if not self._loading else None)
@@ -405,6 +452,12 @@ class SettingsDialog(QDialog):
         self.line_height_spin.setValue(theme["font"]["line_height"])
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
+        self.syntax_box.setChecked(bool(cfg.get("syntax_highlighting", True)))
+        for ext, chip in self.syntax_chips.items():
+            chip.setChecked(ext in cfg.get("syntax_extensions", []))
+        from notex.core.theme_model import relative_luminance
+        self.syntax_scheme_box.setCurrentIndex(1 if relative_luminance(theme["colors"]["paper"]) < 0.4 else 0)
+        self._load_syntax_fields()
         self.backlinks_box.setCurrentIndex(max(0, self.backlinks_box.findData(cfg.get("backlinks_position", "bottom"))))
         self._refresh_theme_list()
         self._loading = False
@@ -427,6 +480,21 @@ class SettingsDialog(QDialog):
         self.theme[section][key] = value
         self._schedule_preview()
 
+    def _load_syntax_fields(self) -> None:
+        scheme = self.syntax_scheme_box.currentData() or "light"
+        loading = self._loading
+        self._loading = True
+        for key, field in self.syntax_fields.items():
+            field.set_color(self.theme["syntax"][scheme][key])
+        self._loading = loading
+
+    def _syntax_color_changed(self, key: str, value: str) -> None:
+        if self._loading:
+            return
+        scheme = self.syntax_scheme_box.currentData() or "light"
+        self.theme["syntax"][scheme][key] = value
+        self._schedule_preview()
+
     def _radius_changed(self, value: int) -> None:
         self.radius_value.setText(f"{value} px")
         self._set(("shape", "radius"), value)
@@ -444,6 +512,7 @@ class SettingsDialog(QDialog):
     def _apply_preview(self) -> None:
         self.theme = self.manager.apply(self.theme)
         self.window_.tabs.set_font_size(self.theme["font"]["editor_size"])
+        self.window_.tabs.relink_all()   # Syntax-Farben neu anlegen
 
     def _preset_chosen(self, index: int) -> None:
         preset = theme_from_preset(self.preset_box.itemText(index))

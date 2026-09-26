@@ -80,8 +80,29 @@ class FakeLanguageTool(BaseHTTPRequestHandler):
         pass
 
 
+CODE_SAMPLE = (
+    "import os\nfrom pathlib import Path\n\n\ndef app_root() -> Path:\n"
+    "    \"\"\"Ordner der laufenden App.\n    Im Build: neben der EXE.\"\"\"\n"
+    "    if getattr(sys, \"frozen\", False):\n        return Path(sys.executable).parent  # PyInstaller\n"
+    "    return Path(__file__).resolve().parent\n\n\nMAX_RETRIES = 3\n"
+)
+LOG_SAMPLE = (
+    "2026-09-26 08:31:30 INFO  Server gestartet auf 127.0.0.1:8081\n"
+    "2026-09-26 08:31:32 DEBUG Konfiguration aus C:\\Apps\\Notex\\config.json geladen\n"
+    "2026-09-26 08:32:01 WARN  Langsame Antwort von 10.0.0.5 (1240 ms)\n"
+    "2026-09-26 08:32:05 ERROR Verbindung zu 192.168.1.10:443 fehlgeschlagen: Timeout\n"
+    "2026-09-26 08:32:06 ERROR Traceback in /var/log/app.log gespeichert\n"
+)
+WIKI_SAMPLE = (
+    "# Python-Notizen\n\nSiehe auch [[osint-checkliste|OSINT]] und [[lpic1-lernplan#Woche 2]].\n"
+    "Kaputter Link: [[gibt-es-nicht]].\n\n```python\nprint([[kein]])  # in Codeblöcken zählen Links nicht\n```\n"
+)
+
 SAMPLE = {
     "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
+    "Projekte/Python/snippets.py": CODE_SAMPLE,
+    "Projekte/Notex/server.log": LOG_SAMPLE,
+    "Projekte/Python/wiki.md": WIKI_SAMPLE,
     "Projekte/Notex/links.txt": (
         "Lange Zeilen brechen um, nichts scrollt seitlich:\n\n"
         "https://github.com/CustomCock/Notex/blob/main/notex/ui/editor.py#L120-L180?utm_source=readme&utm_campaign=portable_editor_2026\n\n"
@@ -260,11 +281,23 @@ def main() -> int:
         later(500, lambda: (compose(window, dialog, "20-settings-system", offset), dialog.reject(), later(100, s_end)))
 
     def s_end():
-        window.close()
-        app.quit()
+        # v1.1: Quick Open, Command Palette, Wiki-Links + Backlinks, Syntax (.py, .log, md-Fence)
+        window.show_palette("files")
+        window.palette.field.setText("snip")
+        later(400, lambda: save(window, "21-quick-open"))
+        later(500, lambda: (window.palette.close_overlay(), window.show_palette("commands"), window.palette.field.setText(">blatt")))
+        later(900, lambda: save(window, "22-command-palette"))
+        later(1000, lambda: (window.palette.close_overlay(), window.tabs.open_file(data / "Projekte/Python/wiki.md"),
+                             window.sidebar.tree.select_path(data / "Projekte/Python/wiki.md"), window.set_backlinks_visible(True)))
+        later(1600, lambda: save(window, "23-wikilinks-backlinks"))
+        later(1700, lambda: (window.set_backlinks_visible(False), window.tabs.open_file(data / "Projekte/Python/snippets.py")))
+        later(2100, lambda: save(window, "24-syntax-python"))
+        later(2200, lambda: window.tabs.open_file(data / "Projekte/Notex/server.log"))
+        later(2600, lambda: save(window, "25-syntax-log"))
+        later(2700, lambda: (window.close(), app.quit()))
 
     later(500, s_empty)
-    later(40000, app.quit)
+    later(60000, app.quit)
     code = app.exec()
     httpd.shutdown()
     httpd.server_close()

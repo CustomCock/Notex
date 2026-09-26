@@ -186,10 +186,13 @@ class Editor(QTextEdit):
         cursor.setBlockFormat(fmt)
 
     def _apply_hanging_indents(self) -> None:
-        """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen)."""
+        """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen).
+        Nur Blöcke mit Präfix bekommen ein Format – bei 40 000 Zeilen spart das die meiste Zeit."""
         block = self.document().firstBlock()
         while block.isValid():
-            self._set_hanging_indent(block, self._indent_for(block.text()))
+            text = block.text()
+            if text[:1] in (" ", "\t", "-", "*", "+") or text[:1].isdigit():
+                self._set_hanging_indent(block, self._indent_for(text))
             block = block.next()
 
     def _on_block_changed(self, position: int, removed: int, added: int) -> None:

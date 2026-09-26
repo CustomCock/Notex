@@ -68,6 +68,10 @@ def main() -> None:
         "--add-data", f"{PACKAGE / 'assets'}{SEP}notex/assets",
         "--add-data", f"{PACKAGE / 'dictionaries'}{SEP}notex/dictionaries",
         "--collect-data", "enchant",   # enchant-DLLs + Provider aus dem Windows-Wheel
+        # Pygments lädt Lexer dynamisch – nur die benutzten Module einsammeln (klein halten)
+        *[f"--hidden-import=pygments.lexers.{m}" for m in ("python", "data", "configs", "shell", "html", "css",
+                                                          "javascript", "sql", "markup", "textfmts", "special")],
+        "--hidden-import=pygments.formatters",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",

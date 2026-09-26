@@ -173,7 +173,8 @@ class EditorTabs(QTabWidget):
             if editor.highlighter is not None:
                 editor.highlighter.resolve_link = self.resolve_link
                 editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
-                editor.highlighter.relink()   # der erste Durchlauf lief noch ohne Resolver
+                editor.highlighter.lexer = self.lexer_for(path)
+                editor.highlighter.relink()   # der erste Durchlauf lief noch ohne Resolver und Lexer
             toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             toolbar.visibility_changed.connect(self._on_toolbar_toggled)
@@ -442,11 +443,25 @@ class EditorTabs(QTabWidget):
             editor.set_eol(eol)
             self.status_changed.emit()
 
+    SYNTAX_MAX_BYTES = 2 * 1024 * 1024   # größere Dateien bekommen kein Syntax-Highlighting (Ladezeit)
+
+    def lexer_for(self, path: Path) -> str | None:
+        from notex.core.syntax import lexer_for_extension
+        if not self.config.get("syntax_highlighting", True) or path.suffix.lower() not in self.config.get("syntax_extensions", []):
+            return None
+        try:
+            if path.stat().st_size > self.SYNTAX_MAX_BYTES:
+                return None
+        except OSError:
+            pass
+        return lexer_for_extension(path.suffix)
+
     def relink_all(self) -> None:
-        """Nach Änderungen am Datei-/Link-Index: Link-Zustände (kaputt/ok) neu zeichnen."""
+        """Nach Änderungen an Index oder Einstellungen: Links, Syntax und Farben neu zeichnen."""
         for editor in self.editors():
             if editor.highlighter is not None:
                 editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
+                editor.highlighter.lexer = self.lexer_for(editor.path)
                 editor.highlighter.relink()
 
     def replace_text_keep_cursor(self, editor: Editor, new_text: str) -> None:
