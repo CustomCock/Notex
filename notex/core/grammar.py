@@ -69,9 +69,10 @@ class GrammarClient:
 
     def wait_for_slot(self) -> None:
         """Blockiert, bis die nächste Anfrage erlaubt ist (Rate-Limit)."""
-        remaining = self.min_interval - (time.monotonic() - self._last_request)
-        if remaining > 0:
-            time.sleep(remaining)
+        # Schleife statt einmal schlafen: unter Windows kann sleep() gemessen an monotonic() (≈16 ms Auflösung)
+        # etwas zu früh zurückkehren – das Limit gilt aber als Mindestabstand
+        while (remaining := self.min_interval - (time.monotonic() - self._last_request)) > 0:
+            time.sleep(max(remaining, 0.001))
 
     def check(self, text: str, language: str = "de") -> list[GrammarMatch]:
         if is_public_url(self.server_url) and not self.allow_public:
