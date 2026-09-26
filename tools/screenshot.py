@@ -680,16 +680,71 @@ def main() -> int:
             def entropy_shot():
                 window.show_entropy(sample)
                 dialog = window._analysis_dialogs["entropy"][-1]
-                dialog_shot(dialog, "53-entropy", finish)
+                dialog_shot(dialog, "53-entropy", lambda: block_h_shots(dialog_shot))
 
-            def finish():
-                window.close()
-                app.quit()
+        def block_h_shots(dialog_shot):
+            """Block H (1.9.0): Metadaten, YARA, Zeitleiste, IOC entschärfen."""
+            import sys as _sys
+            from notex.core import timeline as tl
+            _sys.path.insert(0, str(ROOT / "tests"))
+            from test_metadata import jpeg
+            for key in ("metadata", "yara", "timeline", "ioc"):
+                window.modules.set_enabled(key, True)
+            photo = files / "urlaub.jpg"
+            photo.write_bytes(jpeg())
+            rule = files / "c2-beispiel.yar"
+            rule.write_text('rule C2_Beispiel : c2\n{\n    meta:\n        author = "Notex"\n    strings:\n'
+                            '        $url = "update.example.com" ascii nocase\n        $mz  = { 4D 5A }\n'
+                            '        $reg = "CurrentVersion\\\\Run" ascii\n    condition:\n        $mz at 0 and any of '
+                            '($url, $reg)\n}\n', encoding="utf-8")
+            timeline_path = files / "Vorfall Webserver.md"
+            text = tl.new_text("Vorfall Webserver")
+            for when, source, what, tags in (
+                    ("2026-09-26T13:58:02+02:00", "proxy.log", "Download update.exe von update[.]example[.]com", "#malware"),
+                    ("2026-09-26T14:03:11+02:00", "auth.log", "Fehlgeschlagener Login root von 203.0.113.5", "#ssh #bruteforce"),
+                    ("2026-09-26T14:05:40+02:00", "auth.log", "Login root von 203.0.113.5 erfolgreich", "#ssh"),
+                    ("2026-09-26T12:07:00Z", "EDR", "Neuer Dienst „UpdSvc“ installiert", "#persistenz"),
+                    ("2026-09-26T14:20:00+02:00", "Analyst", "Host isoliert, Abbild gesichert (B-20260926-01)", "#reaktion")):
+                entry = tl.Entry(tl.parse_iso(when), source, what, tags.split())
+                text = tl.add_entry(text, entry)[0]
+            timeline_path.write_text(text, encoding="utf-8")
+
+            def metadata_shot():
+                window.show_metadata(photo)
+                dialog_shot(window._analysis_dialogs["metadata"][-1], "54-metadata", yara_shot)
+
+            def yara_shot():
+                window.tabs.open_file(rule)
+                window.test_yara(target=files)
+                dialog_shot(window._analysis_dialogs["yara"][-1], "55-yara", timeline_shot)
+
+            def timeline_shot():
+                window.tabs.open_file(timeline_path)
+                window.show_timeline()
+                dialog = window._analysis_dialogs["timeline"][-1]
+                dialog.mode.setCurrentIndex(1)
+                dialog_shot(dialog, "56-timeline", ioc_shot)
+
+            def ioc_shot():
+                note = files / "IOCs.md"
+                note.write_text("# IOCs aus dem Vorfall\n\n- C2: http://update.example.com/v2/gate.php\n"
+                                "- Angreifer: 203.0.113.5, 2001:db8::bad:1\n- Phishing von billing@example.org\n"
+                                "- Datei: update.exe (setup.py bleibt unverändert)\n\n```\n"
+                                "curl http://update.example.com/v2/pkg\n```\n", encoding="utf-8")
+                editor = window.tabs.open_file(note)
+                window.convert_iocs(True)
+                later_rel(400, lambda: (save(window, "57-ioc-defanged"), editor.document().setModified(False),
+                                        finish()))
+            metadata_shot()
+
+        def finish():
+            window.close()
+            app.quit()
 
         shot_image()
 
     later(500, s_empty)
-    later(90000, app.quit)
+    later(150000, app.quit)
     code = app.exec()
     httpd.shutdown()
     httpd.server_close()

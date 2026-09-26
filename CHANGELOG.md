@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.9.0] – unveröffentlicht
+## [1.9.0] – 2026-09-26
 
 ### Hinzugefügt
 - Modul Metadaten (`Ctrl+Alt+M`): EXIF inkl. GPS (OpenStreetMap nur auf Klick), XMP, IPTC, PNG-Text; PDF-Info, XMP

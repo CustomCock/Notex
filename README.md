@@ -423,6 +423,8 @@ Modul „Metadaten“ (Standard aus). Rechtsklick auf eine Datei im Baum → **M
 
 Grau = bleibt beim Entfernen (Formatangabe oder Teil des Inhalts), gelb = GPS.
 
+![Metadaten](docs/54-metadata.png)
+
 
 ## YARA
 
@@ -440,6 +442,8 @@ Modul „YARA“ (Standard aus, bringt yara-python mit). `.yar`/`.yara`-Dateien 
   unterwellt, bis du weitertippst. `include "x.yar"` wird relativ zum Ordner der Regeldatei aufgelöst.
 - Dateien werden nur gelesen (libyara mappt sie selbst, auch große), Zeitlimit 60 s je Datei, Symlinks werden nicht
   verfolgt, höchstens 20 000 Trefferstellen.
+
+![YARA-Regel testen](docs/55-yara.png)
 
 
 ## Zeitleiste und Beweismittel
@@ -479,6 +483,8 @@ titel: Vorfall Webserver
 sie in die Tabelle unter „Prüfsummen“ ein; „Beweismittel: Übergabe eintragen“ hängt eine Zeile mit der aktuellen Zeit
 an die Übergaben an und setzt den Cursor in „Von“.
 
+![Zeitleiste](docs/56-timeline.png)
+
 
 ## IOCs entschärfen
 
@@ -500,6 +506,8 @@ Command Palette. Wirkt auf die Auswahl, ohne Auswahl auf die ganze Datei – ein
   Werte werden nicht doppelt entschärft.
 - Code-Blöcke (``` und `inline`) bleiben standardmäßig unverändert (Einstellungen → Module).
 - Alles geschieht nur im Editor – bei verschlüsselten Notizen landet nichts im Klartext auf der Platte.
+
+![IOCs entschärft](docs/57-ioc-defanged.png)
 
 
 ## Live verfolgen (Logs)
