@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QTextCursor
 from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
@@ -47,6 +47,8 @@ class FadeOverlay(QWidget):
         self.raise_()
         self.show()
         anim.animate(self, 1.0, 0.0, DURATION.fade, self._step, self.hide)
+        # Sicherheitsnetz: bleibt die Animation hängen (volle Ereignisschleife), nie dauerhaft etwas verdecken
+        QTimer.singleShot(max(300, 3 * DURATION.fade), self.hide)
 
     def _step(self, value: float) -> None:
         self.alpha = value
@@ -119,7 +121,10 @@ class EditorTabs(QTabWidget):
     def _on_current_changed(self, index: int) -> None:
         # Kurzer Fade nur bei echtem Wechsel zwischen zwei offenen Tabs
         if index >= 0 and self._last_index >= 0 and index != self._last_index and self.currentWidget():
-            self._fade.run(self.currentWidget().geometry())
+            # geometry() ist relativ zum internen Stack – in Koordinaten des Tab-Widgets umrechnen,
+            # sonst deckt die Blende die Tab-Leiste ab und lässt unten einen Streifen frei
+            page = self.currentWidget()
+            self._fade.run(QRect(page.mapTo(self, QPoint(0, 0)), page.size()))
         self._last_index = index
         self.currentChanged.connect(lambda _index: self.status_changed.emit())
 

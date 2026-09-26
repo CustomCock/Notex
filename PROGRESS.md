@@ -21,7 +21,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
 | 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), kein Release (Besitzer) |
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
-| 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | offen |
+| 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | in Arbeit |
 
 ## Erledigt
 
@@ -77,12 +77,18 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   Ende-zu-Ende-Test: Marker-Suche über den ganzen App-Ordner inkl. dekomprimierter Historie ohne Treffer.
   `docs/ENCRYPTION.md` liegt auch im Build-Ordner. Build +15 MB (cryptography/OpenSSL).
 
+### 1.4.0 – Block D (in Arbeit)
+- D1 Vorlagen: `core/templates.py` (Platzhalter inkl. strftime-Format und Tagesversatz, ISO-Woche/-Jahr,
+  `ensure_defaults` legt Woche/Tagesnotiz/Besprechung nur beim allerersten Mal an), `templates/` neben der App,
+  Befehle Neue Datei aus Vorlage (Ctrl+Shift+T), Neue Woche (Alt+W), Nächste Woche, Vorlagen-Ordner öffnen, jede
+  Vorlage als Palette-Befehl, Einstellungen (Wochen-Ordner, -Dateiname). Nebenbei behoben: Tab-Überblendung in
+  falschen Koordinaten (seit 1.0).
+
 ## Offen
 
 ### Block C – 1.3.0
 
 ### Block D – 1.4.0
-- `templates/` + „Neue Woche“ mit Platzhaltern `{{date}} {{time}} {{weekday}} {{week}} {{year}} {{title}} {{cursor}}`.
 - Update-Check über GitHub-Releases-API (max. 1×/Tag, kein Auto-Download).
 - Linux: Plattform-Guards, .desktop/MIME auf Knopfdruck, CI auf Windows und Ubuntu, Linux-tar.gz-Build.
 

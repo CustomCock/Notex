@@ -418,6 +418,24 @@ class SettingsDialog(QDialog):
                   "ausgedünnt (24 h alles, dann stündlich, täglich, wöchentlich). Verschlüsselte Notizen (.ntx) "
                   "bekommen nie einen Verlauf.")
 
+        page.section("Vorlagen")
+        self.week_folder_edit = QLineEdit()
+        self.week_folder_edit.setToolTip("Ordner in data/, in dem „Neue Woche“ (Alt+W) die Wochenpläne anlegt")
+        self.week_folder_edit.editingFinished.connect(
+            lambda: self.config.setdefault("templates", {}).__setitem__("week_folder", self.week_folder_edit.text().strip() or "Wochen"))
+        page.row("Wochen-Ordner", self.week_folder_edit)
+        self.week_name_edit = QLineEdit()
+        self.week_name_edit.setToolTip("Dateiname ohne .md, Platzhalter wie in Vorlagen: {{week}} {{year}} {{date:%Y-%m-%d}}")
+        self.week_name_edit.editingFinished.connect(
+            lambda: self.config.setdefault("templates", {}).__setitem__("week_name", self.week_name_edit.text().strip() or "KW{{week}} {{year}}"))
+        page.row("Wochen-Dateiname", self.week_name_edit)
+        templates_button = QPushButton("Vorlagen-Ordner öffnen")
+        templates_button.clicked.connect(lambda: getattr(self.window_, "open_templates_folder", lambda: None)())
+        page.row("", templates_button)
+        page.note("Vorlagen sind .md/.txt-Dateien in templates/ neben der App. Platzhalter: {{date}} {{time}} {{weekday}} "
+                  "{{week}} {{year}} {{title}} {{cursor}}, Versätze wie {{date+1}} und Formate wie {{date:%Y-%m-%d}}. "
+                  "Ctrl+Shift+T: neue Datei aus Vorlage, Alt+W: Neue Woche.")
+
         page.section("Verschlüsselte Notizen")
         self.autolock_spin = QSpinBox()
         self.autolock_spin.setRange(0, 240)
@@ -517,6 +535,9 @@ class SettingsDialog(QDialog):
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
         self.markdown_view_box.setCurrentIndex(max(0, self.markdown_view_box.findData(cfg.get("markdown_view", "edit"))))
+        tpl = cfg.get("templates", {})
+        self.week_folder_edit.setText(str(tpl.get("week_folder", "Wochen")))
+        self.week_name_edit.setText(str(tpl.get("week_name", "KW{{week}} {{year}}")))
         self.autolock_spin.setValue(int(cfg.get("encryption", {}).get("auto_lock_minutes", 5)))
         hist = cfg.get("history", {})
         self.history_box.setChecked(bool(hist.get("enabled", True)))

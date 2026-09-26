@@ -16,7 +16,7 @@ Notizen würden dort landen (Notex warnt in dem Fall beim Start).
 
 **Update:** Notex schließen, im bestehenden Ordner `Notex.exe` und `_internal/` durch die aus der
 neuen ZIP ersetzen (`licenses/`, `docs/`, `LICENSE`, `CHANGELOG.md` gleich mit). `data/`, `history/`,
-`config.json`, `themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
+`templates/`, `config.json`, `themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
 neu entpackt, bekommt beim nächsten Start die Frage, ob die Windows-Dateizuordnung auf den neuen
 Pfad gesetzt werden soll (auch später möglich unter Einstellungen → System → „Pfad aktualisieren“).
 
@@ -156,6 +156,28 @@ Undo-Schritt und speichert nicht.
   ebenfalls nicht.
 
 ![Versionsverlauf](docs/29-history.png)
+
+## Vorlagen und „Neue Woche“
+
+Vorlagen sind `.md`- oder `.txt`-Dateien in `templates/` neben der App. Beim ersten Benutzen legt Notex
+drei an: Woche, Tagesnotiz, Besprechung. **Ctrl+Shift+T** erzeugt eine neue Datei aus einer Vorlage im
+gewählten Ordner; jede Vorlage steht auch als „Vorlage: …“ in der Command Palette.
+
+| Platzhalter | Ergebnis |
+|---|---|
+| `{{date}}` / `{{date:%Y-%m-%d}}` | 26.09.2026 / beliebiges strftime-Format |
+| `{{time}}` | 14:05 |
+| `{{weekday}}` | Samstag |
+| `{{week}}` / `{{year}}` | ISO-Kalenderwoche (zweistellig) / Jahr (mit `{{week}}` das ISO-Jahr) |
+| `{{title}}` | Name der neuen Datei ohne Endung |
+| `{{cursor}}` | hier steht der Cursor danach |
+| `{{date+1}}`, `{{weekday+2}}` | Tagesversatz, z. B. für Wochenpläne |
+
+**Alt+W** („Neue Woche“) legt in `data/Wochen/` den Plan der aktuellen ISO-Woche an, z. B.
+`KW39 2026.md` mit Montag bis Freitag samt Datum; gibt es ihn schon, wird er geöffnet. „Nächste Woche
+anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter Einstellungen → Editor ein.
+
+![Neue Woche](docs/31-new-week.png)
 
 ## Verschlüsselte Notizen
 
@@ -360,6 +382,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
+| Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
 | Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
@@ -389,6 +413,7 @@ Notex/
   _internal/      <- Python + Qt, nicht anfassen
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
   history/        <- Versionsverlauf (entsteht beim ersten Speichern, darf gelöscht werden)
+  templates/      <- Vorlagen (.md/.txt), beim ersten Benutzen mit drei Beispielen angelegt
   config.json     <- Einstellungen und Zustand (wird jede Sekunde bei Änderung gesichert)
   themes/, fonts/user/, user_dictionary.txt   <- eigene Themes, Schriften, Wörterbuch (optional)
   licenses/, docs/ENCRYPTION.md, LICENSE, THIRD_PARTY_LICENSES.md, CHANGELOG.md

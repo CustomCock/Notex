@@ -340,7 +340,9 @@ def main() -> int:
             window.tabs.open_file(target)
         later(5800, open_locked)
         later(6400, lambda: save(window, "30-encrypted-locked"))
-        later(6500, lambda: (window.close(), app.quit()))
+        later(6500, lambda: window.new_week())
+        later(7000, lambda: save(window, "31-new-week"))
+        later(7100, lambda: (window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)

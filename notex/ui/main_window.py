@@ -213,6 +213,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Zuletzt geöffnet …", "Ctrl+R", self.show_recent))
         file_menu.addAction(self._action("Versionsverlauf …", "Ctrl+Shift+Y", self.show_history))
         file_menu.addSeparator()
+        file_menu.addAction(self._action("Neue Datei aus Vorlage …", "Ctrl+Shift+T", lambda: self.new_from_template()))
+        file_menu.addAction(self._action("Neue Woche", "Alt+W", lambda: self.new_week()))
+        file_menu.addAction(self._action("Nächste Woche anlegen", None, lambda: self.new_week(next_week=True)))
+        file_menu.addAction(self._action("Vorlagen-Ordner öffnen", None, self.open_templates_folder))
+        file_menu.addSeparator()
         file_menu.addAction(self._action("Neue verschlüsselte Notiz …", "Ctrl+Shift+Alt+N", self.new_encrypted_note))
         file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
         file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
@@ -819,6 +824,104 @@ class MainWindow(QMainWindow):
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
 
+    # ---- Vorlagen ---------------------------------------------------------------------------
+    def templates_folder(self) -> Path:
+        from notex.core.templates import ensure_defaults
+        folder = app_root() / "templates"
+        try:
+            ensure_defaults(folder)
+        except OSError:
+            pass
+        return folder
+
+    def _create_from_text(self, path: Path, text: str, cursor: int | None) -> None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fileops.atomic_write_bytes(path, text.encode("utf-8"))
+        except OSError as error:
+            dialogs.warn(self, "Neue Datei", str(error))
+            return
+        self.file_index.request_rescan()
+        editor = self.tabs.open_file(path)
+        self.sidebar.tree.select_path(path)
+        if editor is not None and cursor is not None:
+            c = editor.textCursor()
+            c.setPosition(min(cursor, len(editor.toPlainText())))
+            editor.setTextCursor(c)
+            editor.center_cursor()
+
+    def new_from_template(self, name: str | None = None) -> None:
+        from datetime import datetime
+        from notex.core.templates import default_file_name, list_templates, render
+        folder = self.templates_folder()
+        names = [p.name for p in list_templates(folder)]
+        if name is None:
+            if not names:
+                self.toast.show_message("Keine Vorlagen – Vorlagen-Ordner öffnen und .md/.txt ablegen", "info")
+                return
+            name = dialogs.choose(self, "Neue Datei aus Vorlage", "Vorlage:", names)
+            if name is None:
+                return
+        try:
+            template = (folder / name).read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeDecodeError) as error:
+            dialogs.warn(self, "Vorlage", str(error))
+            return
+        now = datetime.now()
+        tree = self.sidebar.tree
+        target_folder = tree.folder_for(tree.selected_path())
+        file_name = dialogs.ask_text(self, "Neue Datei aus Vorlage", "Dateiname:", default_file_name(name, now))
+        if not file_name:
+            return
+        if "." not in file_name:
+            file_name += Path(name).suffix or ".md"
+        if fileops.is_encrypted_path(file_name):
+            dialogs.warn(self, "Neue Datei aus Vorlage", "Vorlagen erzeugen Klartext – für .ntx „Neue verschlüsselte Notiz“ nutzen.")
+            return
+        path = target_folder / file_name
+        if path.exists():
+            dialogs.warn(self, "Neue Datei aus Vorlage", f"„{file_name}“ gibt es schon.")
+            return
+        rendered = render(template, now, title=Path(file_name).stem)
+        self._create_from_text(path, rendered.text, rendered.cursor)
+
+    def new_week(self, next_week: bool = False) -> None:
+        """Wochenplan für die aktuelle (oder nächste) ISO-Woche anlegen – gibt es ihn schon, wird er geöffnet."""
+        from datetime import datetime, timedelta
+        from notex.core.templates import monday_of, render, render_name, template_text
+        cfg = self.config.get("templates", {})
+        now = datetime.now()
+        monday = monday_of(now.date()) + timedelta(days=7 if next_week else 0)
+        folder_name = str(cfg.get("week_folder", "Wochen")).strip().strip("/\\") or "Wochen"
+        folder = (self.root / folder_name)
+        if not fileops.is_within(folder, self.root):
+            folder = self.root / "Wochen"
+        name = render_name(str(cfg.get("week_name", "KW{{week}} {{year}}")), now, base=monday) + ".md"
+        path = folder / name
+        if path.exists():
+            self.tabs.open_file(path)
+            self.sidebar.tree.select_path(path)
+            self.toast.show_message(f"{name} gibt es schon – geöffnet", "calendar-clock")
+            return
+        template = template_text(self.templates_folder(), str(cfg.get("week_template", "Woche.md"))) \
+            or template_text(self.templates_folder(), "Woche.md") or ""
+        rendered = render(template, now, title=Path(name).stem, base=monday)
+        self._create_from_text(path, rendered.text, rendered.cursor)
+        self.toast.show_message(f"{name} angelegt", "calendar-clock")
+
+    def open_templates_folder(self) -> None:
+        fileops.reveal_in_file_manager(self.templates_folder())
+
+    def _refresh_template_commands(self) -> None:
+        """Jede Vorlage als eigener Befehl in der Command Palette („Vorlage: Besprechung“)."""
+        from notex.core.templates import list_templates
+        for command in list(self.registry.all()):
+            if command.id.startswith("template:"):
+                self.registry.remove(command.id)
+        for path in list_templates(self.templates_folder()):
+            self.registry.add(f"template:{path.name}", f"Vorlage: {path.stem}", lambda n=path.name: self.new_from_template(n),
+                              category="Datei", keywords="neu vorlage template")
+
     # ---- Verschlüsselte Notizen ------------------------------------------------------------
     def eventFilter(self, watched, event) -> bool:
         from PySide6.QtCore import QEvent
@@ -1348,6 +1451,8 @@ class MainWindow(QMainWindow):
         self.registry.add(id, title, callback, category=category, shortcut=shortcut, **kw)
 
     def show_palette(self, mode: str) -> None:
+        if mode == "commands":
+            self._refresh_template_commands()
         self.palette.recent_files = [self.tabs.relative(Path(p)) if not self.tabs.is_external(Path(p)) else p
                                      for p in self.config.get("recent_files", [])]
         self.file_index.set_externals([p for p in self.config.get("recent_files", []) if self.tabs.is_external(Path(p))])

@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.4.0] – unveröffentlicht
+
+### Hinzugefügt
+- Vorlagen in `templates/` neben der App (Woche, Tagesnotiz, Besprechung als Start), Platzhalter {{date}} {{time}}
+  {{weekday}} {{week}} {{year}} {{title}} {{cursor}} plus Formate und Tagesversätze; Neue Datei aus Vorlage
+  (Ctrl+Shift+T), jede Vorlage als Befehl in der Command Palette
+- Neue Woche (Alt+W): Wochenplan der aktuellen ISO-Woche in `data/Wochen/`, vorhandener Plan wird geöffnet;
+  „Nächste Woche anlegen“; Ordner, Dateiname und Vorlage einstellbar
+
+### Behoben
+- Überblendung beim Tabwechsel deckte kurz die Tab-Leiste ab und ließ unten einen Streifen frei (falsche
+  Koordinaten); bleibt die Animation hängen, verschwindet die Blende trotzdem
+
 ## [1.3.0] – 2026-09-26
 
 ### Hinzugefügt
