@@ -1,5 +1,5 @@
 @echo off
-rem Baut Textbaum unter Windows. Voraussetzung: Python 3.12 im PATH.
+rem Baut Notex unter Windows. Voraussetzung: Python 3.12 im PATH.
 cd /d "%~dp0"
 if not exist venv (
     python -m venv venv
@@ -9,5 +9,5 @@ python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 python build.py
 echo.
-echo Ergebnis liegt in dist\Textbaum\
+echo Ergebnis liegt in dist\Notex\
 pause

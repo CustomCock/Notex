@@ -1,7 +1,7 @@
 import codecs
 from pathlib import Path
 
-from textbaum.core.encoding import decode_bytes, detect_encoding, detect_eol, encode_text, read_text_file
+from notex.core.encoding import decode_bytes, detect_encoding, detect_eol, encode_text, read_text_file
 
 
 def test_detect_utf8_bom() -> None:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
-from textbaum.core.search import SearchOptions, search
+from notex.core.search import SearchOptions, search
 
 
 class SearchWorker(QThread):

@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from textbaum.core.encoding import encode_text
+from notex.core.encoding import encode_text
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:

@@ -1,4 +1,4 @@
-/* Textbaum – mattes Dunkelgrau, flach, keine Glanzeffekte.
+/* Notex – mattes Dunkelgrau, flach, keine Glanzeffekte.
    Platzhalter @name werden in theme.py durch Farben ersetzt. */
 
 * {

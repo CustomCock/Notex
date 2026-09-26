@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterator
 
-from textbaum.core.encoding import decode_bytes
+from notex.core.encoding import decode_bytes
 
 SNIPPET_BEFORE = 30   # Zeichen Kontext vor dem Treffer
 SNIPPET_AFTER = 60    # Zeichen Kontext nach dem Treffer

@@ -11,7 +11,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QFileIconProvider
 
-from textbaum.theme.theme import COLORS
+from notex.theme.theme import COLORS
 
 
 def _pixmap(size: int) -> tuple[QPixmap, QPainter]:

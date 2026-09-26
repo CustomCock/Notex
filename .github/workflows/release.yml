@@ -32,8 +32,8 @@ jobs:
       - name: ZIP packen
         shell: pwsh
         run: |
-          $name = "Textbaum-${{ github.ref_name }}-windows-portable.zip"
-          Compress-Archive -Path dist/Textbaum -DestinationPath $name
+          $name = "Notex-${{ github.ref_name }}-windows-portable.zip"
+          Compress-Archive -Path dist/Notex -DestinationPath $name
           "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Release erstellen und ZIP anhängen

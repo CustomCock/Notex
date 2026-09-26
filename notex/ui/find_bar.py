@@ -6,7 +6,7 @@ from typing import Callable
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QLabel, QLineEdit, QPushButton, QWidget
 
-from textbaum.ui.editor import Editor
+from notex.ui.editor import Editor
 
 
 class FindBar(QWidget):

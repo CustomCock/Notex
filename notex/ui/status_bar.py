@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QLabel, QStatusBar
 
-from textbaum.ui.editor import Editor
+from notex.ui.editor import Editor
 
 ENCODING_LABELS = {"utf-8": "UTF-8", "utf-8-sig": "UTF-8 BOM", "cp1252": "cp1252"}
 

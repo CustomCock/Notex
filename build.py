@@ -1,8 +1,8 @@
-"""Baut die portable App mit PyInstaller nach dist/Textbaum/.
+"""Baut die portable App mit PyInstaller nach dist/Notex/.
 
 Aufruf:  python build.py
-Ergebnis: dist/Textbaum/Textbaum.exe (Windows) plus _internal/ mit allen Abhängigkeiten.
-Den Ordner dist/Textbaum kann man komplett kopieren; data/ und config.json
+Ergebnis: dist/Notex/Notex.exe (Windows) plus _internal/ mit allen Abhängigkeiten.
+Den Ordner dist/Notex kann man komplett kopieren; data/ und config.json
 entstehen beim ersten Start daneben.
 """
 from __future__ import annotations
@@ -15,26 +15,26 @@ from pathlib import Path
 import PyInstaller.__main__
 
 ROOT = Path(__file__).resolve().parent
-PACKAGE = ROOT / "textbaum"
+PACKAGE = ROOT / "notex"
 # PyInstaller trennt Quelle und Ziel mit ";" auf Windows und ":" sonst
 SEP = ";" if sys.platform == "win32" else ":"
 
 
 def main() -> None:
     os.chdir(ROOT)
-    for stale in (ROOT / "build", ROOT / "dist" / "Textbaum"):
+    for stale in (ROOT / "build", ROOT / "dist" / "Notex"):
         shutil.rmtree(stale, ignore_errors=True)
 
     args = [
         str(ROOT / "main.py"),
-        "--name", "Textbaum",
+        "--name", "Notex",
         "--noconfirm",
         "--clean",
         "--windowed",                       # kein Konsolenfenster
-        "--icon", str(PACKAGE / "assets" / "textbaum.ico"),
+        "--icon", str(PACKAGE / "assets" / "notex.ico"),
         # Nicht-Python-Dateien, die die App zur Laufzeit lädt (Pfad im Bundle wie im Quellbaum)
-        "--add-data", f"{PACKAGE / 'theme' / 'dark.qss'}{SEP}textbaum/theme",
-        "--add-data", f"{PACKAGE / 'assets'}{SEP}textbaum/assets",
+        "--add-data", f"{PACKAGE / 'theme' / 'dark.qss'}{SEP}notex/theme",
+        "--add-data", f"{PACKAGE / 'assets'}{SEP}notex/assets",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",
@@ -47,7 +47,7 @@ def main() -> None:
         "--exclude-module", "PySide6.QtPdf",
     ]
     PyInstaller.__main__.run(args)
-    print(f"\nFertig: {ROOT / 'dist' / 'Textbaum'}")
+    print(f"\nFertig: {ROOT / 'dist' / 'Notex'}")
 
 
 if __name__ == "__main__":

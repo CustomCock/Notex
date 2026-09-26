@@ -8,14 +8,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QToolButton, QVBoxLayout, QWidget
 
-from textbaum import APP_NAME
-from textbaum.core.encoding import read_text_file
-from textbaum.ui.editor_tabs import EditorTabs
-from textbaum.ui.file_watcher import OpenFileWatcher
-from textbaum.ui.find_bar import FindBar
-from textbaum.ui.sidebar import Sidebar
-from textbaum.ui.status_bar import StatusBar
-from textbaum.ui.winapi import apply_dark_titlebar
+from notex import APP_NAME
+from notex.core.encoding import read_text_file
+from notex.ui.editor_tabs import EditorTabs
+from notex.ui.file_watcher import OpenFileWatcher
+from notex.ui.find_bar import FindBar
+from notex.ui.sidebar import Sidebar
+from notex.ui.status_bar import StatusBar
+from notex.ui.winapi import apply_dark_titlebar
 
 
 class MainWindow(QMainWindow):

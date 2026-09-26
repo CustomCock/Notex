@@ -7,11 +7,11 @@ from pathlib import Path
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from textbaum import APP_NAME
-from textbaum.core.config import load_config, save_config
-from textbaum.paths import config_path, data_dir
-from textbaum.theme.theme import load_stylesheet
-from textbaum.ui.main_window import MainWindow
+from notex import APP_NAME
+from notex.core.config import load_config, save_config
+from notex.paths import config_path, data_dir
+from notex.theme.theme import load_stylesheet
+from notex.ui.main_window import MainWindow
 
 
 def run() -> int:
@@ -22,7 +22,7 @@ def run() -> int:
     app.setApplicationName(APP_NAME)
     app.setStyle("Fusion")  # neutraler Basis-Stil, auf dem das QSS sauber aufsetzt
     app.setStyleSheet(load_stylesheet())
-    icon_path = Path(__file__).resolve().parent / "assets" / "textbaum.png"
+    icon_path = Path(__file__).resolve().parent / "assets" / "notex.png"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from textbaum.core.search import SearchOptions, iter_files, search
+from notex.core.search import SearchOptions, iter_files, search
 
 
 @pytest.fixture

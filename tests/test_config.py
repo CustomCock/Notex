@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from textbaum.core.config import DEFAULTS, load_config, save_config
+from notex.core.config import DEFAULTS, load_config, save_config
 
 
 def test_missing_file_gives_defaults(tmp_path: Path) -> None:

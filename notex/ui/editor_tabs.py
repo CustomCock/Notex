@@ -6,10 +6,10 @@ from pathlib import Path
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
-from textbaum.core.encoding import read_text_file
-from textbaum.core import fileops
-from textbaum.core.fileops import save_text_file
-from textbaum.ui.editor import Editor
+from notex.core.encoding import read_text_file
+from notex.core import fileops
+from notex.core.fileops import save_text_file
+from notex.ui.editor import Editor
 
 DIRTY_MARK = " ●"
 MIN_FONT_SIZE, MAX_FONT_SIZE = 6, 40

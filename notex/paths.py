@@ -12,7 +12,7 @@ from pathlib import Path
 def app_root() -> Path:
     """Der Ordner, in dem die App liegt.
 
-    - Gebaut (PyInstaller setzt `sys.frozen`): der Ordner der Textbaum.exe.
+    - Gebaut (PyInstaller setzt `sys.frozen`): der Ordner der Notex.exe.
     - Dev-Modus: der Projektordner, also der Ordner über diesem Paket.
     """
     if getattr(sys, "frozen", False):

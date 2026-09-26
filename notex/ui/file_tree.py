@@ -14,8 +14,8 @@ from PySide6.QtCore import QDir, QModelIndex, QPoint, Qt, Signal
 from PySide6.QtGui import QDropEvent
 from PySide6.QtWidgets import QAbstractItemView, QFileSystemModel, QInputDialog, QMenu, QMessageBox, QTreeView
 
-from textbaum.core import fileops
-from textbaum.theme.icons import FlatIconProvider
+from notex.core import fileops
+from notex.theme.icons import FlatIconProvider
 
 
 class FileTree(QTreeView):

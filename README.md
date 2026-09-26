@@ -1,9 +1,9 @@
-# Textbaum
+# Notex
 
 Portabler Explorer + Editor für Textdateien unter Windows. Ein Ordner, eine EXE,
 keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich den Zustand.
 
-![Screenshot von Textbaum](docs/screenshot.png)
+![Screenshot von Notex](docs/screenshot.png)
 <!-- Screenshot-Platzhalter: docs/screenshot.png anlegen, z. B. mit Win+Shift+S -->
 
 ## Was es kann
@@ -39,8 +39,8 @@ keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich
 ## Ordnerstruktur der portablen App
 
 ```
-Textbaum/
-  Textbaum.exe
+Notex/
+  Notex.exe
   _internal/      <- Python + Qt, nicht anfassen
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
   config.json     <- Einstellungen und Zustand (wird beim Beenden geschrieben)
@@ -71,14 +71,14 @@ Im Dev-Modus liegen `data/` und `config.json` im Projektordner (beide in `.gitig
 python -m pytest
 ```
 
-Die Tests decken die Qt-freie Kernlogik in `textbaum/core/` ab: Suche, Encoding-Erkennung,
+Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche, Encoding-Erkennung,
 atomares Speichern und das Laden einer kaputten `config.json`.
 
 ### Projektstruktur
 
 ```
 main.py                 Einstieg
-textbaum/
+notex/
   paths.py              App-Ordner ermitteln (EXE-Ordner bzw. Projektordner)
   app.py                QApplication, Theme, Hauptfenster
   core/                 Qt-frei: config, encoding, fileops, search
@@ -96,13 +96,13 @@ build.py / build.bat    PyInstaller-Build
 python build.py
 ```
 
-oder Doppelklick auf `build.bat` (legt bei Bedarf ein venv an). Ergebnis: `dist/Textbaum/`.
+oder Doppelklick auf `build.bat` (legt bei Bedarf ein venv an). Ergebnis: `dist/Notex/`.
 Diesen Ordner kannst du komplett kopieren, z. B. auf einen USB-Stick.
 
 ## Release über GitHub Actions
 
 Ein Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut die App
-auf `windows-latest`, packt `dist/Textbaum` als ZIP und hängt es an ein GitHub-Release.
+auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
 
 ```bat
 git tag v0.1.0

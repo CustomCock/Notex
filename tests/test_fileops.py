@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from textbaum.core import fileops
+from notex.core import fileops
 
 
 def test_atomic_write_creates_file_and_leaves_no_temp(tmp_path: Path) -> None:

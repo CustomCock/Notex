@@ -1,4 +1,4 @@
-"""Erzeugt das App-Icon (textbaum/assets/textbaum.ico + .png) aus einer kleinen Zeichnung.
+"""Erzeugt das App-Icon (notex/assets/notex.ico + .png) aus einer kleinen Zeichnung.
 
 Aufruf: python tools/make_icon.py
 Braucht nur PySide6 – kein Grafikprogramm. Das Icon: ein dunkles Quadrat mit
@@ -17,7 +17,7 @@ import struct  # noqa: E402
 from PySide6.QtCore import QBuffer, QIODevice, QRectF, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QGuiApplication, QImage, QPainter, QPen  # noqa: E402
 
-OUT_DIR = Path(__file__).resolve().parent.parent / "textbaum" / "assets"
+OUT_DIR = Path(__file__).resolve().parent.parent / "notex" / "assets"
 
 
 def draw(size: int) -> QImage:
@@ -89,8 +89,8 @@ def write_ico(path: Path, images: list[QImage]) -> None:
 def main() -> int:
     app = QGuiApplication(sys.argv)  # noqa: F841 – QPainter braucht eine laufende GUI-Anwendung
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    draw(256).save(str(OUT_DIR / "textbaum.png"))
-    write_ico(OUT_DIR / "textbaum.ico", [draw(size) for size in (16, 24, 32, 48, 64, 128, 256)])
+    draw(256).save(str(OUT_DIR / "notex.png"))
+    write_ico(OUT_DIR / "notex.ico", [draw(size) for size in (16, 24, 32, 48, 64, 128, 256)])
     draw_close("#8a8a8a").save(str(OUT_DIR / "close.png"))
     draw_close("#d0d0d0").save(str(OUT_DIR / "close-hover.png"))
     print("geschrieben:", OUT_DIR)

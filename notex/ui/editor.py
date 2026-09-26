@@ -11,8 +11,8 @@ from PySide6.QtCore import QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QTextCharFormat, QTextCursor, QTextDocument
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
 
-from textbaum.core.encoding import TextFile
-from textbaum.theme.theme import COLORS, editor_font
+from notex.core.encoding import TextFile
+from notex.theme.theme import COLORS, editor_font
 
 MAX_HIGHLIGHTS = 2000   # mehr Treffer gleichzeitig zu markieren wäre nur langsam
 

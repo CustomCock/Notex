@@ -14,10 +14,10 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLineEdit, QStackedWidget, QVBoxLayout, QWidget
 
-from textbaum.core.search import SearchOptions, SearchResult
-from textbaum.ui.file_tree import FileTree
-from textbaum.ui.search_results import SearchResults
-from textbaum.ui.search_worker import SearchWorker
+from notex.core.search import SearchOptions, SearchResult
+from notex.ui.file_tree import FileTree
+from notex.ui.search_results import SearchResults
+from notex.ui.search_worker import SearchWorker
 
 DEBOUNCE_MS = 250
 
