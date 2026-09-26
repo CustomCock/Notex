@@ -6,10 +6,13 @@ Mit NOTEX_SCALE=1.5 lässt sich High-DPI (150 %) prüfen.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
 import tempfile
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -35,7 +38,50 @@ from notex.ui.settings_dialog import SettingsDialog  # noqa: E402
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs"
 OUT.mkdir(parents=True, exist_ok=True)
 
+SPELL_SAMPLE = (
+    "# Rechtschreibung\n\n"
+    "Notex prüft Wörter offline mit Hunspell. Ein Tippfehller wie dieser bekommt eine rote Wellenlinie,\n"
+    "und im Kontextmenü stehen Vorschläge. Das Wort das gerade getippt wird bleibt bis zur Pause unmarkiert.\n\n"
+    "URLs wie https://languagetool.org, Pfade wie C:\\Notex\\data und `inline_code` werden ausgelassen.\n\n"
+    "```python\nprint(\"in Codeblöcken wird nichts geprüft\")\n```\n\n"
+    "Grammatik kommt von LanguageTool: Ich weiß daß es geht  hier.\n"
+)
+
+
+class FakeLanguageTool(BaseHTTPRequestHandler):
+    """Antwortet wie LanguageTool, aber nur für den Beispieltext – damit der Screenshot ohne Server geht."""
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8")
+        matches = []
+        if "geht  hier" in body:
+            text = body.split("text=")[1].split("&")[0]
+            from urllib.parse import unquote_plus
+            text = unquote_plus(text)
+            matches = [
+                {"offset": text.index("daß"), "length": 3, "message": "Seit der Rechtschreibreform 1996 schreibt man „dass“.",
+                 "replacements": [{"value": "dass"}], "rule": {"id": "DASS_MIT_SS", "category": {"name": "Grammatik"}}},
+                {"offset": text.index("geht  hier") + 4, "length": 2, "message": "Möglicherweise doppeltes Leerzeichen.",
+                 "replacements": [{"value": " "}], "rule": {"id": "WHITESPACE_RULE"}},
+            ]
+        payload = json.dumps({"matches": matches}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"[]")
+
+    def log_message(self, *args):
+        pass
+
+
 SAMPLE = {
+    "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
     "Projekte/Notex/README.md": "# Notex\n\nPortabler Explorer + Editor für Textdateien.\n\n## Ziele\n\n- portabel\n- schnell\n- ruhig im Design\n",
     "Projekte/Notex/todo.txt": "[ ] Suche testen\n[x] Encoding-Erkennung\n[ ] Release v0.1.0 taggen\n[ ] Screenshot für README\n",
     "Projekte/Python/notizen.md": "# Python-Notizen\n\n## Dataclasses\n\nEin `@dataclass` erzeugt __init__, __repr__ und __eq__ automatisch.\nFrozen dataclasses sind unveränderlich – gut für Design-Tokens.\n\n## Pathlib\n\n`Path(__file__).resolve().parent` liefert den Ordner der Datei.\nDas ist die Grundlage für portable Apps: Root relativ zur EXE ermitteln.\n\n## Threads\n\nEin `threading.Event` ist die einfachste Art, einen Worker sauber abzubrechen.\nDie Suche in Notex prüft das Event einmal pro Datei.\n",
@@ -74,6 +120,12 @@ def compose(window, popup, name: str, offset: QPoint) -> None:
 
 def main() -> int:
     write_sample()
+    httpd = HTTPServer(("127.0.0.1", 0), FakeLanguageTool)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    (WORK / "user_dictionary.txt").write_text("Notex\nHunspell\nLanguageTool\n", encoding="utf-8")
+    (WORK / "config.json").write_text(json.dumps({
+        "grammar": {"enabled": True, "server_url": f"http://127.0.0.1:{httpd.server_port}"},
+    }), encoding="utf-8")
     app = create_app([])
     window = create_window()
     window.resize(1280, 800)
@@ -159,7 +211,31 @@ def main() -> int:
         later(800, lambda: theme_manager().apply(theme_from_preset("Graphit", "Dunkel")))
         later(1000, lambda: save(window, "13-preset-graphit-dunkel"))
         later(1200, lambda: theme_manager().apply(theme_from_preset("Matt", "Weiß")))
-        later(1400, s_end)
+        later(1400, s_spelling)
+
+    def s_spelling():
+        editor = window.tabs.open_file(data / "Projekte/Notex/rechtschreibung.md")
+        window.sidebar.tree.select_path(data / "Projekte/Notex/rechtschreibung.md")
+        editor.goto_line(3, 0, 0)
+        later(2800, lambda: s_spelling_menu(editor))
+
+    def s_spelling_menu(editor):
+        block = editor.document().findBlockByNumber(2)
+        column = block.text().index("Tippfehller") + 4
+        cursor = editor.textCursor()
+        cursor.setPosition(block.position() + column)
+        editor.setTextCursor(cursor)
+        point = editor.cursorRect(cursor).center()
+        menu = editor.build_context_menu(point)
+        menu.show()
+        origin = editor.viewport().mapTo(window, point)
+        compose(window, menu, "14-spellcheck", origin + QPoint(8, 8))
+        menu.close()
+        dialog = SettingsDialog(window, window.theme_store)
+        dialog.show_category("Rechtschreibung")
+        dialog.show()
+        offset = QPoint((window.width() - dialog.width()) // 2, (window.height() - dialog.height()) // 2)
+        later(300, lambda: (compose(window, dialog, "15-settings-spelling", offset), dialog.reject(), later(100, s_end)))
 
     def s_end():
         window.close()
@@ -168,6 +244,8 @@ def main() -> int:
     later(500, s_empty)
     later(25000, app.quit)
     code = app.exec()
+    httpd.shutdown()
+    httpd.server_close()
     shutil.rmtree(WORK, ignore_errors=True)
     return code
 
