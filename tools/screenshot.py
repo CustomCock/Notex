@@ -347,7 +347,17 @@ def main() -> int:
         later(6400, lambda: save(window, "30-encrypted-locked"))
         later(6500, lambda: window.new_week())
         later(7000, lambda: save(window, "31-new-week"))
-        later(7100, lambda: (window.close(), app.quit()))
+        def open_update():
+            from notex.core.update_check import Release
+            from notex.ui.update_service import UpdateDialog
+            release = Release((1, 5, 0), "v1.5.0", "Notex 1.5.0", "https://github.com/CustomCock/Notex/releases/tag/v1.5.0",
+                              "2026-10-10T10:00:00Z", "## Neu\n- Beispielhafte Versionshinweise\n- Noch ein Punkt\n\n"
+                              "**Full Changelog**: v1.4.0...v1.5.0")
+            window._shot_update = UpdateDialog(window, release)
+            window._shot_update.show()
+        later(7100, open_update)
+        later(7500, lambda: save(window._shot_update, "32-update"))
+        later(7600, lambda: (window._shot_update.close(), window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)

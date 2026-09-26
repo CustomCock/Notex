@@ -10,6 +10,9 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   (Ctrl+Shift+T), jede Vorlage als Befehl in der Command Palette
 - Neue Woche (Alt+W): Wochenplan der aktuellen ISO-Woche in `data/Wochen/`, vorhandener Plan wird geöffnet;
   „Nächste Woche anlegen“; Ordner, Dateiname und Vorlage einstellbar
+- Update-Check über die GitHub-Releases-API: höchstens einmal täglich, abschaltbar, nur ein Hinweis –
+  kein Download; Hilfe › Nach Updates suchen mit Versionshinweisen, Release-Seite öffnen, Version überspringen;
+  ignoriert Entwürfe, Vorabversionen und Tags, die keine Version sind
 
 ### Behoben
 - Überblendung beim Tabwechsel deckte kurz die Tab-Leiste ab und ließ unten einen Streifen frei (falsche

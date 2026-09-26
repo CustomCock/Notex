@@ -119,6 +119,9 @@ class MainWindow(QMainWindow):
         self.history = History(history_folder(app_root()), max_bytes=int(hist_cfg.get("max_mb", 200)) * 1024 * 1024)
         self._snapshots_since_limit = 0
         QTimer.singleShot(5000, self._enforce_history_limit)
+        self._update_worker = None
+        self._available_release = None
+        QTimer.singleShot(8000, self.check_updates)   # nach dem Start, nie blockierend
         # Verschlüsselte Notizen nach Inaktivität sperren
         import time as _time
         self._last_activity = _time.monotonic()
@@ -269,6 +272,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self._action("Verkleinern", QKeySequence.StandardKey.ZoomOut, lambda: self.tabs.zoom(-1)))
         view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(FONT_SIZE.editor)))
         help_menu = self.menuBar().addMenu("&Hilfe")
+        help_menu.addAction(self._action("Nach Updates suchen …", None, lambda: self.check_updates(manual=True)))
         help_menu.addAction(self._action(f"Über {APP_NAME}", None, lambda: AboutDialog(self).exec()))
         # Ctrl+Plus liegt je nach Tastatur auf "Ctrl+=" – beides abdecken
         self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
@@ -476,6 +480,24 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
         from notex.ui.widgets import Chip
+        from PySide6.QtWidgets import QCheckBox
+
+        page.section("Updates")
+        update_box = QCheckBox("Einmal täglich auf GitHub nach neuen Versionen sehen")
+        update_box.setChecked(bool(self.config.get("update_check", {}).get("enabled", True)))
+        update_box.toggled.connect(lambda on: self.config.setdefault("update_check", {}).__setitem__("enabled", on))
+        page.add(update_box)
+        check_now = QPushButton("Jetzt prüfen")
+        check_now.clicked.connect(lambda: self.check_updates(manual=True))
+        check_row = QHBoxLayout()
+        check_row.setContentsMargins(0, 0, 0, 0)
+        check_row.addWidget(check_now)
+        check_row.addStretch(1)
+        check_widget = QWidget()
+        check_widget.setLayout(check_row)
+        page.add(check_widget)
+        page.note("Es wird nur die öffentliche Release-Liste abgerufen (api.github.com), ohne Kennung oder "
+                  "Nutzungsdaten. Notex lädt und installiert nie etwas selbst – es zeigt nur einen Hinweis.")
 
         page.section("Windows-Dateizuordnung")
         status_label = QLabel()
@@ -823,6 +845,53 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    # ---- Update-Check ------------------------------------------------------------------------
+    def check_updates(self, manual: bool = False) -> None:
+        """Automatisch höchstens einmal pro Tag (abschaltbar), manuell jederzeit. Lädt nie etwas herunter."""
+        from notex.core import update_check
+        from notex.ui.update_service import UpdateWorker
+        cfg = self.config.setdefault("update_check", {})
+        if not manual and (not cfg.get("enabled", True) or not update_check.should_check(float(cfg.get("last_check", 0) or 0))):
+            return
+        if self._update_worker is not None and self._update_worker.isRunning():
+            return
+        worker = UpdateWorker()
+        worker.done.connect(lambda payload, error, m=manual: self._on_update_result(payload, error, m))
+        worker.finished.connect(lambda w=worker: setattr(self, "_update_worker", None) if self._update_worker is w else None)
+        self._update_worker = worker
+        worker.start()
+        if manual:
+            self.toast.show_message("Suche nach Updates …", "refresh-cw")
+
+    def _on_update_result(self, payload, error: str, manual: bool) -> None:
+        import time as _time
+        from notex import __version__
+        from notex.core import update_check
+        cfg = self.config.setdefault("update_check", {})
+        if error:
+            if manual:
+                dialogs.warn(self, "Nach Updates suchen", "Die Release-Liste konnte nicht abgerufen werden.",
+                             informative=f"{error}\n\nOffline oder Proxy? Die Seite {update_check.RELEASES_PAGE} "
+                                         "lässt sich auch im Browser öffnen.")
+            return
+        cfg["last_check"] = _time.time()
+        release = update_check.update_available(payload, __version__, "" if manual else str(cfg.get("skipped", "")))
+        self._available_release = release
+        if release is None:
+            if manual:
+                self.toast.show_message(f"{APP_NAME} {__version__} ist aktuell", "check")
+            return
+        if manual:
+            self._show_update_dialog(release)
+        else:
+            self.toast.show_message(f"{APP_NAME} {release.version_text} verfügbar – Hilfe › Nach Updates suchen", "download")
+
+    def _show_update_dialog(self, release) -> None:
+        from notex.ui.update_service import UpdateDialog
+        dialog = UpdateDialog(self, release)
+        dialog.skip_requested.connect(lambda version: self.config.setdefault("update_check", {}).__setitem__("skipped", version))
+        dialog.exec()
 
     # ---- Vorlagen ---------------------------------------------------------------------------
     def templates_folder(self) -> Path:

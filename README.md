@@ -179,6 +179,17 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 
 ![Neue Woche](docs/31-new-week.png)
 
+## Updates
+
+Notex sieht höchstens einmal am Tag in der öffentlichen Release-Liste auf GitHub nach, ob es eine neuere
+Version gibt, und zeigt dann einen Hinweis. **Es wird nie etwas heruntergeladen oder installiert.**
+„Hilfe › Nach Updates suchen …“ prüft sofort und zeigt die Versionshinweise; „Release-Seite öffnen“
+öffnet den Browser, „Diese Version überspringen“ schweigt bis zur nächsten. Abschalten unter
+Einstellungen → System. Übertragen wird nur die normale HTTPS-Anfrage an api.github.com (IP-Adresse,
+User-Agent `Notex/<Version>`), keine Kennung und keine Nutzungsdaten.
+
+![Update verfügbar](docs/32-update.png)
+
 ## Verschlüsselte Notizen
 
 Dateien mit der Endung `.ntx` sind mit einem Passwort verschlüsselt: AES-256-GCM, der Schlüssel entsteht
@@ -386,6 +397,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
 | Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
+| Hilfe › Nach Updates suchen | Update-Check sofort (kein Kürzel, auch in der Command Palette) |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |

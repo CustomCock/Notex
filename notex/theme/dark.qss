@@ -389,6 +389,10 @@ QTextBrowser#Preview QScrollBar::handle:vertical:hover {
 QDialog, QMessageBox, QInputDialog {
     background: @surface;
 }
+/* Texte in Dialogen liegen auf @surface – ohne das malt die globale QWidget-Regel dunkle Kästen dahinter */
+QDialog QLabel, QMessageBox QLabel, QInputDialog QLabel, QDialog QCheckBox {
+    background: transparent;
+}
 QMessageBox QLabel, QInputDialog QLabel {
     color: @text;
     background: transparent;

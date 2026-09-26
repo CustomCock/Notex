@@ -63,6 +63,11 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "update_check": {         # höchstens einmal täglich GitHub-Releases prüfen, nie etwas herunterladen
+        "enabled": True,
+        "last_check": 0.0,    # Unix-Zeit der letzten Prüfung
+        "skipped": "",        # Version, auf die nicht mehr hingewiesen wird
+    },
     "templates": {            # Vorlagen liegen in templates/ neben der App
         "week_folder": "Wochen",            # Ordner in data/ für „Neue Woche“
         "week_name": "KW{{week}} {{year}}",  # Dateiname (ohne .md) mit Platzhaltern

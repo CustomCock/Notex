@@ -83,13 +83,16 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   Befehle Neue Datei aus Vorlage (Ctrl+Shift+T), Neue Woche (Alt+W), Nächste Woche, Vorlagen-Ordner öffnen, jede
   Vorlage als Palette-Befehl, Einstellungen (Wochen-Ordner, -Dateiname). Nebenbei behoben: Tab-Überblendung in
   falschen Koordinaten (seit 1.0).
+- D2 Update-Check: `core/update_check.py` (höchste gültige Version statt jüngstes Datum, Entwürfe/Vorabversionen/
+  Nicht-Versions-Tags wie „main“ ignoriert, nur Links ins eigene Repo, 2-MB-Grenze, 1×/Tag), `ui/update_service.py`
+  (QThread + Dialog), Hinweis per Toast, Hilfe › Nach Updates suchen, überspringen, Einstellungen → System. Kein
+  Download. Tests inkl. lokalem Fake-Server.
 
 ## Offen
 
 ### Block C – 1.3.0
 
 ### Block D – 1.4.0
-- Update-Check über GitHub-Releases-API (max. 1×/Tag, kein Auto-Download).
 - Linux: Plattform-Guards, .desktop/MIME auf Knopfdruck, CI auf Windows und Ubuntu, Linux-tar.gz-Build.
 
 ### Bekannte Einschränkungen (nicht geplant zu ändern, außer angegeben)
