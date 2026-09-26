@@ -35,6 +35,8 @@ def main() -> None:
         # Nicht-Python-Dateien, die die App zur Laufzeit lädt (Pfad im Bundle wie im Quellbaum)
         "--add-data", f"{PACKAGE / 'theme' / 'dark.qss'}{SEP}notex/theme",
         "--add-data", f"{PACKAGE / 'assets'}{SEP}notex/assets",
+        "--add-data", f"{PACKAGE / 'dictionaries'}{SEP}notex/dictionaries",
+        "--collect-data", "enchant",   # enchant-DLLs + Provider aus dem Windows-Wheel
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",

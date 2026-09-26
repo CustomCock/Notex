@@ -41,7 +41,7 @@ class MainWindow(QMainWindow):
         self.theme_store = ThemeStore(app_root() / "themes")
 
         self.sidebar = Sidebar(root, config)
-        self.tabs = EditorTabs(root)
+        self.tabs = EditorTabs(root, config)
         self.tabs.font_size = config["font_size"]
         self.tabs.word_wrap = config["word_wrap"]
         self.tabs.paper_mode = config["paper_mode"]
@@ -100,6 +100,9 @@ class MainWindow(QMainWindow):
         self.tabs.file_saved.connect(lambda path: self.toast.show_message(f"Gespeichert · {path.name}"))
         self.watcher.file_changed_externally.connect(self._on_external_change)
         self.watcher.file_removed_externally.connect(self._on_external_remove)
+        self.status.spell_toggled.connect(self.toggle_spellcheck)
+        self.status.grammar_toggled.connect(self.toggle_grammar)
+        self.status.language_chosen.connect(self._set_tab_language)
 
     # ---- Menü & Shortcuts ---------------------------------------------------
     def _action(self, text: str, shortcut, slot, checkable: bool = False) -> QAction:
@@ -128,6 +131,13 @@ class MainWindow(QMainWindow):
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
         edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
         edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
+        edit_menu.addSeparator()
+        self.spell_action = self._action("Rechtschreibung prüfen", "F7", self.toggle_spellcheck, checkable=True)
+        self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
+        edit_menu.addAction(self.spell_action)
+        self.grammar_action = self._action("Grammatik prüfen (LanguageTool)", "Shift+F7", self.toggle_grammar, checkable=True)
+        self.grammar_action.setChecked(self.config["grammar"]["enabled"])
+        edit_menu.addAction(self.grammar_action)
 
         view_menu = self.menuBar().addMenu("&Ansicht")
         self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
@@ -156,6 +166,90 @@ class MainWindow(QMainWindow):
         self.config["theme"] = theme_manager().apply(theme)
         self.anim_action.setChecked(not theme["animation"]["enabled"])
 
+    # ---- Rechtschreibung / Grammatik --------------------------------------------
+    def toggle_spellcheck(self) -> None:
+        self.config["spellcheck"]["enabled"] = not self.config["spellcheck"]["enabled"]
+        self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
+        self.tabs.apply_spell_settings()
+        self._update_status()
+
+    def toggle_grammar(self) -> None:
+        self.config["grammar"]["enabled"] = not self.config["grammar"]["enabled"]
+        self.grammar_action.setChecked(self.config["grammar"]["enabled"])
+        self.tabs.apply_spell_settings()
+        self._update_status()
+
+    def _set_tab_language(self, language) -> None:
+        editor = self.tabs.current_editor()
+        if editor is not None:
+            editor.set_language(language)
+            self._update_status()
+
+    def build_spelling_settings(self, page) -> None:
+        """Seite „Rechtschreibung“ im Einstellungsdialog (wird vom Dialog aufgerufen)."""
+        from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLineEdit, QWidget
+        from notex.core.spell import LANGUAGE_LABELS
+        from notex.ui.widgets import Chip
+
+        cfg = self.config["spellcheck"]
+        page.section("Rechtschreibung")
+        enabled = QCheckBox("Rechtschreibung prüfen  (F7)")
+        enabled.setChecked(cfg["enabled"])
+        enabled.toggled.connect(lambda on: (cfg.__setitem__("enabled", on), self.spell_action.setChecked(on),
+                                            self.tabs.apply_spell_settings(), self._update_status()))
+        page.row("", enabled)
+        language = QComboBox()
+        for key in ("de", "en", "both"):
+            language.addItem(LANGUAGE_LABELS[key], key)
+        language.setCurrentIndex(("de", "en", "both").index(cfg["language"]))
+        language.currentIndexChanged.connect(lambda i: (cfg.__setitem__("language", language.itemData(i)),
+                                                         self.tabs.apply_spell_settings(), self._update_status()))
+        page.row("Sprache", language)
+
+        chips_row = QHBoxLayout()
+        chips_row.setContentsMargins(0, 0, 0, 0)
+        for ext in self.config["extensions"]:
+            chip = Chip(ext, f"Rechtschreibung für {ext}-Dateien")
+            chip.setChecked(ext in cfg["extensions"])
+
+            def toggled(on: bool, e=ext) -> None:
+                exts = set(cfg["extensions"])
+                exts.add(e) if on else exts.discard(e)
+                cfg["extensions"] = sorted(exts)
+                self.tabs.apply_spell_settings()
+                self._update_status()
+
+            chip.toggled.connect(toggled)
+            chips_row.addWidget(chip)
+        chips_row.addStretch(1)
+        chips = QWidget()
+        chips.setLayout(chips_row)
+        page.row("Dateiendungen", chips)
+        backend = self.tabs.checker.backend_name()
+        words = len(list(self.tabs.checker.user_words()))
+        page.note(f"Wörterbücher de_DE und en_US (LibreOffice) liegen in notex/dictionaries/. "
+                  f"Backend: {backend}. Eigene Wörter: {words} in user_dictionary.txt.")
+
+        gcfg = self.config["grammar"]
+        page.section("Grammatik (LanguageTool)")
+        genabled = QCheckBox("Grammatik prüfen  (Shift+F7)")
+        genabled.setChecked(gcfg["enabled"])
+        genabled.toggled.connect(lambda on: (gcfg.__setitem__("enabled", on), self.grammar_action.setChecked(on),
+                                             self.tabs.apply_spell_settings(), self._update_status()))
+        page.row("", genabled)
+        url = QLineEdit(gcfg["server_url"])
+        url.setPlaceholderText("http://localhost:8081")
+        url.editingFinished.connect(lambda: (gcfg.__setitem__("server_url", url.text().strip() or "http://localhost:8081"),
+                                             self.tabs.apply_spell_settings()))
+        page.row("Server-URL", url)
+        public = QCheckBox("Öffentliche API (api.languagetool.org) erlauben")
+        public.setChecked(gcfg["allow_public"])
+        public.toggled.connect(lambda on: (gcfg.__setitem__("allow_public", on), self.tabs.apply_spell_settings()))
+        page.row("", public)
+        page.note("Achtung: Bei der öffentlichen API wird der Text jedes geprüften Absatzes an einen externen "
+                  "Server von LanguageTool geschickt. Standard ist ein lokaler Server (siehe README), "
+                  "dann bleibt alles auf deinem Rechner.")
+
     def open_settings(self, category: str | None = None) -> None:
         dialog = SettingsDialog(self, self.theme_store)
         if category:
@@ -179,6 +273,7 @@ class MainWindow(QMainWindow):
         self.sidebar.retheme()
         self.tabs.retheme()
         self.find_bar.retheme()
+        self.status.retheme()
         self.anim_action.setChecked(anim.reduced())
         self.sidebar.tree.setAnimated(not anim.reduced())
         self._update_status()
@@ -304,6 +399,10 @@ class MainWindow(QMainWindow):
             return
         relative = self.tabs.relative(editor.path)
         self.status.update_for(editor, relative)
+        self.status.set_spell_state(
+            self.tabs.spell_enabled_for(editor.path), self.tabs.grammar_enabled_for(editor.path),
+            editor.language or self.config["spellcheck"]["language"], editor.language is not None,
+            self.tabs.grammar_note() if hasattr(self.tabs, "grammar_note") else "")
         self.setWindowTitle(f"{'● ' if editor.is_dirty else ''}{relative} – {APP_NAME}")
 
     # ---- Zustand ----------------------------------------------------------

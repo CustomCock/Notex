@@ -556,3 +556,27 @@ QListWidget::item:selected {
 QColorDialog {
     background: @bg;
 }
+
+/* Statusleiste: Sprache und Prüf-Schalter */
+QToolButton#StatusLanguage {
+    background: transparent;
+    border: 1px solid transparent;
+    color: @text_muted;
+    padding: 1px 6px;
+    min-height: 0;
+    font-size: @fs_smallpx;
+}
+QToolButton#StatusLanguage:hover {
+    background: @hover;
+    color: @text;
+}
+QToolButton#StatusLanguage::menu-indicator {
+    image: none;
+    width: 0;
+}
+QStatusBar QToolButton#IconButton {
+    padding: 2px;
+}
+QStatusBar QToolButton#IconButton:checked {
+    background: @selection;
+}

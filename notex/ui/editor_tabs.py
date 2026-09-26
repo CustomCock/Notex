@@ -13,6 +13,8 @@ from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 from notex.core import fileops
 from notex.core.encoding import read_text_file
 from notex.core.fileops import save_text_file
+from notex.core.spell import SpellChecker
+from notex.paths import app_root
 from notex.theme.tokens import COLORS, DURATION, FONT_SIZE
 from notex.ui import anim
 from notex.ui.editor import Editor
@@ -60,9 +62,12 @@ class EditorTabs(QTabWidget):
     font_size_changed = Signal(int)
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, config: dict | None = None) -> None:
         super().__init__()
         self.root = root
+        self.config = config if config is not None else {}
+        self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
+        self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
         self.font_size = FONT_SIZE.editor
         self.word_wrap = False
         self.paper_mode = True
@@ -122,8 +127,9 @@ class EditorTabs(QTabWidget):
             except OSError as error:
                 QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
                 return None
-            editor = Editor(path, text_file, self.font_size)
+            editor = Editor(path, text_file, self.font_size, checker=self.checker)
             editor.set_word_wrap(self.word_wrap)
+            self._apply_spell_to(editor)
             editor.document().modificationChanged.connect(lambda _m, e=editor: self._refresh_title(e))
             editor.cursorPositionChanged.connect(self.status_changed.emit)
             editor.textChanged.connect(self.status_changed.emit)
@@ -262,7 +268,29 @@ class EditorTabs(QTabWidget):
     def retheme(self) -> None:
         for page in self.pages():
             page.retheme()
+            if page.editor.highlighter is not None:
+                page.editor.highlighter.reset()   # Wellenlinien in neuen Theme-Farben
         self.tab_bar.update()
+
+    # ---- Rechtschreibung / Grammatik -------------------------------------------
+    def spell_enabled_for(self, path: Path) -> bool:
+        cfg = self.config.get("spellcheck", {})
+        return bool(cfg.get("enabled", True)) and path.suffix.lower() in cfg.get("extensions", [])
+
+    def grammar_enabled_for(self, path: Path) -> bool:
+        cfg = self.config.get("grammar", {})
+        return bool(cfg.get("enabled", False)) and path.suffix.lower() in self.config.get("spellcheck", {}).get("extensions", [])
+
+    def _apply_spell_to(self, editor: Editor) -> None:
+        editor.set_spellcheck(self.spell_enabled_for(editor.path), self.grammar_enabled_for(editor.path))
+
+    def apply_spell_settings(self) -> None:
+        """Nach Änderung in Config/Einstellungen: alle Tabs neu einstellen."""
+        self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
+        for editor in self.editors():
+            self._apply_spell_to(editor)
+            if editor.highlighter is not None:
+                editor.highlighter.reset()
 
     def open_paths(self) -> list[str]:
         return [self.relative(editor.path) for editor in self.editors()]

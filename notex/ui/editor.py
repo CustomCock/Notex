@@ -12,10 +12,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QTextBlockFormat, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
-from PySide6.QtWidgets import QFrame, QTextEdit, QWidget
+from PySide6.QtGui import QAction, QColor, QPainter, QTextBlockFormat, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
+from PySide6.QtWidgets import QFrame, QMenu, QTextEdit, QWidget
 
 from notex.core.encoding import TextFile
+from notex.core.spell import SpellChecker, LANGUAGE_LABELS
+from notex.theme.icons import icon
+from notex.theme.theme import style_menu
+from notex.ui.spell_highlighter import Issue, SpellHighlighter
 from notex.theme.fonts import editor_font
 from notex.theme.tokens import COLORS, LAYOUT, SPACING
 
@@ -38,13 +42,17 @@ class LineNumberArea(QWidget):
 class Editor(QTextEdit):
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
 
-    def __init__(self, path: Path, text_file: TextFile, font_size: int) -> None:
+    def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None) -> None:
         super().__init__()
         self.path = path
         self.encoding = text_file.encoding
         self.eol = text_file.eol
         self._search_selections: list[QTextEdit.ExtraSelection] = []
         self._font_size = font_size
+        self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
+        self.highlighter: SpellHighlighter | None = None
+        if checker is not None:
+            self.highlighter = SpellHighlighter(self.document(), self, checker, markdown=path.suffix.lower() == ".md")
 
         self.setObjectName("Editor")
         self.setFrameStyle(QFrame.Shape.NoFrame)
@@ -70,6 +78,8 @@ class Editor(QTextEdit):
         self.document().setModified(False)
         self._update_margins()
         self._refresh_extra_selections()
+        if self.highlighter is not None:
+            self.highlighter.mark_loaded()
 
     def _apply_line_height(self) -> None:
         """1.5-fache Zeilenhöhe für alle Blöcke. Neue Zeilen erben das Format beim Tippen."""
@@ -263,6 +273,74 @@ class Editor(QTextEdit):
                 painter.drawText(0, top, right, height, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                                  str(block.blockNumber() + 1))
             block = block.next()
+
+    # ---- Rechtschreibung -----------------------------------------------------
+    def set_spellcheck(self, spelling: bool, grammar: bool) -> None:
+        if self.highlighter is not None:
+            self.highlighter.set_enabled(spelling, grammar)
+
+    def set_language(self, language: str | None) -> None:
+        self.language = language
+        if self.highlighter is not None:
+            self.highlighter.set_language(language)
+
+    def issues_at_cursor(self, cursor: QTextCursor) -> list[Issue]:
+        if self.highlighter is None:
+            return []
+        return self.highlighter.issues_at(cursor.block(), cursor.positionInBlock())
+
+    def build_context_menu(self, pos) -> QMenu:
+        """Standardmenü, davor Vorschläge für ein markiertes Wort bzw. die Grammatik-Regel."""
+        cursor = self.cursorForPosition(pos)
+        issues = self.issues_at_cursor(cursor)
+        menu = style_menu(self.createStandardContextMenu(pos))
+        if issues:
+            first = menu.actions()[0] if menu.actions() else None
+            for issue in issues:
+                self._add_issue_actions(menu, first, cursor, issue)
+            menu.insertSeparator(first)
+        return menu
+
+    def contextMenuEvent(self, event) -> None:
+        self.build_context_menu(event.pos()).exec(event.globalPos())
+
+    def _replace_issue(self, cursor: QTextCursor, issue: Issue, replacement: str) -> None:
+        block_start = cursor.block().position()
+        edit = QTextCursor(self.document())
+        edit.setPosition(block_start + issue.start)
+        edit.setPosition(block_start + issue.start + issue.length, QTextCursor.MoveMode.KeepAnchor)
+        edit.insertText(replacement)
+
+    def _add_issue_actions(self, menu: QMenu, before, cursor: QTextCursor, issue: Issue) -> None:
+        checker = self.highlighter.checker if self.highlighter else None
+        if issue.kind == "spelling" and checker is not None:
+            suggestions = checker.suggestions(issue.word, limit=5, language=self.language)
+            if not suggestions:
+                action = QAction("Keine Vorschläge", menu)
+                action.setEnabled(False)
+                menu.insertAction(before, action)
+            for suggestion in suggestions:
+                action = QAction(suggestion, menu)
+                action.triggered.connect(lambda _c=False, s=suggestion: self._replace_issue(cursor, issue, s))
+                menu.insertAction(before, action)
+            add = QAction(icon("plus"), "Zum Wörterbuch hinzufügen", menu)
+            add.triggered.connect(lambda: (checker.add_to_dictionary(issue.word), self.highlighter.reset()))
+            menu.insertAction(before, add)
+            ignore = QAction("In dieser Sitzung ignorieren", menu)
+            ignore.triggered.connect(lambda: (checker.ignore_for_session(issue.word), self.highlighter.reset()))
+            menu.insertAction(before, ignore)
+        elif issue.kind == "grammar":
+            title = QAction(issue.message[:90] + ("…" if len(issue.message) > 90 else ""), menu)
+            title.setEnabled(False)
+            menu.insertAction(before, title)
+            for replacement in issue.replacements[:5]:
+                action = QAction(f"→ {replacement}", menu)
+                action.triggered.connect(lambda _c=False, r=replacement: self._replace_issue(cursor, issue, r))
+                menu.insertAction(before, action)
+            if issue.rule:
+                rule = QAction(f"Regel: {issue.rule}", menu)
+                rule.setEnabled(False)
+                menu.insertAction(before, rule)
 
     # ---- Zoom -------------------------------------------------------------
     def wheelEvent(self, event) -> None:

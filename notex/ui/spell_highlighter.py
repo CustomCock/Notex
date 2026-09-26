@@ -1,0 +1,217 @@
+"""Markiert Rechtschreib- und Grammatikfehler im Editor (rote bzw. blaue Wellenlinie).
+
+Leistung:
+- QSyntaxHighlighter prüft von sich aus nur geänderte Blöcke neu.
+- Beim Öffnen großer Dateien würde Qt trotzdem alle Blöcke durchlaufen. Deshalb prüft
+  der Highlighter nur Blöcke im sichtbaren Bereich (plus Puffer); beim Scrollen werden
+  die neu sichtbaren nachgeholt (kurz verzögert).
+- Das Wort, das gerade getippt wird, bleibt bis zu einer Tipp-Pause unmarkiert.
+- Jedes Wort wird pro Sprache nur einmal nachgeschlagen (Cache im SpellChecker).
+
+Grammatik-Treffer kommen asynchron vom LanguageTool-Client und werden pro Block
+gespeichert; beim nächsten Zeichnen des Blocks legt der Highlighter sie mit an.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextBlock, QTextBlockUserData, QTextCharFormat, QTextDocument
+
+from notex.core.spell import SpellChecker
+from notex.core.spell_rules import is_code_fence, tokenize
+from notex.theme.tokens import COLORS
+
+STATE_NORMAL, STATE_IN_FENCE = 0, 1
+TYPING_PAUSE_MS = 400
+SCROLL_CHECK_MS = 120
+VISIBLE_BUFFER = 20     # Blöcke über/unter dem sichtbaren Bereich mitprüfen
+
+
+@dataclass
+class Issue:
+    start: int
+    length: int
+    kind: str                     # "spelling" | "grammar"
+    word: str = ""
+    message: str = ""
+    replacements: list[str] = field(default_factory=list)
+    rule: str = ""
+
+
+class BlockIssues(QTextBlockUserData):
+    """Hängt an jedem geprüften Block: die gefundenen Probleme, für das Kontextmenü."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.issues: list[Issue] = []
+        self.checked = False
+
+
+class SpellHighlighter(QSyntaxHighlighter):
+    def __init__(self, document: QTextDocument, editor, checker: SpellChecker, markdown: bool) -> None:
+        super().__init__(document)
+        self.editor = editor
+        self.checker = checker
+        self.markdown = markdown
+        self.spelling_enabled = False
+        self.grammar_enabled = False
+        self.language: str | None = None          # None = globale Sprache des Checkers
+        self._grammar: dict[int, list[Issue]] = {}  # Blocknummer -> Grammatik-Treffer
+        self._full_pass = False
+
+        # Tipp-Pause: das aktuelle Wort erst prüfen, wenn kurz nichts mehr kommt
+        self._typing_timer = QTimer(self)
+        self._typing_timer.setSingleShot(True)
+        self._typing_timer.setInterval(TYPING_PAUSE_MS)
+        self._typing_timer.timeout.connect(self._recheck_cursor_block)
+        self._typing = False
+        # Beim Scrollen die neu sichtbaren Blöcke nachprüfen
+        self._scroll_timer = QTimer(self)
+        self._scroll_timer.setSingleShot(True)
+        self._scroll_timer.setInterval(SCROLL_CHECK_MS)
+        self._scroll_timer.timeout.connect(self.check_visible)
+        editor.verticalScrollBar().valueChanged.connect(lambda _v: self._scroll_timer.start())
+        document.contentsChange.connect(self._on_contents_change)
+
+    # ---- Steuerung -----------------------------------------------------------------
+    def set_enabled(self, spelling: bool, grammar: bool) -> None:
+        changed = (spelling, grammar) != (self.spelling_enabled, self.grammar_enabled)
+        self.spelling_enabled, self.grammar_enabled = spelling, grammar
+        if not grammar:
+            self._grammar.clear()
+        if changed:
+            self.reset()
+
+    def set_language(self, language: str | None) -> None:
+        self.language = language
+        self.reset()
+
+    def reset(self) -> None:
+        """Alle Markierungen verwerfen und den sichtbaren Bereich neu prüfen."""
+        block = self.document().firstBlock()
+        while block.isValid():
+            data = block.userData()
+            if isinstance(data, BlockIssues):
+                data.checked = False
+            block = block.next()
+        if not (self.spelling_enabled or self.grammar_enabled):
+            self._full_pass = True     # einmal komplett durchlaufen, um alte Wellenlinien zu löschen
+            self.rehighlight()
+            self._full_pass = False
+            return
+        self.check_visible()
+
+    def mark_loaded(self) -> None:
+        """Nach dem Laden einer Datei: das ist kein Tippen, also sofort alles prüfen."""
+        self._typing_timer.stop()
+        self._typing = False
+        self._grammar.clear()
+        self.reset()
+
+    def set_grammar_issues(self, block_number: int, issues: list[Issue]) -> None:
+        self._grammar[block_number] = issues
+        block = self.document().findBlockByNumber(block_number)
+        if block.isValid():
+            self.rehighlightBlock(block)
+
+    def clear_grammar(self) -> None:
+        self._grammar.clear()
+        self.reset()
+
+    def issues_at(self, block: QTextBlock, position_in_block: int) -> list[Issue]:
+        data = block.userData()
+        if not isinstance(data, BlockIssues):
+            return []
+        return [i for i in data.issues if i.start <= position_in_block <= i.start + i.length]
+
+    # ---- Sichtbarer Bereich ----------------------------------------------------------
+    def visible_block_range(self) -> tuple[int, int]:
+        viewport = self.editor.viewport()
+        first = self.editor.cursorForPosition(viewport.rect().topLeft()).blockNumber()
+        last = self.editor.cursorForPosition(viewport.rect().bottomLeft()).blockNumber()
+        return max(0, first - VISIBLE_BUFFER), last + VISIBLE_BUFFER
+
+    def check_visible(self) -> None:
+        if not (self.spelling_enabled or self.grammar_enabled):
+            return
+        first, last = self.visible_block_range()
+        block = self.document().findBlockByNumber(first)
+        while block.isValid() and block.blockNumber() <= last:
+            data = block.userData()
+            if not (isinstance(data, BlockIssues) and data.checked):
+                self.rehighlightBlock(block)
+            block = block.next()
+
+    def _in_visible_range(self, block: QTextBlock) -> bool:
+        first, last = self.visible_block_range()
+        return first <= block.blockNumber() <= last
+
+    # ---- Tippen -----------------------------------------------------------------------
+    def _on_contents_change(self, position: int, removed: int, added: int) -> None:
+        self._typing = True
+        self._typing_timer.start()
+        # Grammatik-Treffer des geänderten Blocks sind jetzt veraltet
+        block = self.document().findBlock(position)
+        if block.isValid():
+            self._grammar.pop(block.blockNumber(), None)
+
+    def _recheck_cursor_block(self) -> None:
+        self._typing = False
+        block = self.editor.textCursor().block()
+        if block.isValid() and (self.spelling_enabled or self.grammar_enabled):
+            self.rehighlightBlock(block)
+
+    # ---- Das eigentliche Prüfen -------------------------------------------------------
+    def highlightBlock(self, text: str) -> None:
+        block = self.currentBlock()
+        previous_state = self.previousBlockState()
+        in_fence = previous_state == STATE_IN_FENCE
+        if self.markdown and is_code_fence(text):
+            in_fence = not in_fence
+            self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
+            self._store(block, [])
+            return
+        self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
+
+        if not (self.spelling_enabled or self.grammar_enabled):
+            self._store(block, [])
+            return
+        if not self._full_pass and not self._in_visible_range(block):
+            return   # später, wenn der Block sichtbar wird
+
+        issues: list[Issue] = []
+        if self.spelling_enabled and not (self.markdown and in_fence):
+            issues.extend(self._spell_issues(block, text))
+        if self.grammar_enabled:
+            issues.extend(self._grammar.get(block.blockNumber(), []))
+
+        spell_format = QTextCharFormat()
+        spell_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SpellCheckUnderline)
+        spell_format.setUnderlineColor(QColor(COLORS.spell_underline))
+        grammar_format = QTextCharFormat()
+        grammar_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+        grammar_format.setUnderlineColor(QColor(COLORS.grammar_underline))
+        for issue in issues:
+            self.setFormat(issue.start, issue.length, spell_format if issue.kind == "spelling" else grammar_format)
+        self._store(block, issues)
+
+    def _spell_issues(self, block: QTextBlock, text: str) -> list[Issue]:
+        # Das Wort unter dem Cursor auslassen, solange getippt wird
+        cursor = self.editor.textCursor()
+        skip_at = cursor.positionInBlock() if (self._typing and cursor.block() == block) else -1
+        issues = []
+        for token in tokenize(text, self.markdown):
+            if skip_at >= 0 and token.start <= skip_at <= token.end:
+                continue
+            if not self.checker.is_correct(token.text, self.language):
+                issues.append(Issue(token.start, token.end - token.start, "spelling", word=token.text))
+        return issues
+
+    def _store(self, block: QTextBlock, issues: list[Issue]) -> None:
+        data = block.userData()
+        if not isinstance(data, BlockIssues):
+            data = BlockIssues()
+            self.setCurrentBlockUserData(data)
+        data.issues = issues
+        data.checked = True
