@@ -6,10 +6,65 @@ from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QTabBar, QToolButton, QWidget
 
 from notex.theme.icons import icon, pixmap
-from notex.theme.tokens import COLORS, LAYOUT, SPACING
+from notex.theme.tokens import COLORS, DURATION, LAYOUT, RADIUS, SPACING
+from notex.ui.anim import HoverFade
 
 
-class Chip(QToolButton):
+class FadeButton(QToolButton):
+    """QToolButton, der seine Hover-Fläche selbst malt – mit weichem Übergang.
+
+    Das QSS lässt den Hintergrund transparent; hier kommt die Fläche mit
+    Deckkraft aus HoverFade darunter, dann zeichnet Qt Text/Icon wie gewohnt.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._hover = HoverFade(self, DURATION.hover)
+        self._hover.changed.connect(self.update)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+
+    def enterEvent(self, event) -> None:
+        self._hover.fade_to(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._hover.fade_to(False)
+        super().leaveEvent(event)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        if self.isCheckable() and self.isChecked():
+            painter.setBrush(QColor(COLORS.selection))
+            painter.drawRoundedRect(self.rect(), RADIUS.control, RADIUS.control)
+        elif self._hover.value > 0:
+            color = QColor(COLORS.hover)
+            color.setAlphaF(self._hover.value)
+            painter.setBrush(color)
+            painter.drawRoundedRect(self.rect(), RADIUS.control, RADIUS.control)
+        if self.isDown():
+            color = QColor(COLORS.selection)
+            painter.setBrush(color)
+            painter.drawRoundedRect(self.rect(), RADIUS.control, RADIUS.control)
+        painter.end()
+        super().paintEvent(event)
+
+
+class IconButton(FadeButton):
+    """Flacher Icon-Button (z. B. Seitenleiste umschalten, Leiste schließen)."""
+
+    def __init__(self, icon_name: str, tooltip: str, size: int = 16) -> None:
+        super().__init__()
+        self.setObjectName("IconButton")
+        self.setIcon(icon(icon_name))
+        self.setIconSize(QSize(size, size))
+        self.setToolTip(tooltip)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+
+
+class Chip(FadeButton):
     """Kompakter Umschalter (an/aus), Ersatz für eine Checkbox. Gleiche API: isChecked/setChecked/toggled."""
 
     def __init__(self, text: str, tooltip: str = "") -> None:
@@ -171,6 +226,9 @@ class EditorTabBar(QTabBar):
         self.setDrawBase(False)
         self.setElideMode(Qt.TextElideMode.ElideRight)
         self._hovered = -1
+        self._hover_prev = -1
+        self._hover = HoverFade(self, DURATION.hover)
+        self._hover.changed.connect(self.update)
 
     def tabInserted(self, index: int) -> None:
         super().tabInserted(index)
@@ -196,7 +254,26 @@ class EditorTabBar(QTabBar):
             button = self.tabButton(i, QTabBar.ButtonPosition.RightSide) if i >= 0 else None
             if isinstance(button, TabButton):
                 button.set_state(tab_hovered=(i == index))
+        self._hover_prev = self._hovered
         self._hovered = index
+        self._hover.value = 0.0
+        self._hover.fade_to(True)   # der neue Tab blendet ein, der alte gleichzeitig aus
+
+    def paintEvent(self, event) -> None:
+        # Hover-Flächen vor den Tabs malen; das QSS hält die Tab-Hintergründe transparent
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        for index, alpha in ((self._hovered, self._hover.value), (self._hover_prev, 1.0 - self._hover.value)):
+            if index < 0 or index == self.currentIndex() or alpha <= 0:
+                continue
+            color = QColor(COLORS.sidebar)
+            color.setAlphaF(alpha)
+            painter.setBrush(color)
+            rect = self.tabRect(index).adjusted(SPACING.xs, SPACING.xs, -SPACING.xs, -SPACING.xs - 2)
+            painter.drawRoundedRect(rect, RADIUS.control, RADIUS.control)
+        painter.end()
+        super().paintEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
         self._set_hovered(self.tabAt(event.position().toPoint()))

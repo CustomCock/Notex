@@ -14,7 +14,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import QDir, QModelIndex, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QDir, QModelIndex, QPersistentModelIndex, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QDropEvent, QPainter
 from PySide6.QtWidgets import (QAbstractItemView, QFileSystemModel, QLabel, QMenu, QStyledItemDelegate,
                                QStyleOptionViewItem, QTreeView)
@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QFileSystemModel, QLabel, QMen
 from notex.core import fileops
 from notex.theme.icons import LucideIconProvider, icon, pixmap
 from notex.theme.theme import style_menu
-from notex.theme.tokens import COLORS, LAYOUT, RADIUS, SPACING
-from notex.ui import dialogs
+from notex.theme.tokens import COLORS, DURATION, LAYOUT, RADIUS, SPACING
+from notex.ui import anim, dialogs
 
 CHEVRON_SIZE = 14
 
@@ -55,6 +55,10 @@ class FileTree(QTreeView):
         self.root = Path(root)
         self._expanded: set[str] = set()
         self._hover_row = QModelIndex()
+        self._hover_prev = QModelIndex()
+        self._hover = anim.HoverFade(self, DURATION.hover)
+        self._hover.changed.connect(self.viewport().update)
+        self._chevrons: dict[QPersistentModelIndex, float] = {}   # laufende Drehwinkel
 
         self.model_ = QFileSystemModel(self)
         self.model_.setIconProvider(LucideIconProvider())
@@ -79,6 +83,7 @@ class FileTree(QTreeView):
         self.setIndentation(LAYOUT.tree_indent)
         self.setIconSize(QSize(16, 16))
         self.setMouseTracking(True)
+        self.setAnimated(not anim.reduced())   # Auf-/Zuklappen gleitet
         self.setFrameShape(QTreeView.Shape.NoFrame)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
@@ -147,9 +152,25 @@ class FileTree(QTreeView):
     # ---- Auf-/Zuklappzustand ------------------------------------------------
     def _on_expanded(self, index: QModelIndex) -> None:
         self._expanded.add(self._relative(self.path_at(index)))
+        self._rotate_chevron(index, 90.0)
 
     def _on_collapsed(self, index: QModelIndex) -> None:
         self._expanded.discard(self._relative(self.path_at(index)))
+        self._rotate_chevron(index, 0.0)
+
+    def _rotate_chevron(self, index: QModelIndex, target: float) -> None:
+        key = QPersistentModelIndex(index)
+        start = self._chevrons.get(key, 90.0 - target)
+
+        def step(value: float) -> None:
+            self._chevrons[key] = value
+            self.viewport().update()
+
+        def done() -> None:
+            self._chevrons.pop(key, None)
+            self.viewport().update()
+
+        anim.animate(self, start, target, DURATION.chevron, step, done)
 
     def expanded_folders(self) -> list[str]:
         return sorted(self._expanded)
@@ -164,7 +185,10 @@ class FileTree(QTreeView):
 
     # ---- Zeichnen ------------------------------------------------------------
     def chevron_angle(self, index: QModelIndex) -> float:
-        """0 = zu (Pfeil nach rechts), 90 = offen. Wird in der Animations-Stufe weich."""
+        """0 = zu (Pfeil nach rechts), 90 = offen; während der Drehung ein Zwischenwert."""
+        running = self._chevrons.get(QPersistentModelIndex(index))
+        if running is not None:
+            return running
         return 90.0 if self.isExpanded(index) else 0.0
 
     def drawBranches(self, painter: QPainter, rect: QRect, index: QModelIndex) -> None:
@@ -182,8 +206,15 @@ class FileTree(QTreeView):
     def row_background(self, index: QModelIndex) -> QColor | None:
         if index in self.selectedIndexes() or index == self.currentIndex():
             return QColor(COLORS.selection)
+        alpha = 0.0
         if index == self._hover_row:
-            return QColor(COLORS.hover)
+            alpha = self._hover.value
+        elif index == self._hover_prev:
+            alpha = 1.0 - self._hover.value
+        if alpha > 0:
+            color = QColor(COLORS.hover)
+            color.setAlphaF(alpha)
+            return color
         return None
 
     def drawRow(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
@@ -207,8 +238,10 @@ class FileTree(QTreeView):
 
     def _set_hover(self, index: QModelIndex) -> None:
         if index != self._hover_row:
+            self._hover_prev = self._hover_row
             self._hover_row = index
-            self.viewport().update()
+            self._hover.value = 0.0
+            self._hover.fade_to(True)   # neue Zeile blendet ein, alte gleichzeitig aus
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

@@ -6,19 +6,49 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QMessageBox, QTabWidget
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QPainter
+from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
 from notex.core import fileops
 from notex.core.encoding import read_text_file
 from notex.core.fileops import save_text_file
-from notex.theme.tokens import FONT_SIZE
+from notex.theme.tokens import COLORS, DURATION, FONT_SIZE
+from notex.ui import anim
 from notex.ui.editor import Editor
 from notex.ui.paper import EditorPage
 from notex.ui.widgets import EditorTabBar
 
 DIRTY_MARK = " ●"
 MIN_FONT_SIZE, MAX_FONT_SIZE = 8, 40
+
+
+class FadeOverlay(QWidget):
+    """Liegt kurz über dem Editorbereich und blendet von Hintergrundfarbe zu durchsichtig."""
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.alpha = 0.0
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.hide()
+
+    def run(self, rect) -> None:
+        if anim.duration(DURATION.fade) == 0:
+            return
+        self.setGeometry(rect)
+        self.alpha = 1.0
+        self.raise_()
+        self.show()
+        anim.animate(self, 1.0, 0.0, DURATION.fade, self._step, self.hide)
+
+    def _step(self, value: float) -> None:
+        self.alpha = value
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        color = QColor(COLORS.bg)
+        color.setAlphaF(self.alpha)
+        QPainter(self).fillRect(self.rect(), color)
 
 
 class EditorTabs(QTabWidget):
@@ -42,6 +72,15 @@ class EditorTabs(QTabWidget):
         self.setMovable(True)
         self.setDocumentMode(True)
         self.dirty_changed.connect(self.tab_bar.set_dirty)
+        self._fade = FadeOverlay(self)
+        self._last_index = -1
+        self.currentChanged.connect(self._on_current_changed)
+
+    def _on_current_changed(self, index: int) -> None:
+        # Kurzer Fade nur bei echtem Wechsel zwischen zwei offenen Tabs
+        if index >= 0 and self._last_index >= 0 and index != self._last_index and self.currentWidget():
+            self._fade.run(self.currentWidget().geometry())
+        self._last_index = index
         self.currentChanged.connect(lambda _index: self.status_changed.emit())
 
     # ---- Zugriff ----------------------------------------------------------

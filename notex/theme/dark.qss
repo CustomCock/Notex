@@ -85,13 +85,14 @@ QToolButton#Chip {
     font-size: @fs_smallpx;
 }
 QToolButton#Chip:hover {
-    background: @hover;
     color: @text;
 }
 QToolButton#Chip:checked {
-    background: @selection;
     color: @text;
-    border-color: @selection;
+    border-color: transparent;
+}
+QToolButton#Chip:pressed {
+    background: transparent;
 }
 QToolButton#Chip:focus {
     border-color: @accent;
@@ -137,7 +138,7 @@ QTabBar {
     qproperty-drawBase: 0;
 }
 QTabBar::tab {
-    background: @bg;
+    background: transparent;
     color: @text_muted;
     border: none;
     border-bottom: 2px solid transparent;
@@ -146,7 +147,7 @@ QTabBar::tab {
     margin: 0;
 }
 QTabBar::tab:hover {
-    background: @sidebar;
+    background: transparent;
     color: @text;
 }
 QTabBar::tab:selected {
@@ -282,11 +283,8 @@ QToolButton#IconButton {
     padding: @sp_xspx;
     min-height: 0;
 }
-QToolButton#IconButton:hover {
-    background: @hover;
-}
-QToolButton#IconButton:checked {
-    background: @selection;
+QToolButton#IconButton:hover, QToolButton#IconButton:pressed, QToolButton#IconButton:checked {
+    background: transparent;
 }
 
 QSplitter::handle {

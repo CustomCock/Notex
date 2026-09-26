@@ -49,6 +49,8 @@ class SvgIconEngine(QIconEngine):
         _renderer(self.name, self._color_for(mode), self.stroke_width).render(painter, QRectF(rect))
 
     def pixmap(self, size: QSize, mode, state) -> QPixmap:
+        if size.isEmpty():
+            return QPixmap()   # z. B. während die Seitenleiste auf 0 px zufährt
         pixmap = QPixmap(size)
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)

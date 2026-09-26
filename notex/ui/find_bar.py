@@ -4,9 +4,9 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import QCheckBox, QGridLayout, QLabel, QLineEdit, QPushButton, QToolButton, QWidget
+from PySide6.QtWidgets import QCheckBox, QGridLayout, QLabel, QLineEdit, QPushButton, QWidget
 
-from notex.theme.icons import icon
+from notex.ui.widgets import IconButton
 
 from notex.ui.editor import Editor
 
@@ -28,10 +28,7 @@ class FindBar(QWidget):
         self.prev_button = QPushButton("Zurück")
         self.replace_button = QPushButton("Ersetzen")
         self.replace_all_button = QPushButton("Alle ersetzen")
-        self.close_button = QToolButton()
-        self.close_button.setObjectName("IconButton")
-        self.close_button.setIcon(icon("x"))
-        self.close_button.setToolTip("Schließen  Esc")
+        self.close_button = IconButton("x", "Schließen  Esc")
 
         grid = QGridLayout(self)
         grid.setContentsMargins(8, 4, 8, 6)

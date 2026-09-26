@@ -6,7 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QSplitter, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget
 
 from notex import APP_NAME
 from notex.core.encoding import read_text_file
@@ -17,7 +17,11 @@ from notex.ui.find_bar import FindBar
 from notex.ui.sidebar import Sidebar
 from notex.ui.status_bar import StatusBar
 from notex.theme.icons import icon
-from notex.theme.tokens import FONT_SIZE
+from notex.theme.tokens import DURATION, FONT_SIZE
+from notex.ui import anim
+from notex.ui.widgets import IconButton
+
+QWIDGETSIZE_MAX = 16777215
 from notex.ui.winapi import apply_dark_titlebar
 
 
@@ -28,6 +32,7 @@ class MainWindow(QMainWindow):
         self.config = config
         self._save_config = on_save_config
         self.setWindowTitle(APP_NAME)
+        anim.set_reduced(config["reduce_animations"])
 
         self.sidebar = Sidebar(root, config)
         self.tabs = EditorTabs(root)
@@ -41,11 +46,9 @@ class MainWindow(QMainWindow):
 
         # Kleiner Button links neben den Tabs, der die Seitenleiste ein-/ausklappt.
         # Er sitzt bewusst außerhalb der Seitenleiste, damit er auch sichtbar ist, wenn sie weg ist.
-        self.sidebar_button = QToolButton()
-        self.sidebar_button.setObjectName("IconButton")
-        self.sidebar_button.setIcon(icon("panel-left"))
-        self.sidebar_button.setToolTip("Seitenleiste ein-/ausblenden  Ctrl+B")
+        self.sidebar_button = IconButton("panel-left", "Seitenleiste ein-/ausblenden  Ctrl+B")
         self.sidebar_button.clicked.connect(self.toggle_sidebar)
+        self._sidebar_anim = None
         self.tabs.setCornerWidget(self.sidebar_button, Qt.Corner.TopLeftCorner)
 
         # Rechte Seite: Tabs oben, darunter (ausblendbar) die Suchen/Ersetzen-Leiste
@@ -120,12 +123,22 @@ class MainWindow(QMainWindow):
         self.paper_action = self._action("Blatt zentrieren", "Alt+P", self.toggle_paper_mode, checkable=True)
         self.paper_action.setChecked(self.config["paper_mode"])
         view_menu.addAction(self.paper_action)
+        self.anim_action = self._action("Animationen reduzieren", None, self.toggle_animations, checkable=True)
+        self.anim_action.setChecked(self.config["reduce_animations"])
+        view_menu.addAction(self.anim_action)
         view_menu.addSeparator()
         view_menu.addAction(self._action("Vergrößern", QKeySequence.StandardKey.ZoomIn, lambda: self.tabs.zoom(+1)))
         view_menu.addAction(self._action("Verkleinern", QKeySequence.StandardKey.ZoomOut, lambda: self.tabs.zoom(-1)))
         view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(FONT_SIZE.editor)))
         # Ctrl+Plus liegt je nach Tastatur auf "Ctrl+=" – beides abdecken
         self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
+
+    def toggle_animations(self) -> None:
+        reduced = not anim.reduced()
+        anim.set_reduced(reduced)
+        self.sidebar.tree.setAnimated(not reduced)
+        self.anim_action.setChecked(reduced)
+        self.config["reduce_animations"] = reduced
 
     def toggle_paper_mode(self) -> None:
         enabled = not self.tabs.paper_mode
@@ -157,16 +170,48 @@ class MainWindow(QMainWindow):
         self.set_sidebar_visible(not self.sidebar.isVisible())
 
     def set_sidebar_visible(self, visible: bool, animate: bool = True) -> None:
-        if not visible and self.sidebar.isVisible():
-            sizes = self.splitter.sizes()
-            if sizes and sizes[0] > 0:
-                self.config["sidebar"]["width"] = sizes[0]  # Breite merken, bevor sie auf 0 geht
-        self.sidebar.setVisible(visible)
-        if visible:
-            width = self.config["sidebar"]["width"]
-            self.splitter.setSizes([width, max(200, self.width() - width)])
+        """Seitenleiste ein-/ausklappen, auf Wunsch animiert (Breite gleitet, ~200 ms)."""
+        if self._sidebar_anim is not None:
+            self._sidebar_anim.stop()
+            self._sidebar_anim = None
+        currently_visible = self.sidebar.isVisible() and self.splitter.sizes()[0] > 0
+        if not visible and currently_visible:
+            self.config["sidebar"]["width"] = self.splitter.sizes()[0]  # Breite merken, bevor sie auf 0 geht
+        width = self.config["sidebar"]["width"]
         self.sidebar_action.setChecked(visible)
         self.config["sidebar"]["visible"] = visible
+
+        if not animate or anim.duration(DURATION.sidebar) == 0 or visible == currently_visible:
+            self.sidebar.setMaximumWidth(QWIDGETSIZE_MAX)
+            self.sidebar.setVisible(visible)
+            if visible:
+                self._apply_sidebar_width(width)
+            return
+
+        # Animation: die Maximalbreite der Seitenleiste fährt hoch/runter, der Splitter folgt.
+        start, end = (0, width) if visible else (width, 0)
+        if visible:
+            self.sidebar.setMaximumWidth(0)
+            self.sidebar.setVisible(True)
+
+        def step(value: float) -> None:
+            self.sidebar.setMaximumWidth(int(value))
+            self._apply_sidebar_width(int(value))
+
+        def done() -> None:
+            self._sidebar_anim = None
+            if visible:
+                self.sidebar.setMaximumWidth(QWIDGETSIZE_MAX)
+                self._apply_sidebar_width(width)
+            else:
+                self.sidebar.setVisible(False)
+                self.sidebar.setMaximumWidth(QWIDGETSIZE_MAX)
+
+        self._sidebar_anim = anim.animate(self, start, end, DURATION.sidebar, step, done)
+
+    def _apply_sidebar_width(self, width: int) -> None:
+        total = sum(self.splitter.sizes()) or self.width()
+        self.splitter.setSizes([width, max(200, total - width)])
 
     # ---- Reaktionen auf Baum / Watcher -----------------------------------------
     def _on_path_renamed(self, old: Path, new: Path) -> None:
