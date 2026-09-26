@@ -88,6 +88,7 @@ def main() -> None:
         *[f"--hidden-import=pygments.lexers.{m}" for m in ("python", "data", "configs", "shell", "html", "css",
                                                           "javascript", "sql", "markup", "textfmts", "special")],
         "--hidden-import=pygments.formatters",
+        "--hidden-import=markdown_it", "--hidden-import=mdurl",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",

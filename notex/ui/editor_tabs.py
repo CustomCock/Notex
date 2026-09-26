@@ -68,6 +68,8 @@ class EditorTabs(QTabWidget):
     text_font_changed = Signal(str)     # Familie ("" = Standard)
     files_dropped = Signal(list)        # Dateien aufs Blatt gezogen
     link_activated = Signal(object, object)     # Editor, LinkSpan
+    preview_link = Signal(object, str)          # Editor, Ziel aus der Markdown-Vorschau
+    view_mode_changed = Signal(str)             # "edit" | "preview" | "split" des aktuellen Tabs
     completion_requested = Signal(object, str, str)   # Editor, Art, Text
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
 
@@ -179,8 +181,13 @@ class EditorTabs(QTabWidget):
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             toolbar.visibility_changed.connect(self._on_toolbar_toggled)
             editor.set_line_numbers(self.line_numbers)
-            page = EditorPage(editor, self.paper_mode, toolbar)
+            page = EditorPage(editor, self.paper_mode, toolbar, root=self.root)
+            page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
+            page.link_requested.connect(lambda target, e=editor: self.preview_link.emit(e, target))
+            page.view_mode_changed.connect(lambda mode, pg=page: self.view_mode_changed.emit(mode) if pg is self.currentWidget() else None)
             index = self.addTab(page, path.name)
+            if page.supports_preview and self.config.get("markdown_view", "edit") != "edit":
+                page.set_view_mode(self.config.get("markdown_view", "edit"))
             self.setTabToolTip(index, self.relative(path))
             if self.is_external(path):
                 self.setTabIcon(index, icon("external-link"))   # dezentes Kennzeichen: außerhalb von data/
@@ -474,11 +481,44 @@ class EditorTabs(QTabWidget):
         c.setPosition(min(position, len(new_text)))
         editor.setTextCursor(c)
 
+    # ---- Markdown-Vorschau ---------------------------------------------------------
+    def current_page(self) -> EditorPage | None:
+        widget = self.currentWidget()
+        return widget if isinstance(widget, EditorPage) else None
+
+    def view_mode(self) -> str:
+        page = self.current_page()
+        return page.view_mode if page is not None else "edit"
+
+    def set_view_mode(self, mode: str) -> bool:
+        """Ansicht des aktuellen Tabs; False, wenn die Datei keine Vorschau hat (kein Markdown)."""
+        page = self.current_page()
+        if page is None or not page.supports_preview:
+            return False
+        page.set_view_mode(mode)
+        self.status_changed.emit()
+        return True
+
+    def cycle_view_mode(self) -> str | None:
+        page = self.current_page()
+        if page is None or not page.supports_preview:
+            return None
+        mode = page.cycle_view_mode()
+        self.status_changed.emit()
+        return mode
+
+    def apply_preview_settings(self) -> None:
+        for page in self.pages():
+            page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
+
     def grammar_note(self) -> str:
         return self.grammar.note if self.config.get("grammar", {}).get("enabled") else ""
 
     def shutdown(self) -> None:
         self.grammar.shutdown()
+        for page in self.pages():
+            if page.preview is not None:
+                page.preview.shutdown()
 
     def open_paths(self) -> list[str]:
         """Für config.json: relativ innerhalb von data/, absolut für externe Dateien."""

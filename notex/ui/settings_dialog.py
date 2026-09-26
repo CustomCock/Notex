@@ -376,6 +376,21 @@ class SettingsDialog(QDialog):
         page.note("Nur sichtbare Blöcke werden gefärbt; Dateien über 2 MB bleiben ohne Highlighting. "
                   "In .md-Dateien werden ```python-Blöcke usw. mit dem passenden Lexer gefärbt.")
 
+        page.section("Markdown-Vorschau")
+        self.markdown_view_box = QComboBox()
+        self.markdown_view_box.addItem("Bearbeiten", "edit")
+        self.markdown_view_box.addItem("Vorschau", "preview")
+        self.markdown_view_box.addItem("Geteilt (Blatt + Vorschau)", "split")
+        self.markdown_view_box.currentIndexChanged.connect(
+            lambda i: self.config.__setitem__("markdown_view", self.markdown_view_box.itemData(i)) if not self._loading else None)
+        page.row(".md öffnen als", self.markdown_view_box)
+        self.sync_scroll_box = QCheckBox("Vorschau scrollt mit dem Editor (geteilte Ansicht)")
+        self.sync_scroll_box.toggled.connect(lambda on: (self.config.__setitem__("preview_sync_scroll", on),
+                                                         self.window_.tabs.apply_preview_settings()) if not self._loading else None)
+        page.row("", self.sync_scroll_box)
+        page.note("Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt. Die Vorschau lädt nie von selbst aus dem "
+                  "Internet: externe Bilder erscheinen als „Bild laden“, externe Links öffnen den Browser erst auf Klick.")
+
         page.section("Wiki-Links")
         self.wiki_box = QCheckBox("[[Links]] hervorheben und auflösen (Ctrl+Klick öffnet)")
         self.wiki_box.toggled.connect(lambda on: (self.config.__setitem__("wiki_links", on), self.window_.tabs.relink_all()) if not self._loading else None)
@@ -452,6 +467,8 @@ class SettingsDialog(QDialog):
         self.line_height_spin.setValue(theme["font"]["line_height"])
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
+        self.markdown_view_box.setCurrentIndex(max(0, self.markdown_view_box.findData(cfg.get("markdown_view", "edit"))))
+        self.sync_scroll_box.setChecked(bool(cfg.get("preview_sync_scroll", True)))
         self.syntax_box.setChecked(bool(cfg.get("syntax_highlighting", True)))
         for ext, chip in self.syntax_chips.items():
             chip.setChecked(ext in cfg.get("syntax_extensions", []))

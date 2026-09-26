@@ -147,6 +147,7 @@ class MainWindow(QMainWindow):
         self.tabs.status_changed.connect(self._update_status)
         self.tabs.file_opened.connect(self._on_file_opened)
         self.tabs.link_activated.connect(self._on_link_activated)
+        self.tabs.preview_link.connect(self._on_preview_link)
         self.tabs.completion_requested.connect(self._on_completion_requested)
         self.tabs.file_saved.connect(self._on_saved_for_links)
         self.tabs.currentChanged.connect(lambda _i: self._refresh_backlinks())
@@ -740,6 +741,9 @@ class MainWindow(QMainWindow):
         a("md_checkbox", "square-check", "Checkbox", "Ctrl+Alt+X", lambda: ed(lambda e: e.apply_line_op(ops.toggle_checkbox)))
         a("md_code", "code", "Code", "Ctrl+Alt+C", lambda: ed(lambda e: e.apply_text_op(ops.toggle_code)))
         a("md_link", "link", "Link", "Ctrl+K", lambda: ed(lambda e: e.apply_text_op(ops.toggle_link)))
+        self.preview_action = a("preview", "eye", "Markdown-Vorschau (Bearbeiten → Vorschau → Geteilt)", "Ctrl+Shift+V",
+                                self.cycle_preview)
+        self.preview_action.setToolTip("Markdown-Vorschau umschalten  Ctrl+Shift+V")
         self.spell_toolbar_action = a("spell", "spell-check", "Rechtschreibung", None, self.toggle_spellcheck, checkable=True)
         self.spell_toolbar_action.setToolTip("Rechtschreibung prüfen  F7")
         self.grammar_toolbar_action = a("grammar", "languages", "Grammatik (LanguageTool)", None, self.toggle_grammar, checkable=True)
@@ -748,6 +752,39 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    # ---- Markdown-Vorschau -------------------------------------------------------------
+    def cycle_preview(self) -> None:
+        mode = self.tabs.cycle_view_mode()
+        if mode is None:
+            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+            return
+        self.toast.show_message({"edit": "Bearbeiten", "preview": "Vorschau", "split": "Geteilte Ansicht"}[mode], "eye")
+
+    def set_preview_mode(self, mode: str) -> None:
+        if not self.tabs.set_view_mode(mode):
+            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+
+    def _on_preview_link(self, editor, target: str) -> None:
+        """Link aus der Vorschau: relativer Pfad (a/b.md#Ziel) oder Wiki-Name (Plan#Ziel)."""
+        name, _, heading = target.partition("#")
+        name = name.strip()
+        if not name:
+            return
+        candidate = self.root / name
+        if candidate.is_file() and fileops.is_within(candidate, self.root):
+            rel = self.tabs.relative(candidate)
+        else:
+            rel = self.links.resolve(name)
+        if rel is None:
+            from notex.ui.spell_highlighter import LinkSpan
+            self._on_link_activated(editor, LinkSpan(0, 0, name, heading or None, None))
+            return
+        opened = self.tabs.open_file(self.root / rel)
+        if opened is not None and heading:
+            line = find_heading_line(opened.toPlainText(), heading)
+            if line:
+                opened.goto_line(line)
 
     # ---- Wiki-Links und Backlinks ------------------------------------------------------
     def _on_file_index_updated(self) -> None:
@@ -981,6 +1018,9 @@ class MainWindow(QMainWindow):
                               category="Einstellungen")
         self.registry.add("palette:files", "Quick Open", lambda: self.show_palette("files"), category="Navigation", shortcut="Ctrl+P")
         self.registry.add("palette:commands", "Command Palette", lambda: self.show_palette("commands"), category="Navigation", shortcut="Ctrl+Shift+P")
+        for mode, title in (("edit", "Markdown: Bearbeiten"), ("preview", "Markdown: Vorschau"), ("split", "Markdown: Geteilte Ansicht")):
+            self.registry.add(f"preview:{mode}", title, lambda m=mode: self.set_preview_mode(m), category="Ansicht",
+                              keywords="markdown vorschau preview rendern")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))

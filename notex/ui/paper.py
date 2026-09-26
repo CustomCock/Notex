@@ -9,13 +9,20 @@ Volle Breite: das Blatt füllt den Bereich.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPixmap
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget
+from pathlib import Path
 
+from PySide6.QtCore import QRect, QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QPainter, QPixmap
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QSplitter, QVBoxLayout, QWidget
+
+from notex.core.markdown import toggle_task_line
 from notex.theme.tokens import LAYOUT, RADIUS, SPACING
 from notex.ui.editor import Editor
+from notex.ui.preview import MarkdownPreview
 from notex.ui.toolbar import EditorToolbar
+
+VIEW_MODES = ("edit", "preview", "split")
+PREVIEW_DEBOUNCE_MS = 300
 
 SHADOW_BLUR = 28      # wie weit der Schatten nach außen reicht
 SHADOW_OFFSET_Y = 8
@@ -59,17 +66,43 @@ def _shadow_pixmap(width: int, height: int, dpr: float) -> QPixmap:
     return pixmap
 
 
+class PreviewFrame(QFrame):
+    """Zweites Blatt für die Markdown-Vorschau, gleiche Optik wie PaperFrame."""
+
+    def __init__(self, preview: MarkdownPreview) -> None:
+        super().__init__()
+        self.setObjectName("PaperFrame")
+        self.preview = preview
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(preview)
+
+
 class EditorPage(QWidget):
-    def __init__(self, editor: Editor, paper_mode: bool, toolbar: EditorToolbar | None = None) -> None:
+    link_requested = Signal(str)       # Ziel aus der Vorschau: "rel/pfad#Überschrift" oder Wiki-Name
+    view_mode_changed = Signal(str)
+
+    def __init__(self, editor: Editor, paper_mode: bool, toolbar: EditorToolbar | None = None,
+                 root: Path | None = None) -> None:
         super().__init__()
         self.setObjectName("EditorPage")
         self.editor = editor
         self.frame = PaperFrame(editor)
         self.toolbar = toolbar
+        self.root = root or editor.path.parent
+        self.preview: MarkdownPreview | None = None
+        self.preview_frame: PreviewFrame | None = None
+        self.view_mode = "edit"
+        self.sync_scroll = True
         self._shadow: QPixmap | None = None
         self._shadow_key: tuple = ()
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.setInterval(PREVIEW_DEBOUNCE_MS)
+        self._preview_timer.timeout.connect(self._refresh_preview)
+        self._syncing = False
 
-        # Spalte: Bearbeitungsleiste oben, darunter das Blatt – beide gleich breit
+        # Spalte: Bearbeitungsleiste oben, darunter Blatt (+ Vorschau-Blatt daneben) – gleich breit
         self.column = QWidget()
         column_layout = QVBoxLayout(self.column)
         column_layout.setContentsMargins(0, 0, 0, 0)
@@ -78,7 +111,12 @@ class EditorPage(QWidget):
             column_layout.addWidget(toolbar)
             self.frame.setProperty("attached", True)   # oben eckig, weil die Leiste den Radius trägt
             toolbar.visibility_changed.connect(lambda _v: self.update())
-        column_layout.addWidget(self.frame, 1)
+        self.body = QSplitter(Qt.Orientation.Horizontal)
+        self.body.setObjectName("PreviewSplitter")
+        self.body.setHandleWidth(SPACING.sm)
+        self.body.setChildrenCollapsible(False)
+        self.body.addWidget(self.frame)
+        column_layout.addWidget(self.body, 1)
 
         margin = LAYOUT.paper_margin
         layout = QHBoxLayout(self)
@@ -94,8 +132,12 @@ class EditorPage(QWidget):
         if enabled:
             # Maximale Textbreite in Zeichen + Zeilennummern + rechter Rand + Scrollbar.
             # Das ist ein Maximum: wird das Fenster schmaler, schrumpft das Blatt mit.
+            # Geteilte Ansicht: zwei Blätter nebeneinander, also doppelt so breit.
             text_width = int(LAYOUT.paper_max_columns * self.editor.char_width())
-            self.column.setMaximumWidth(text_width + self.editor.gutter_width() + SPACING.xl + LAYOUT.scrollbar + SPACING.sm)
+            width = text_width + self.editor.gutter_width() + SPACING.xl + LAYOUT.scrollbar + SPACING.sm
+            if self.view_mode == "split":
+                width = 2 * width + self.body.handleWidth()
+            self.column.setMaximumWidth(width)
         else:
             self.column.setMaximumWidth(QWIDGETSIZE_MAX)
         # Das Blatt bekommt (fast) allen Platz bis zu seiner Maximalbreite, der Rest
@@ -109,8 +151,88 @@ class EditorPage(QWidget):
         self._fit_padding()
         self._shadow = None
         self.editor.retheme()
+        if self.preview is not None:
+            self.preview.set_fonts(self.editor.font().family(), self.editor.font_size)
+            self.preview.retheme()
         self.refresh_width()
         self.update()
+
+    # ---- Markdown-Vorschau ---------------------------------------------------------
+    @property
+    def supports_preview(self) -> bool:
+        return self.editor.path.suffix.lower() in (".md", ".markdown")
+
+    def set_view_mode(self, mode: str) -> None:
+        """"edit" (nur Blatt), "preview" (nur Vorschau) oder "split" (beides nebeneinander)."""
+        if mode not in VIEW_MODES or not self.supports_preview and mode != "edit":
+            mode = "edit"
+        if mode != "edit" and self.preview is None:
+            self._create_preview()
+        self.view_mode = mode
+        self.frame.setVisible(mode != "preview")
+        if self.preview_frame is not None:
+            self.preview_frame.setVisible(mode != "edit")
+        if mode != "edit":
+            self._preview_timer.stop()
+            self._refresh_preview()
+            if mode == "split":
+                self.body.setSizes([1, 1])
+        self.refresh_width()
+        (self.preview if mode == "preview" and self.preview is not None else self.editor).setFocus()
+        self.view_mode_changed.emit(mode)
+
+    def cycle_view_mode(self) -> str:
+        index = VIEW_MODES.index(self.view_mode) if self.view_mode in VIEW_MODES else 0
+        self.set_view_mode(VIEW_MODES[(index + 1) % len(VIEW_MODES)])
+        return self.view_mode
+
+    def _create_preview(self) -> None:
+        self.preview = MarkdownPreview(self.root)
+        self.preview_frame = PreviewFrame(self.preview)
+        if self.toolbar is not None:
+            self.preview_frame.setProperty("attached", True)   # wie das Blatt: oben eckig unter der Leiste
+        self.body.addWidget(self.preview_frame)
+        self.preview.set_fonts(self.editor.font().family(), self.editor.font_size)
+        self.preview.set_padding(self.editor._padding)
+        self.preview.open_requested.connect(self.link_requested)
+        self.preview.toggle_requested.connect(self._toggle_task)
+        self.preview.scrolled.connect(self._on_preview_scrolled)
+        self.editor.textChanged.connect(self._schedule_preview)
+        self.editor.verticalScrollBar().valueChanged.connect(self._on_editor_scrolled)
+
+    def _schedule_preview(self) -> None:
+        if self.view_mode != "edit":
+            self._preview_timer.start()
+
+    def _refresh_preview(self) -> None:
+        if self.preview is not None and self.view_mode != "edit":
+            self.preview.set_source(self.editor.toPlainText(), self.editor.path)
+
+    def _toggle_task(self, line: int) -> None:
+        new_text = toggle_task_line(self.editor.toPlainText(), line)
+        if new_text is None:
+            return
+        new_line = new_text.split("\n")[line]
+        self.editor._grouped(lambda: self.editor._replace_blocks(line, line, [new_line]))
+        self._preview_timer.stop()
+        self._refresh_preview()
+
+    def _on_editor_scrolled(self, value: int) -> None:
+        if self._syncing or not self.sync_scroll or self.view_mode != "split" or self.preview is None:
+            return
+        bar = self.editor.verticalScrollBar()
+        if bar.maximum():
+            self._syncing = True
+            self.preview.set_scroll_fraction(value / bar.maximum())
+            self._syncing = False
+
+    def _on_preview_scrolled(self, fraction: float) -> None:
+        if self._syncing or not self.sync_scroll or self.view_mode != "split":
+            return
+        bar = self.editor.verticalScrollBar()
+        self._syncing = True
+        bar.setValue(round(fraction * bar.maximum()))
+        self._syncing = False
 
     def refresh_width(self) -> None:
         """Nach Zoom: die maximale Breite hängt von der Zeichenbreite ab."""
@@ -129,6 +251,8 @@ class EditorPage(QWidget):
         padding = round(SPACING.lg + (LAYOUT.paper_padding - SPACING.lg) * t)
         self._layout.setContentsMargins(margin, max(SPACING.sm, margin - SHADOW_OFFSET_Y // 2), margin, margin)
         self.editor.set_padding(padding)
+        if self.preview is not None:
+            self.preview.set_padding(max(SPACING.lg, padding))
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)

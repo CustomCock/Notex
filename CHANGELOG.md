@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.2.0] – unveröffentlicht
+
+### Hinzugefügt
+- Markdown-Vorschau (Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt): markdown-it-py rendert
+  CommonMark plus Tabellen/Durchstreichen in ein zweites Blatt (QTextBrowser, kein JavaScript). Rohes HTML
+  wird nie durchgereicht, Links nur http(s)/mailto/#Anker/relativ im Notizordner, externe Bilder erst nach
+  Klick auf „Bild laden“, externe Links öffnen den Browser nur auf Klick. Aufgaben-Checkboxen sind in der
+  Vorschau klickbar, [[Wiki-Links]] und relative .md-Links öffnen die Zieldatei, Codeblöcke in den
+  Syntax-Farben des Themes, Scrollen in der geteilten Ansicht synchron (abschaltbar)
+
 ## [1.1.1] – 2026-09-26
 
 ### Behoben

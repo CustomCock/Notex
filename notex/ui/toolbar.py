@@ -35,7 +35,7 @@ GROUPS: list[tuple[str, list[str]]] = [
     ("Ansicht", ["zoom_reset", "paper_mode", "line_numbers"]),
     ("Zeilen", ["dup_line", "move_up", "move_down", "sort_lines", "unique_lines", "strip_ws"]),
     ("Text", ["upper", "lower", "title", "datetime"]),
-    ("Markdown", ["md_bold", "md_italic", "md_heading", "md_list", "md_checkbox", "md_code", "md_link"]),
+    ("Markdown", ["md_bold", "md_italic", "md_heading", "md_list", "md_checkbox", "md_code", "md_link", "preview"]),
     ("Prüfung", ["spell", "grammar"]),
     ("Datei", ["widget:encoding", "widget:eol"]),
 ]

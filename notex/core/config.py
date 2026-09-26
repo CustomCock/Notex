@@ -43,6 +43,8 @@ DEFAULTS: dict[str, Any] = {
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
     "toolbar_visible": True,  # Bearbeitungsleiste über dem Blatt ausgeklappt
     "line_numbers": True,
+    "markdown_view": "edit",      # Ansicht beim Öffnen von .md: "edit" | "preview" | "split"
+    "preview_sync_scroll": True,  # Vorschau scrollt mit dem Editor (geteilte Ansicht)
     "theme": default_theme(), # das aktive Theme, komplett (Presets/Dateien sind nur Vorlagen)
     "spellcheck": {
         "enabled": True,

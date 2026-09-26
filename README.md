@@ -114,6 +114,22 @@ Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Tex
 Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
 offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
 
+## Markdown-Vorschau
+
+`Ctrl+Shift+V` wechselt bei `.md`-Dateien zwischen Bearbeiten, Vorschau und geteilter Ansicht (Blatt links,
+gerendertes Markdown rechts, Scrollen synchron). Die Vorschau ist bewusst zurückhaltend:
+
+- Kein JavaScript, kein rohes HTML aus der Datei, keine Netzverbindung ohne Klick. Externe Bilder erscheinen
+  als „Bild laden“, externe Links öffnen den Browser erst beim Anklicken.
+- Aufgaben `- [ ]` lassen sich in der Vorschau anhaken, die Datei wird sofort geändert.
+- `[[Wiki-Links]]`, relative Links (`ordner/notiz.md#Abschnitt`) und `#Anker` funktionieren.
+- Codeblöcke (```python usw.) bekommen die Syntax-Farben des Themes, Tabellen und ~~Durchstreichen~~ werden gerendert.
+
+Einstellungen → Editor legt fest, wie `.md`-Dateien öffnen (Bearbeiten, Vorschau, Geteilt) und ob die
+Vorschau mitscrollt.
+
+![Markdown-Vorschau](docs/26-markdown-preview.png)
+
 ## Syntax-Highlighting
 
 Code und Logs werden über [Pygments](https://pygments.org) farbig hervorgehoben: `.py`, `.json`,
@@ -275,6 +291,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+Shift+K | Backlinks-Panel |
+| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt |
 | Ctrl+Klick | Wiki-Link öffnen (bzw. Ziel anlegen) |
 | Ctrl+, | Einstellungen |
 | Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |

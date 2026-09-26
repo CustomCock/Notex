@@ -98,7 +98,17 @@ WIKI_SAMPLE = (
     "Kaputter Link: [[gibt-es-nicht]].\n\n```python\nprint([[kein]])  # in Codeblöcken zählen Links nicht\n```\n"
 )
 
+PREVIEW_SAMPLE = (
+    "# Wochenplan\n\nSiehe [[osint-checkliste|OSINT]] und die [Python-Notizen](../Python/notizen.md#Pathlib).\n\n"
+    "## Aufgaben\n\n- [x] Rechtschreibprüfung testen\n- [ ] Release taggen\n- [ ] Screenshots erneuern\n\n"
+    "## Notizen\n\n> Portabel heißt: alles neben der EXE, nichts in AppData.\n\n"
+    "| Version | Inhalt |\n|---|---|\n| 1.1 | Wiki-Links, Syntax |\n| 1.2 | Vorschau, Split View |\n\n"
+    "```python\nfrom pathlib import Path\nroot = Path(__file__).resolve().parent\n```\n\n"
+    "![Logo](https://example.org/logo.png)\n"
+)
+
 SAMPLE = {
+    "Projekte/Notex/vorschau.md": PREVIEW_SAMPLE,
     "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
     "Projekte/Python/snippets.py": CODE_SAMPLE,
     "Projekte/Notex/server.log": LOG_SAMPLE,
@@ -293,7 +303,10 @@ def main() -> int:
         later(2100, lambda: save(window, "24-syntax-python"))
         later(2200, lambda: window.tabs.open_file(data / "Projekte/Notex/server.log"))
         later(2600, lambda: save(window, "25-syntax-log"))
-        later(2700, lambda: (window.close(), app.quit()))
+        # v1.2: Markdown-Vorschau geteilt
+        later(2700, lambda: (window.tabs.open_file(data / "Projekte/Notex/vorschau.md"), window.set_preview_mode("split")))
+        later(3300, lambda: save(window, "26-markdown-preview"))
+        later(3400, lambda: (window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)
