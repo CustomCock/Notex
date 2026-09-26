@@ -932,3 +932,62 @@ QTableView#CsvTable QLineEdit {
     selection-background-color: @paper_selection;
     selection-color: @paper_text;
 }
+
+/* JSON/YAML-Prüfung und Dateityp-Warnung in der Statusleiste */
+QToolButton#StatusProblem {
+    background: transparent;
+    border: none;
+    border-radius: @r_controlpx;
+    color: @danger;
+    padding: 1px 6px;
+    min-height: 0;
+    font-size: @fs_smallpx;
+}
+QToolButton#StatusProblem[level="ok"] {
+    color: @text_muted;
+}
+QToolButton#StatusProblem:hover {
+    background: @hover;
+}
+QTreeWidget#DataTree {
+    background: @paper;
+    alternate-background-color: @paper_line;
+    color: @paper_text;
+    border: none;
+    padding: 0;
+    show-decoration-selected: 1;
+    selection-background-color: @paper_selection;
+    selection-color: @paper_text;
+}
+QTreeWidget#DataTree::item {
+    color: @paper_text;
+    padding: 1px @sp_xspx;
+}
+QTreeWidget#DataTree::item:selected, QTreeWidget#DataTree::item:selected:active {
+    background: @paper_selection;
+    color: @paper_text;
+}
+QTreeWidget#DataTree::item:hover:!selected {
+    background: @paper_line;
+}
+QTreeWidget#DataTree::item:disabled {
+    color: @paper_muted;
+}
+QTreeWidget#DataTree QHeaderView::section {
+    background: @paper;
+    color: @paper_muted;
+    border: none;
+    border-bottom: 1px solid @paper_line;
+    padding: 2px @sp_smpx;
+}
+QTreeWidget#DataTree::branch:has-children:closed {
+    image: url(@img_chevron_right);
+}
+QTreeWidget#DataTree::branch:has-children:open {
+    image: url(@img_chevron_down);
+}
+QLabel#DataError {
+    color: @paper_text;
+    font-size: @fs_uipx;
+    padding: @sp_lgpx;
+}

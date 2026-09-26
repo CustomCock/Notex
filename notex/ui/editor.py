@@ -56,6 +56,7 @@ class Editor(QTextEdit):
         self.encoding = text_file.encoding
         self.eol = text_file.eol
         self._search_selections: list[QTextEdit.ExtraSelection] = []
+        self._problem_selections: list[QTextEdit.ExtraSelection] = []   # JSON/YAML-Fehler
         self._font_size = font_size
         self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
@@ -439,13 +440,30 @@ class Editor(QTextEdit):
         self._refresh_extra_selections()
 
     # ---- Aktuelle Zeile + Extra-Selections ----------------------------------
+    def set_problem(self, position: int | None) -> None:
+        """Fehlerstelle (JSON/YAML) rot unterwellen – das Zeichen an `position` bzw. das Zeilenende; None löscht."""
+        self._problem_selections = []
+        if position is not None:
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(max(0, min(position, self.document().characterCount() - 1)))
+            if cursor.atBlockEnd() and cursor.position() > cursor.block().position():
+                cursor.movePosition(QTextCursor.MoveOperation.Left)
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = cursor
+            selection.format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+            selection.format.setUnderlineColor(QColor(COLORS.danger))
+            selection.format.setBackground(QColor(COLORS.paper_match))
+            self._problem_selections.append(selection)
+        self._refresh_extra_selections()
+
     def _refresh_extra_selections(self) -> None:
         current_line = QTextEdit.ExtraSelection()
         current_line.format.setBackground(QColor(COLORS.paper_line))
         current_line.format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)
         current_line.cursor = self.textCursor()
         current_line.cursor.clearSelection()
-        selections = [current_line, *self._search_selections]
+        selections = [current_line, *self._problem_selections, *self._search_selections]
         # Der Treffer unter dem Cursor wird etwas kräftiger markiert
         cursor = self.textCursor()
         if cursor.hasSelection():

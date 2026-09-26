@@ -189,11 +189,13 @@ class EditorPage(QWidget):
     @property
     def data_kind(self) -> str | None:
         """"table" (CSV/TSV), "tree" (JSON/YAML) oder None. Nie für .ntx."""
-        from notex.core import csvdata
+        from notex.core import csvdata, structured
         if getattr(self.editor, "encrypted", False):
             return None
         if csvdata.table_supported(self.editor.path):
             return "table"
+        if structured.kind_for(self.editor.path):
+            return "tree"
         return None
 
     @property
@@ -254,8 +256,13 @@ class EditorPage(QWidget):
         if self.data_frame is not None:
             self.data_frame.setParent(None)
             self.data_frame.deleteLater()
-        from notex.ui.csv_view import CsvView
-        view = CsvView()
+        if mode == "tree":
+            from notex.ui.tree_view import DataTreeView
+            view = DataTreeView()
+            view.jump_requested.connect(self._jump_to_error)
+        else:
+            from notex.ui.csv_view import CsvView
+            view = CsvView()
         view._reparse = self._reparse_table
         view._reencode = self.reencode_requested.emit
         view.changed.connect(self._on_data_edited)
@@ -272,6 +279,14 @@ class EditorPage(QWidget):
         view = self.data_view
         keep = dialect or (view.dialect if view.overridden else None)
         view.load_text(self.editor.toPlainText(), self.editor.path.name, keep, self.editor.encoding)
+
+    def _jump_to_error(self, position: int) -> None:
+        self.set_view_mode("edit")
+        cursor = self.editor.textCursor()
+        cursor.setPosition(min(position, self.editor.document().characterCount() - 1))
+        self.editor.setTextCursor(cursor)
+        self.editor.ensureCursorVisible()
+        self.editor.setFocus()
 
     def _reparse_table(self, dialect) -> None:
         """Anderes Trennzeichen gewählt: ungespeicherte Tabellenänderungen erst in den Text, dann neu lesen."""

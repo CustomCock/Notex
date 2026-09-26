@@ -15,6 +15,11 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   überschreibbar, Kopfzeile umschaltbar, Sortieren per Spaltenklick (numerisch erkannt), Filter über alle Spalten,
   Zellen/Zeilen/Spalten bearbeiten, Blöcke kopieren/einfügen; Speichern erhält Trennzeichen, Quoting-Stil, Encoding
   und Zeilenenden; 100 000 Zeilen ohne Einfrieren; Einstellung „CSV/TSV direkt als Tabelle öffnen“
+- JSON/YAML: Formatieren (Shift+Alt+F, Einrückung einstellbar), Minimieren (Shift+Alt+M), Prüfen (Shift+Alt+V und
+  beim Tippen) mit Zeile/Spalte in der Statusleiste und Markierung im Text; JSON token-basiert (Zahlen und Escapes
+  bleiben exakt); Baumansicht mit Pfad (`$.users[3].name`) und „Pfad kopieren“; YAML nur safe_load/safe_dump,
+  Warnung vor dem Formatieren, wenn Kommentare verloren gingen
+- Neue Abhängigkeit PyYAML 6.0.3 (MIT, exakt gepinnt)
 - UTF-16-Dateien mit BOM werden erkannt (z. B. „Unicode-Text“-Export aus Excel)
 
 ### Verbessert

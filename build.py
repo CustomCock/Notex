@@ -52,7 +52,7 @@ VSVersionInfo(
 def check_dependencies() -> None:
     """PyInstaller baut auch ohne PySide6 stumm weiter – dann startet die Exe mit „No module named 'PySide6'“."""
     missing = []
-    for module in ("PySide6", "pygments", "enchant", "spylls", "send2trash", "markdown_it", "regex", "cryptography"):
+    for module in ("PySide6", "pygments", "enchant", "spylls", "send2trash", "markdown_it", "regex", "cryptography", "yaml"):
         try:
             __import__(module)
         except ImportError:
@@ -88,7 +88,7 @@ def main() -> None:
         *[f"--hidden-import=pygments.lexers.{m}" for m in ("python", "data", "configs", "shell", "html", "css",
                                                           "javascript", "sql", "markup", "textfmts", "special")],
         "--hidden-import=pygments.formatters",
-        "--hidden-import=markdown_it", "--hidden-import=mdurl", "--hidden-import=regex", "--hidden-import=cryptography.hazmat.primitives.kdf.argon2",
+        "--hidden-import=markdown_it", "--hidden-import=mdurl", "--hidden-import=regex", "--hidden-import=yaml", "--hidden-import=cryptography.hazmat.primitives.kdf.argon2",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",

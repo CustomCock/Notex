@@ -409,6 +409,15 @@ class SettingsDialog(QDialog):
         page.row("", csv_box)
         page.note("Ctrl+Shift+V wechselt bei .csv/.tsv zwischen Text und Tabelle. Sortieren und Filtern ändern nur die "
                   "Ansicht; Speichern behält Trennzeichen, Anführungszeichen-Stil, Encoding und Zeilenenden.")
+        indent_spin = QSpinBox()
+        indent_spin.setRange(1, 8)
+        indent_spin.setValue(int(data_cfg.get("json_indent", 2)))
+        indent_spin.setSuffix(" Leerzeichen")
+        indent_spin.valueChanged.connect(lambda v: self.config.setdefault("data_view", {}).__setitem__("json_indent", v))
+        page.row("JSON/YAML einrücken mit", indent_spin)
+        page.note("Shift+Alt+F formatiert, Shift+Alt+M minimiert, Shift+Alt+V prüft JSON/YAML. Fehler stehen mit Zeile "
+                  "und Spalte in der Statusleiste. YAML wird nur sicher gelesen (safe_load) – Kommentare gehen beim "
+                  "Formatieren verloren, davor wird gefragt.")
 
         page.section("Versionshistorie")
         self.history_box = QCheckBox("Bei jedem Speichern einen Schnappschuss in history/ ablegen")

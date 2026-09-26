@@ -234,6 +234,23 @@ Datenformate öffnet CSV/TSV auf Wunsch direkt als Tabelle.
 - Große Dateien (100 000 Zeilen) laufen über ein Tabellenmodell, das nur sichtbare Zellen zeichnet.
 - Verschlüsselte Notizen (`.ntx`) bekommen keine Tabellenansicht.
 
+## JSON und YAML
+
+Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Palette):
+
+- **Formatieren** (`Shift+Alt+F`) rückt neu ein (Einrückung in Einstellungen → Editor → Datenformate).
+  JSON wird token-basiert formatiert: Zahlen (`1.10`, `1e5`), Escapes und die Reihenfolge der Schlüssel bleiben
+  exakt erhalten, nur der Leerraum ändert sich. **Minimieren** (`Shift+Alt+M`) schreibt alles in eine Zeile.
+  Beides ist ein einziger Rückgängig-Schritt.
+- **Prüfen** (`Shift+Alt+V`) – und automatisch beim Tippen (bis 2 MB): Fehler erscheinen mit Zeile und Spalte rechts
+  in der Statusleiste (Klick springt hin) und als rote Wellenlinie im Text.
+- **Baumansicht** (`Ctrl+Shift+V` schaltet Text ↔ Baum): Schlüssel, Wert, Typ; der Pfad der Auswahl steht oben
+  (z. B. `$.users[3].name`) und lässt sich mit „Pfad kopieren“ übernehmen. Kinder werden erst beim Aufklappen
+  erzeugt, große Dateien bleiben flüssig. Bei ungültigem Inhalt zeigt der Baum den Fehler mit „Zur Stelle springen“.
+- **YAML** wird ausschließlich sicher gelesen und geschrieben (`safe_load`/`safe_dump` – keine Python-Objekte, kein
+  Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
+- Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
+
 ## Nachschlagen
 
 Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
@@ -499,8 +516,9 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+Shift+K | Backlinks-Panel |
-| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle |
+| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle; JSON/YAML: Text ↔ Baum |
 | Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
+| Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
 | Ctrl+C / Ctrl+V / Entf (in der Tabelle) | Zellen als Tab-getrennten Block kopieren / einfügen / leeren |
 | Ctrl+\ | Editor teilen / Teilung aufheben |
 | Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |

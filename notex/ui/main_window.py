@@ -152,6 +152,8 @@ class MainWindow(QMainWindow):
         self.palette.goto_line.connect(lambda line: self._with_editor(lambda e: e.goto_line(line)))
         self.palette.run_command.connect(self._run_command)
         self._connect_signals()
+        from notex.ui.structured_commands import StructuredCommands
+        self.structured = StructuredCommands(self)
         self._build_menu()
         self._build_editor_actions()
         self._build_registry()
@@ -258,6 +260,12 @@ class MainWindow(QMainWindow):
         self.lookup_web_action = self._action("Im Web suchen (Browser)", "Ctrl+Alt+G", lambda: self.lookup_current("web"))
         for action in (self.lookup_wikipedia_action, self.lookup_wiktionary_action, self.lookup_web_action):
             lookup_menu.addAction(action)
+        data_menu = edit_menu.addMenu("JSON/YAML")
+        data_menu.addAction(self._action("Formatieren", "Shift+Alt+F", self.structured.format))
+        data_menu.addAction(self._action("Minimieren", "Shift+Alt+M", self.structured.minify))
+        data_menu.addAction(self._action("Prüfen", "Shift+Alt+V", self.structured.validate))
+        data_menu.addSeparator()
+        data_menu.addAction(self._action("Pfad kopieren (Baumansicht)", None, self.structured.copy_path))
         edit_menu.addSeparator()
         self.spell_action = self._action("Rechtschreibung prüfen", "F7", self.toggle_spellcheck, checkable=True)
         self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
@@ -1872,6 +1880,16 @@ class MainWindow(QMainWindow):
                               keywords="markdown vorschau preview rendern")
         self.registry.add("view:table", "CSV/TSV: Als Tabelle anzeigen", lambda: self.set_preview_mode("table"),
                           category="Ansicht", shortcut="Ctrl+Shift+V", keywords="csv tsv tabelle spalten excel")
+        self.registry.add("view:tree", "JSON/YAML: Als Baum anzeigen", lambda: self.set_preview_mode("tree"),
+                          category="Ansicht", shortcut="Ctrl+Shift+V", keywords="json yaml baum tree struktur pfad")
+        self.registry.add("data:format", "JSON/YAML: Formatieren", self.structured.format, category="Bearbeiten",
+                          shortcut="Shift+Alt+F", keywords="json yaml einrücken pretty print beautify")
+        self.registry.add("data:minify", "JSON/YAML: Minimieren", self.structured.minify, category="Bearbeiten",
+                          shortcut="Shift+Alt+M", keywords="json yaml kompakt minify eine zeile")
+        self.registry.add("data:validate", "JSON/YAML: Prüfen", self.structured.validate, category="Bearbeiten",
+                          shortcut="Shift+Alt+V", keywords="json yaml validieren syntax fehler lint")
+        self.registry.add("data:path", "JSON/YAML: Pfad kopieren", self.structured.copy_path, category="Bearbeiten",
+                          keywords="json yaml jsonpath pfad kopieren baum")
         self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
                           category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
@@ -1946,9 +1964,10 @@ class MainWindow(QMainWindow):
         self.status.update_for(editor, relative)
         page = self.tabs.current_page()
         if page is not None and self._in_data_view():
-            parts = page.data_view.status_parts()
+            parts = [part for part in page.data_view.status_parts()[:2] if part]
             self.status.position_label.setText(page.data_view.position_text())
-            self.status.chars_label.setText(" · ".join(parts[:2]))
+            self.status.chars_label.setText(" · ".join(parts))
+        self.structured.refresh_status()
         self._sync_editor_actions()
         self.status.set_spell_state(
             self.tabs.spell_enabled_for(editor.path), self.tabs.grammar_enabled_for(editor.path),
