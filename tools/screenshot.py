@@ -132,6 +132,11 @@ def main() -> int:
     def s_find():
         save(window, "07-find-replace")
         window.find_bar.close_bar()
+        window.tabs.save_current()   # löst den Toast aus
+        later(250, s_toast)
+
+    def s_toast():
+        save(window, "08-toast")
         window.close()
         app.quit()
 

@@ -25,9 +25,14 @@ class FindBar(QWidget):
         self.status_label = QLabel()
 
         self.next_button = QPushButton("Weiter")
+        self.next_button.setToolTip("Nächster Treffer  Enter")
         self.prev_button = QPushButton("Zurück")
+        self.prev_button.setToolTip("Vorheriger Treffer  Shift+Enter")
         self.replace_button = QPushButton("Ersetzen")
+        self.replace_button.setToolTip("Aktuellen Treffer ersetzen  Enter im Ersetzen-Feld")
         self.replace_all_button = QPushButton("Alle ersetzen")
+        self.replace_all_button.setToolTip("Alle Treffer ersetzen (ein Undo-Schritt)")
+        self.case_box.setToolTip("Groß-/Kleinschreibung beachten")
         self.close_button = IconButton("x", "Schließen  Esc")
 
         grid = QGridLayout(self)

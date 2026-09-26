@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject
+from PySide6.QtCore import QEvent, QLibraryInfo, QLocale, QObject, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QDialog
 
@@ -30,6 +30,10 @@ def create_app(argv: list[str]) -> QApplication:
     app = QApplication(argv)
     app.setApplicationName(APP_NAME)
     app.setStyle("Fusion")  # neutraler Basis-Stil, auf dem das QSS sauber aufsetzt
+    # Qt-eigene Beschriftungen (OK / Abbrechen in Eingabedialogen) auf Deutsch, falls vorhanden
+    translator = QTranslator(app)
+    if translator.load(QLocale("de"), "qtbase", "_", QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+        app.installTranslator(translator)
     load_bundled_fonts()    # Inter + JetBrains Mono aus assets/fonts/
     app.setFont(ui_font())
     app.setStyleSheet(load_stylesheet())

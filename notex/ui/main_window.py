@@ -6,12 +6,14 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMainWindow, QSplitter, QStackedWidget, QVBoxLayout, QWidget
 
 from notex import APP_NAME
 from notex.core.encoding import read_text_file
 from notex.ui import dialogs
 from notex.ui.editor_tabs import EditorTabs
+from notex.ui.empty_state import EmptyState
+from notex.ui.toast import Toast
 from notex.ui.file_watcher import OpenFileWatcher
 from notex.ui.find_bar import FindBar
 from notex.ui.sidebar import Sidebar
@@ -40,6 +42,8 @@ class MainWindow(QMainWindow):
         self.tabs.word_wrap = config["word_wrap"]
         self.tabs.paper_mode = config["paper_mode"]
         self.find_bar = FindBar(self.tabs.current_editor)
+        self.empty_state = EmptyState()
+        self.toast = Toast(self)
         self.status = StatusBar()
         self.setStatusBar(self.status)
         self.watcher = OpenFileWatcher()
@@ -56,7 +60,11 @@ class MainWindow(QMainWindow):
         editor_layout = QVBoxLayout(editor_area)
         editor_layout.setContentsMargins(0, 0, 0, 0)
         editor_layout.setSpacing(0)
-        editor_layout.addWidget(self.tabs, 1)
+        # Ohne offene Datei zeigt der Stack den Empty State statt der leeren Tab-Leiste
+        self.editor_stack = QStackedWidget()
+        self.editor_stack.addWidget(self.empty_state)
+        self.editor_stack.addWidget(self.tabs)
+        editor_layout.addWidget(self.editor_stack, 1)
         editor_layout.addWidget(self.find_bar)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -83,6 +91,7 @@ class MainWindow(QMainWindow):
         self.tabs.file_opened.connect(self.watcher.watch)
         self.tabs.file_closed.connect(self.watcher.unwatch)
         self.tabs.file_saved.connect(self.watcher.mark_saved)
+        self.tabs.file_saved.connect(lambda path: self.toast.show_message(f"Gespeichert · {path.name}"))
         self.watcher.file_changed_externally.connect(self._on_external_change)
         self.watcher.file_removed_externally.connect(self._on_external_remove)
 
@@ -251,6 +260,9 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _update_status(self) -> None:
+        self.editor_stack.setCurrentWidget(self.tabs if self.tabs.count() else self.empty_state)
+        if not self.tabs.count():
+            self.find_bar.hide()
         editor = self.tabs.current_editor()
         if editor is None:
             self.status.update_for(None, "")
@@ -304,6 +316,12 @@ class MainWindow(QMainWindow):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         apply_dark_titlebar(self)  # das HWND existiert erst, wenn das Fenster sichtbar wird
+        self._update_status()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self.toast.isVisible():
+            self.toast._place()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if not self.tabs.confirm_close_all():

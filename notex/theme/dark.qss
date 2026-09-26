@@ -286,6 +286,23 @@ QToolButton#IconButton {
 QToolButton#IconButton:hover, QToolButton#IconButton:pressed, QToolButton#IconButton:checked {
     background: transparent;
 }
+QToolButton#IconButton:focus {
+    border-color: @accent;
+}
+QTreeView:focus, QTreeWidget:focus {
+    border: none;
+}
+QWidget#EmptyState {
+    background: @bg;
+}
+QWidget#EmptyState QLabel {
+    background: transparent;
+}
+QWidget#EmptyState QLabel#EmptyKey {
+    background: @surface;
+    border: 1px solid @border;
+    color: @text_muted;
+}
 
 QSplitter::handle {
     background: @bg;
