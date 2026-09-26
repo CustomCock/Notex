@@ -5,11 +5,11 @@
     outline: none;
 }
 
+/* Schrift kommt über QApplication.setFont (fonts.ui_font), nicht aus dem QSS – sonst
+   würde sie auch den Editor überschreiben, dessen Textschrift pro Datei gesetzt wird. */
 QMainWindow, QWidget {
     background: @bg;
     color: @text;
-    font-family: @ui_font;
-    font-size: @fs_uipx;
 }
 
 /* ---------- Tooltips ---------- */
@@ -166,7 +166,7 @@ QTextEdit#Editor {
     border: none;
     selection-background-color: @paper_selection;
     selection-color: @paper_text;
-    font-family: @editor_font;
+    /* keine font-family hier: die Textschrift setzt der Editor selbst (pro Dateiendung) */
 }
 QFrame#PaperFrame {
     background: @paper;
@@ -183,6 +183,7 @@ QWidget#FindBar {
 }
 QWidget#FindBar QLineEdit {
     font-family: @editor_font;
+    font-size: @fs_uipx;
 }
 
 /* ---------- Statusleiste ---------- */

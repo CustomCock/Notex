@@ -97,8 +97,9 @@ FONT_SIZE = FontSize()
 DURATION = Duration()
 LAYOUT = Layout()
 
-UI_FONT_FAMILIES = ["Inter", "Segoe UI Variable", "Segoe UI", "Noto Sans", "sans-serif"]
-EDITOR_FONT_FAMILIES = ["JetBrains Mono", "Cascadia Mono", "Consolas", "DejaVu Sans Mono", "monospace"]
+# Nur für das QSS: konkrete Familien löst fonts.py zur Laufzeit auf (SF Pro aus fonts/user/ zuerst)
+UI_FONT_FAMILIES = ["SF Pro Text", "SF Pro Display", "Inter", "Segoe UI Variable", "Segoe UI", "Noto Sans", "sans-serif"]
+TEXT_FONT_FAMILY = ""   # aktuelle Textschrift des Blatts ("" = Standard)
 
 _BASE_SPACING = Spacing()
 _BASE_DURATION = Duration()
@@ -145,8 +146,8 @@ def apply_theme(theme: dict[str, Any]) -> dict[str, Any]:
     FONT_SIZE.ui = theme["font"]["ui_size"]
     FONT_SIZE.small = max(9, theme["font"]["ui_size"] - 1)
     FONT_SIZE.editor = theme["font"]["editor_size"]
-    UI_FONT_FAMILIES[0] = theme["font"]["ui_family"]
-    EDITOR_FONT_FAMILIES[0] = theme["font"]["editor_family"]
+    global TEXT_FONT_FAMILY
+    TEXT_FONT_FAMILY = theme["font"]["editor_family"]
 
     speed = SPEED_FACTORS[theme["animation"]["speed"]]
     for key, base in vars(_BASE_DURATION).items():
@@ -173,7 +174,8 @@ def flat_tokens() -> dict[str, str]:
         for name, value in vars(group).items():
             tokens[f"{prefix}{name}"] = str(value)
     tokens["ui_font"] = ", ".join(f'"{f}"' for f in UI_FONT_FAMILIES)
-    tokens["editor_font"] = ", ".join(f'"{f}"' for f in EDITOR_FONT_FAMILIES)
+    text_families = ([TEXT_FONT_FAMILY] if TEXT_FONT_FAMILY else []) + UI_FONT_FAMILIES
+    tokens["editor_font"] = ", ".join(f'"{f}"' for f in text_families)
     return tokens
 
 

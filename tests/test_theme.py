@@ -116,3 +116,10 @@ def test_store_rename_duplicate_delete_import_export(tmp_path: Path) -> None:
     assert "B" not in store.names()
     imported = store.import_file(exported)
     assert imported["name"] == "B" and "B" in store.names()
+
+
+def test_old_theme_with_ui_family_is_ignored_and_empty_text_font_means_default() -> None:
+    theme = merge_theme({"font": {"ui_family": "Comic Sans", "editor_family": "  "}})
+    assert "ui_family" not in theme["font"]
+    assert theme["font"]["editor_family"] == ""
+    assert merge_theme({"font": {"editor_family": "JetBrains Mono"}})["font"]["editor_family"] == "JetBrains Mono"

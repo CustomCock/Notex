@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QPainter, QTextBlockFormat, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QFrame, QMenu, QTextEdit, QWidget
 
@@ -20,7 +20,7 @@ from notex.core.spell import SpellChecker, LANGUAGE_LABELS
 from notex.theme.icons import icon
 from notex.theme.theme import style_menu
 from notex.ui.spell_highlighter import Issue, SpellHighlighter
-from notex.theme.fonts import editor_font
+from notex.theme.fonts import STANDARD, text_font, ui_font
 from notex.theme.tokens import COLORS, LAYOUT, SPACING
 
 MAX_HIGHLIGHTS = 2000   # mehr Treffer gleichzeitig zu markieren wäre nur langsam
@@ -49,6 +49,7 @@ class Editor(QTextEdit):
         self.eol = text_file.eol
         self._search_selections: list[QTextEdit.ExtraSelection] = []
         self._font_size = font_size
+        self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
         self.highlighter: SpellHighlighter | None = None
         if checker is not None:
@@ -118,9 +119,25 @@ class Editor(QTextEdit):
 
     def set_font_size(self, pixel_size: int) -> None:
         self._font_size = pixel_size
-        self.setFont(editor_font(pixel_size))
+        self._apply_font()
+
+    @property
+    def font_family(self) -> str:
+        return self._font_family
+
+    def set_text_font(self, family: str) -> None:
+        self._font_family = family or STANDARD
+        self._apply_font()
+
+    def _apply_font(self) -> None:
+        self.setFont(text_font(self._font_family, self._font_size))
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
         self._update_margins()
+        self.line_numbers.update()
+
+    def _number_font(self):
+        """Zeilennummern in der UI-Schrift mit tabellarischen Ziffern, etwas kleiner als der Text."""
+        return ui_font(max(9, self._font_size - 2), tabular=True)
 
     def set_word_wrap(self, enabled: bool) -> None:
         self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth if enabled else QTextEdit.LineWrapMode.NoWrap)
@@ -238,7 +255,8 @@ class Editor(QTextEdit):
     # ---- Zeilennummern --------------------------------------------------------
     def gutter_width(self) -> int:
         digits = max(2, len(str(max(1, self.document().blockCount()))))
-        return LAYOUT.paper_padding + self.fontMetrics().horizontalAdvance("9") * digits + GUTTER_GAP
+        from PySide6.QtGui import QFontMetrics
+        return LAYOUT.paper_padding + QFontMetrics(self._number_font()).horizontalAdvance("9") * digits + GUTTER_GAP
 
     def _update_margins(self) -> None:
         # links: Zeilennummern + Innenabstand, oben/unten/rechts: Innenabstand des Blatts
@@ -250,15 +268,21 @@ class Editor(QTextEdit):
         super().resizeEvent(event)
         self._update_margins()
 
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        # Das globale QSS setzt beim Polishen die UI-Schrift auf jedes Widget – danach unsere Textschrift wieder anlegen
+        if event.type() == QEvent.Type.StyleChange:
+            self._apply_font()
+
     def paint_line_numbers(self, event) -> None:
         painter = QPainter(self.line_numbers)
-        painter.setFont(self.font())
+        painter.setFont(self._number_font())
         layout = self.document().documentLayout()
         viewport_top = self.viewport().geometry().top() - self.line_numbers.geometry().top()
         scroll = self.verticalScrollBar().value()
         current_block = self.textCursor().blockNumber()
         right = self.gutter_width() - GUTTER_GAP
-        height = self.fontMetrics().height()
+        height = self.fontMetrics().height()   # Höhe der ersten Textzeile, damit die Nummer mit ihr fluchtet
 
         # Beim ersten sichtbaren Block anfangen statt alle Blöcke abzulaufen
         block = self.cursorForPosition(QPoint(0, 0)).block()

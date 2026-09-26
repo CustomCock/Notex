@@ -56,3 +56,13 @@ def test_defaults_are_not_mutated(tmp_path: Path) -> None:
     cfg = load_config(tmp_path / "x.json")
     cfg["extensions"].append(".xyz")
     assert ".xyz" not in DEFAULTS["extensions"]
+
+
+def test_open_mapping_accepts_new_keys_and_rejects_bad_values(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"font_by_extension": {".py": "Consolas", ".rs": "JetBrains Mono", ".bad": 5}}), encoding="utf-8")
+    cfg = load_config(path)
+    assert cfg["font_by_extension"][".py"] == "Consolas"       # überschrieben
+    assert cfg["font_by_extension"][".rs"] == "JetBrains Mono"  # neuer Schlüssel bleibt
+    assert ".bad" not in cfg["font_by_extension"]               # falscher Typ verworfen
+    assert cfg["font_by_extension"][".json"] == DEFAULTS["font_by_extension"][".json"]

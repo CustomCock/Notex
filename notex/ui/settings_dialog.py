@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFontComboBox, QFormLayout,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFormLayout,
                                QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
                                QScrollArea, QSlider, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 from notex.core.theme_model import (DENSITIES, PAPER_VARIANTS, PRESETS, SPEEDS, contrast_warnings, default_theme,
                                     theme_from_preset)
 from notex.core.theme_store import ThemeStore
+from notex.theme.fonts import STANDARD, STANDARD_LABEL, available_families, sf_available
 from notex.theme.icons import icon
 from notex.theme.manager import theme_manager
 from notex.theme.tokens import SPACING
@@ -261,18 +261,21 @@ class SettingsDialog(QDialog):
     def _build_font(self) -> SettingsPage:
         page = SettingsPage()
         page.section("Oberfläche")
-        self.ui_font_box = QFontComboBox()
-        self.ui_font_box.currentFontChanged.connect(lambda f: self._set(("font", "ui_family"), f.family()))
-        page.row("Schrift", self.ui_font_box)
         self.ui_size_spin = QSpinBox()
         self.ui_size_spin.setRange(9, 20)
         self.ui_size_spin.setSuffix(" px")
         self.ui_size_spin.valueChanged.connect(lambda v: self._set(("font", "ui_size"), v))
         page.row("Größe", self.ui_size_spin)
+        sf_note = "SF Pro aus fonts/user/ ist aktiv." if sf_available() else \
+            "Aktiv ist Inter. Lege SF Pro (oder andere Schriften) nach fonts/user/ neben der App, sie werden beim Start geladen."
+        page.note(f"Die Schrift der Oberfläche ist fest: SF Pro → Inter → Segoe UI. {sf_note}")
 
-        page.section("Editor")
-        self.editor_font_box = QFontComboBox()
-        self.editor_font_box.currentFontChanged.connect(lambda f: self._set(("font", "editor_family"), f.family()))
+        page.section("Textinhalt")
+        self.editor_font_box = QComboBox()
+        self.editor_font_box.setToolTip("Ansichts-Einstellung für alle Dateien – ändert nichts an der Datei")
+        self._fill_font_box(self.editor_font_box)
+        self.editor_font_box.currentIndexChanged.connect(
+            lambda i: self._set(("font", "editor_family"), self.editor_font_box.itemData(i) or STANDARD))
         page.row("Schrift", self.editor_font_box)
         self.editor_size_spin = QSpinBox()
         self.editor_size_spin.setRange(8, 40)
@@ -285,8 +288,40 @@ class SettingsDialog(QDialog):
         self.line_height_spin.setDecimals(1)
         self.line_height_spin.valueChanged.connect(lambda v: self._set(("font", "line_height"), round(v, 2)))
         page.row("Zeilenhöhe", self.line_height_spin)
-        page.note("Gebündelt: Inter und JetBrains Mono. Die Liste zeigt zusätzlich alle installierten Schriften.")
+
+        page.section("Schrift je Dateiendung")
+        self.ext_font_boxes: dict[str, QComboBox] = {}
+        for ext in self.config["extensions"]:
+            box = QComboBox()
+            self._fill_font_box(box, standard_label="Wie Textinhalt")
+            box.currentIndexChanged.connect(lambda i, e=ext, b=box: self._ext_font_changed(e, b.itemData(i) or ""))
+            self.ext_font_boxes[ext] = box
+            page.row(ext, box)
+        page.note("Textdateien haben keine Formatierung. Schrift und Größe sind Ansichts-Einstellungen "
+                  "und ändern nichts am Inhalt. Gebündelt: Inter und JetBrains Mono; alles aus fonts/user/ "
+                  "und alle installierten Schriften stehen ebenfalls zur Wahl.")
         return page
+
+    def _fill_font_box(self, box: QComboBox, standard_label: str = STANDARD_LABEL) -> None:
+        box.addItem(standard_label, STANDARD)
+        for family in available_families():
+            box.addItem(family, family)
+
+    @staticmethod
+    def _select_font(box: QComboBox, family: str) -> None:
+        index = box.findData(family or STANDARD)
+        box.setCurrentIndex(index if index >= 0 else 0)
+
+    def _ext_font_changed(self, ext: str, family: str) -> None:
+        if self._loading:
+            return
+        mapping = dict(self.config.get("font_by_extension", {}))
+        if family:
+            mapping[ext] = family
+        else:
+            mapping.pop(ext, None)
+        self.config["font_by_extension"] = mapping
+        self.window_.tabs.apply_text_fonts()
 
     def _build_editor(self) -> SettingsPage:
         page = SettingsPage()
@@ -345,9 +380,10 @@ class SettingsDialog(QDialog):
         self.padding_spin.setValue(theme["paper"]["padding"])
         self.paper_mode_box.setChecked(cfg["paper_mode"])
         self.columns_spin.setValue(theme["paper"]["max_columns"])
-        self.ui_font_box.setCurrentFont(QFont(theme["font"]["ui_family"]))
         self.ui_size_spin.setValue(theme["font"]["ui_size"])
-        self.editor_font_box.setCurrentFont(QFont(theme["font"]["editor_family"]))
+        self._select_font(self.editor_font_box, theme["font"]["editor_family"])
+        for ext, box in self.ext_font_boxes.items():
+            self._select_font(box, cfg.get("font_by_extension", {}).get(ext, ""))
         self.editor_size_spin.setValue(theme["font"]["editor_size"])
         self.line_height_spin.setValue(theme["font"]["line_height"])
         self.wrap_box.setChecked(cfg["word_wrap"])
@@ -511,8 +547,9 @@ class SettingsDialog(QDialog):
         """Abbrechen: Theme und Config-Werte von vor dem Öffnen wiederherstellen."""
         self._preview_timer.stop()
         self.manager.apply(self._snapshot_theme)
-        for key in ("paper_mode", "word_wrap", "extensions"):
+        for key in ("paper_mode", "word_wrap", "extensions", "font_by_extension"):
             self.config[key] = self._snapshot_config[key]
+        self.window_.tabs.apply_text_fonts()
         self.window_.tabs.set_paper_mode(self.config["paper_mode"])
         self.window_.paper_action.setChecked(self.config["paper_mode"])
         self.window_.tabs.set_word_wrap(self.config["word_wrap"])

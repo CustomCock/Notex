@@ -52,6 +52,9 @@ DEFAULTS: dict[str, Any] = {
         "full_text": False,
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini"],
+    # Textschrift je Dateiendung ("" = Standardschrift des Themes). Offene Zuordnung: eigene Endungen erlaubt.
+    "font_by_extension": {".py": "JetBrains Mono", ".json": "JetBrains Mono", ".csv": "JetBrains Mono",
+                          ".log": "JetBrains Mono", ".ini": "JetBrains Mono"},
     "fulltext_max_mb": 5,     # größere Dateien überspringt die Volltextsuche
 }
 
@@ -65,6 +68,11 @@ def _merge(default: Any, loaded: Any) -> Any:
     if isinstance(default, dict):
         if not isinstance(loaded, dict):
             return copy.deepcopy(default)
+        if default and all(isinstance(v, str) for v in default.values()):
+            # Offene Zuordnung (z. B. Dateiendung -> Schrift): beliebige Schlüssel, Werte müssen Strings sein
+            result = dict(default)
+            result.update({k: v for k, v in loaded.items() if isinstance(k, str) and isinstance(v, str)})
+            return result
         result = {}
         for key, default_value in default.items():
             result[key] = _merge(default_value, loaded.get(key, default_value))

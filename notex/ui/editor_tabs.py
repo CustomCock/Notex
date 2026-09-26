@@ -15,6 +15,7 @@ from notex.core.encoding import read_text_file
 from notex.core.fileops import save_text_file
 from notex.core.spell import SpellChecker
 from notex.paths import app_root
+from notex.theme import tokens
 from notex.theme.tokens import COLORS, DURATION, FONT_SIZE
 from notex.ui import anim
 from notex.ui.editor import Editor
@@ -61,6 +62,7 @@ class EditorTabs(QTabWidget):
     file_opened = Signal(Path)
     file_closed = Signal(Path)
     font_size_changed = Signal(int)
+    text_font_changed = Signal(str)     # Familie ("" = Standard)
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
 
     def __init__(self, root: Path, config: dict | None = None) -> None:
@@ -133,6 +135,7 @@ class EditorTabs(QTabWidget):
                 QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
                 return None
             editor = Editor(path, text_file, self.font_size, checker=self.checker)
+            editor.set_text_font(self.font_family_for(path))
             editor.set_word_wrap(self.word_wrap)
             self.grammar.attach(editor)
             self._apply_spell_to(editor)
@@ -262,6 +265,26 @@ class EditorTabs(QTabWidget):
     def zoom(self, direction: int) -> None:
         self.set_font_size(self.font_size + direction)
 
+    # ---- Textschrift (Ansichts-Einstellung, gilt für alle Dateien) --------------
+    def font_family_for(self, path: Path) -> str:
+        """Schrift je Dateiendung aus der Config, sonst die Textschrift des Themes."""
+        by_ext = self.config.get("font_by_extension", {})
+        return by_ext.get(path.suffix.lower()) or tokens.TEXT_FONT_FAMILY
+
+    def apply_text_fonts(self) -> None:
+        for page in self.pages():
+            page.editor.set_text_font(self.font_family_for(page.editor.path))
+            page.refresh_width()
+        self.text_font_changed.emit(tokens.TEXT_FONT_FAMILY)
+
+    def set_text_font(self, family: str) -> None:
+        """Textschrift des Themes setzen (Toolbar und Einstellungen rufen dasselbe auf)."""
+        from notex.theme.manager import theme_manager
+        theme = theme_manager().current()
+        if theme["font"]["editor_family"] != family:
+            theme["font"]["editor_family"] = family
+            self.config["theme"] = theme_manager().apply(theme)
+
     def set_word_wrap(self, enabled: bool) -> None:
         self.word_wrap = enabled
         for editor in self.editors():
@@ -274,10 +297,12 @@ class EditorTabs(QTabWidget):
 
     def retheme(self) -> None:
         for page in self.pages():
+            page.editor.set_text_font(self.font_family_for(page.editor.path))
             page.retheme()
             if page.editor.highlighter is not None:
                 page.editor.highlighter.reset()   # Wellenlinien in neuen Theme-Farben
         self.tab_bar.update()
+        self.text_font_changed.emit(tokens.TEXT_FONT_FAMILY)
 
     # ---- Rechtschreibung / Grammatik -------------------------------------------
     def spell_enabled_for(self, path: Path) -> bool:

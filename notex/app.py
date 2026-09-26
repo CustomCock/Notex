@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication, QDialog
 from notex import APP_NAME
 from notex.core.config import load_config, save_config
 from notex.paths import config_path, data_dir
-from notex.theme.fonts import load_bundled_fonts, ui_font
+from notex.theme.fonts import load_fonts, ui_font
 from notex.theme.manager import theme_manager
 from notex.theme.theme import load_stylesheet
 from notex.ui.main_window import MainWindow
@@ -35,7 +35,7 @@ def create_app(argv: list[str]) -> QApplication:
     translator = QTranslator(app)
     if translator.load(QLocale("de"), "qtbase", "_", QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
         app.installTranslator(translator)
-    load_bundled_fonts()    # Inter + JetBrains Mono aus assets/fonts/
+    load_fonts()            # Inter + JetBrains Mono aus assets/fonts/, eigene aus fonts/user/
     app.setFont(ui_font())
     app.setStyleSheet(load_stylesheet())
     icon_path = Path(__file__).resolve().parent / "assets" / "notex.png"

@@ -51,8 +51,7 @@ DEFAULT_THEME: dict[str, Any] = {
         "max_columns": 90,          # Blatt-Modus: maximale Textbreite in Zeichen
     },
     "font": {
-        "ui_family": "Inter",
-        "editor_family": "JetBrains Mono",
+        "editor_family": "",        # "" = Standard (SF Pro aus fonts/user/, sonst Inter)
         "ui_size": 13,
         "editor_size": 14,
         "line_height": 1.5,
@@ -135,9 +134,9 @@ def merge_theme(raw: Any) -> dict[str, Any]:
     theme["paper"]["max_columns"] = int(_clamp(paper.get("max_columns"), 40, 200, theme["paper"]["max_columns"]))
 
     font = raw.get("font") if isinstance(raw.get("font"), dict) else {}
-    for key in ("ui_family", "editor_family"):
-        if isinstance(font.get(key), str) and font[key].strip():
-            theme["font"][key] = font[key].strip()
+    # "ui_family" aus älteren Themes wird bewusst ignoriert: die Oberflächenschrift ist fest
+    if isinstance(font.get("editor_family"), str):
+        theme["font"]["editor_family"] = font["editor_family"].strip()[:80]
     theme["font"]["ui_size"] = int(_clamp(font.get("ui_size"), 9, 20, theme["font"]["ui_size"]))
     theme["font"]["editor_size"] = int(_clamp(font.get("editor_size"), 8, 40, theme["font"]["editor_size"]))
     theme["font"]["line_height"] = round(_clamp(font.get("line_height"), 1.0, 2.2, theme["font"]["line_height"]), 2)

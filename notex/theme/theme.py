@@ -14,7 +14,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGraphicsDropShadowEffect, QMenu, QWidget
 from PySide6.QtGui import QColor
 
-from notex.theme.fonts import editor_font  # noqa: F401 – Re-Export für bestehende Importe
 from notex.theme.tokens import COLORS, RADIUS, SPACING, flat_tokens
 
 # Lazy + Lookahead: `@fs_uipx` -> Token "fs_ui" + Einheit "px", `@text_muted;` -> "text_muted"
@@ -69,4 +68,4 @@ def style_menu(menu: QMenu) -> QMenu:
     return menu
 
 
-__all__ = ["COLORS", "RADIUS", "SPACING", "add_shadow", "editor_font", "load_stylesheet", "style_menu"]
+__all__ = ["COLORS", "RADIUS", "SPACING", "add_shadow", "load_stylesheet", "style_menu"]
