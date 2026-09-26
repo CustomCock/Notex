@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.7.0] – unveröffentlicht
+## [1.7.0] – 2026-09-26
 
 ### Hinzugefügt
 - Module: Einstellungen → Module schaltet Funktionen einzeln an/aus, sofort und ohne Neustart; ausgeschaltete Module
@@ -15,6 +15,9 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   optional auch in Werten; Einstellungen → Variablen mit Import/Export und einstellbarem Präfix
 
 ### Behoben
+- Split View: Nach dem Aufheben der Teilung zeigten Signale und Bearbeitungsleiste verschobener Tabs noch auf die
+  gelöschte Gruppe (Fehlermeldungen, Schriftgröße in der Leiste ohne Wirkung); Tabs werden beim Verschieben jetzt
+  neu verdrahtet
 - Dateien mit Bytes, die cp1252 nicht kennt (0x81, 0x8D, 0x8F, 0x90, 0x9D), ließen sich im Editor nicht öffnen;
   jetzt Latin-1 als letzte Stufe (Speichern bleibt byte-identisch)
 

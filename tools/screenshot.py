@@ -216,6 +216,14 @@ def main() -> int:
     write_sample()
     httpd = HTTPServer(("127.0.0.1", 0), FakeLanguageTool)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    (WORK / "variables.json").write_text(json.dumps({"version": 1, "variables": [
+        {"name": "gruss", "value": "Mit freundlichen Grüßen", "description": "Briefschluss"},
+        {"name": "name", "value": "Alex Beispiel", "description": "Unterschrift"},
+        {"name": "firma_tel", "value": "+49 30 1234567", "description": "Telefon Büro"},
+        {"name": "23", "value": "Paragraph 23 der Vereinbarung", "description": ""},
+        {"name": "adresse", "value": "Musterweg 1\n12345 Berlin", "description": "Postanschrift"},
+        {"name": "gute_reise", "value": "Gute Reise und bis bald!", "description": ""}]}, ensure_ascii=False),
+        encoding="utf-8")
     (WORK / "user_dictionary.txt").write_text("Notex\nHunspell\nLanguageTool\n", encoding="utf-8")
     (WORK / "config.json").write_text(json.dumps({
         "grammar": {"enabled": True, "server_url": f"http://127.0.0.1:{httpd.server_port}"},
@@ -571,8 +579,47 @@ def main() -> int:
         def finish_all():
             for editor in window.tabs.editors():
                 editor.document().setModified(False)
-            window.close()
-            app.quit()
+            modules_shots()
+
+        def modules_shots():
+            """Block F (1.7.0): Einstellungen → Module, Variablen im Editor, Vorschläge, Einstellungen → Variablen."""
+            from PySide6.QtGui import QTextCursor
+            if window.tabs.is_split:
+                window.toggle_split()
+            note = data / "Projekte/Notex/brief.md"
+            note.write_text("# Brief an Frau Muster\n\nSehr geehrte Frau Muster,\n\nwie besprochen gilt §23 auch "
+                            "für Ihr Projekt. Der Paragraph \\§23 im Gesetz ist etwas anderes.\n\nRückfragen gern "
+                            "unter §firma_tel.\n\n§gruss\n§name\n\nAdresse: §adresse\n", encoding="utf-8")
+            editor = window.tabs.open_file(note)
+            dialog = SettingsDialog(window, window.theme_store)
+            dialog.show_category("Module")
+            dialog.show()
+            offset = QPoint((window.width() - dialog.width()) // 2, (window.height() - dialog.height()) // 2)
+
+            def variables_page():
+                compose(window, dialog, "46-settings-modules", offset)
+                dialog.show_category("Variablen")
+                later_rel(200, lambda: (compose(window, dialog, "49-settings-variables", offset), dialog.reject(),
+                                        later_rel(200, editor_shots)))
+
+            def editor_shots():
+                save(window, "47-variables-editor")
+                cursor = editor.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                editor.setTextCursor(cursor)
+                editor.insert_variable_prefix()
+                editor.textCursor().insertText("g")
+                editor._maybe_complete()
+                popup = window._completions.get(id(editor))
+                later_rel(300, lambda: (compose(window, popup, "48-variables-completion",
+                                                window.mapFromGlobal(popup.geometry().topLeft())) if popup else None,
+                                        popup.hide() if popup else None, done()))
+
+            def done():
+                editor.document().setModified(False)
+                window.close()
+                app.quit()
+            later_rel(400, variables_page)
 
         shot_image()
 

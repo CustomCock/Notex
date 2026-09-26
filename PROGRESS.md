@@ -30,7 +30,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
 | 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün, lokal getaggt, bleibt (Besitzer) |
-| 1.7.0 | Neuer Block F: Modul-System, Variablen | in Arbeit |
+| 1.7.0 | Neuer Block F: Modul-System, Variablen | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -171,7 +171,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Resolver zu einem Durchlauf zusammen, hängende Einrückung nur bei geänderter Schriftmetrik). 100k Zeilen:
   Öffnen ~2 s + ~1 s Einfärben (vorher ~12 s), Tabelle 0,5 s, Sortieren 0,2 s, Filtern 0,05 s.
 
-### 1.7.0 – neuer Block F (in Arbeit)
+### 1.7.0 – neuer Block F
 - F1 Module: `core/modules.py` – MODULES (15 Einträge mit Name, Beschreibung, Abhängigkeit, Standard, Block),
   ModuleRegistry mit Aktivator-Muster: `contribute(key, activate)`; activate hängt ein und gibt einen Rückbau zurück;
   läuft nur, wenn das Modul an ist; set_enabled baut ohne Neustart auf/ab; has_contributions → „folgt in Block …“.
@@ -192,6 +192,12 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Token, die Datei bleibt byte-identisch. Grenzen: Token in anderer Schriftgröße (z. B. Überschrift mit eigener
   Schrift) → Breite leicht ungenau; Werte über 80 Zeichen werden in der Anzeige gekürzt (Hover zeigt alles),
   mehrzeilige Werte einzeilig mit „⏎“. Kopieren: eigenes QMimeData, weil QTextEditMimeData setText ignoriert.
+- Nebenbei behoben: Split View – beim Verschieben zwischen Gruppen blieben Signale/Leiste an der alten Gruppe
+  (nach Aufheben der Teilung gelöscht). Jetzt `EditorTabs.wire_page/unwire_page`, aufgerufen in `_move_page` und
+  beim Verschieben von Viewern.
+- Build-Größe: keine neuen Abhängigkeiten, build.py unverändert → Build-Check lief nicht; Stand wie nach 1.6.0
+  (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
+- Screenshots 46–49 (Module, Variablen im Editor, Vorschläge, Einstellungen → Variablen).
 
 ## Offen
 
@@ -240,13 +246,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 
 ## Nächster Schritt
 
-**Entscheidung des Besitzers (26.09.2026):** Alter Block F bleibt vollständig im Code (normale Funktionen, keine
-eigenen Module). Hex/Dateityp/Prüfsummen ist die Basis für das neue G1 (nur Lücken ergänzen) und gehört zum Modul
-„Hex & Dateianalyse“. Versionen zählen weiter: alter Block F = 1.6.0 (Tag bleibt), neuer F = 1.7.0, G = 1.8.0,
-H = 1.9.0, I = 1.10.0, J = 1.11.0, K = 1.12.0.
-
-Neuer Plan danach: F (Module, Variablen) → G (Hex/Strings/Eingebettet/Entropie) → H (Metadaten, YARA, Zeitleiste,
-IOC) → I (Ports, IP-Konflikte, RDAP/ASN) → J (Scanner) → K (Logs, PCAP); nach jedem Block anhalten.
+Neuer Block F (1.7.0) fertig, lokal getaggt. **Gestoppt** – weiter mit Block G (1.8.0: Forensik-Basis – Lücken in
+Hex/Dateityp/Prüfsummen, Strings, Eingebettete Dateien, Entropie), sobald der Besitzer „weiter“ schreibt.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.

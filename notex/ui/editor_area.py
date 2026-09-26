@@ -219,6 +219,8 @@ class EditorArea(QWidget):
         index = source.indexOf(page)
         title, tooltip, icon = source.tabText(index), source.tabToolTip(index), source.tabIcon(index)
         source.removeTab(index)
+        source.unwire_page(page)
+        target.wire_page(page)
         new_index = target.addTab(page, title)
         target.setTabToolTip(new_index, tooltip)
         target.setTabIcon(new_index, icon)
@@ -233,6 +235,8 @@ class EditorArea(QWidget):
         if source is not target and page in source.viewers() and target in self.groups:
             title, tooltip, icon_ = source.tabText(index), source.tabToolTip(index), source.tabIcon(index)
             source.removeTab(index)
+            source.unwire_page(page)
+            target.wire_page(page)
             new_index = target.addTab(page, icon_, title)
             target.setTabToolTip(new_index, tooltip)
             target.setCurrentIndex(new_index)

@@ -243,6 +243,9 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
 öffnen Binärdateien wieder im Texteditor.
 
+![Einstellungen → Module](docs/46-settings-modules.png)
+
+
 ## Variablen
 
 Textbausteine mit Verknüpfung (Modul „Variablen“, Standard an). Einstellungen → **Variablen** (`Ctrl+Shift+Alt+V`):
@@ -267,6 +270,11 @@ Tabelle mit Name, Wert (auch mehrzeilig) und Beschreibung, Suche, Import/Export 
 - Keine Rekursion: Variablen in Variablenwerten werden nicht aufgelöst. Funktioniert in allen Textdateien, auch in
   `.ntx` (aufgelöst wird nur im Speicher). Ist das Modul aus, erscheinen Tokens als normaler Text; Dateien bleiben
   unverändert – auch bloßes Öffnen und Speichern ändert kein Byte.
+
+| Im Editor | Vorschläge | Verwalten |
+|---|---|---|
+| ![Variablen im Editor](docs/47-variables-editor.png) | ![Vorschläge](docs/48-variables-completion.png) | ![Einstellungen → Variablen](docs/49-settings-variables.png) |
+
 
 ## CSV als Tabelle
 

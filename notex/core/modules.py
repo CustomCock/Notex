@@ -45,7 +45,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("ip_conflicts", "IP-Konflikte", "IP-Zuordnungen in Notizen sammeln und Konflikte zeigen",
                "keine", False, "I"),
     ModuleInfo("rdap", "RDAP/ASN", "Inhaber, Netzblock und ASN zu IPs und Domains (nur auf Klick, Netzwerk)",
-               "keine (Netzwerk)", False, "I"),
+               "Netzwerk (nur auf Klick)", False, "I"),
     ModuleInfo("scanner", "Netzwerk-Scanner", "Hosts und offene Ports im eigenen Netz prüfen", "keine", False, "J"),
     ModuleInfo("logs", "Log-Auswertung", "auth.log und Windows-Ereignisprotokolle auswerten", "python-evtx", False, "K"),
     ModuleInfo("pcap", "PCAP-Übersicht", "Mitschnitte (.pcap/.pcapng) zusammenfassen", "dpkt", False, "K"),

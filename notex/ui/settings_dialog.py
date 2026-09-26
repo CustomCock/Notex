@@ -572,7 +572,7 @@ class SettingsDialog(QDialog):
                   "und laden ihre Bibliotheken nicht. Umschalten wirkt sofort.")
         self.module_boxes = {}
         for module in MODULES:
-            box = QCheckBox(module.name)
+            box = QCheckBox(module.name.replace("&", "&&"))      # „&“ ist sonst Tastenkürzel-Markierung
             box.setChecked(registry.enabled(module.key) if registry else bool(module.default))
             box.toggled.connect(lambda on, key=module.key: registry.set_enabled(key, on) if registry else None)
             ready = registry is None or registry.has_contributions(module.key)
