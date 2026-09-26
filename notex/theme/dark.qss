@@ -1064,3 +1064,19 @@ QLabel#HexInspector {
     border-bottom-left-radius: @r_panelpx;
     border-bottom-right-radius: @r_panelpx;
 }
+/* Analyse-Tabellen (Strings, Eingebettete Dateien) */
+QTableView#AnalysisTable {
+    background: @surface;
+    alternate-background-color: @bg;
+    gridline-color: @border;
+    border: none;
+    selection-background-color: @selection;
+    selection-color: @text;
+}
+QTableView#AnalysisTable QHeaderView::section {
+    background: @surface;
+    color: @text_muted;
+    border: none;
+    border-bottom: 1px solid @border;
+    padding: 2px @sp_smpx;
+}

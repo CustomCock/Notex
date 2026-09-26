@@ -107,6 +107,10 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
         "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
     },
+    "strings": {              # Modul Strings: letzte Einstellungen des Dialogs
+        "min_len": 4,
+        "encodings": ["ascii", "utf16le"],
+    },
     "variables": {            # Modul Variablen – Definitionen liegen in variables.json neben der App
         "prefix": "§",
         "copy": "values",     # Ctrl+C: "values" (Werte einsetzen) oder "tokens"

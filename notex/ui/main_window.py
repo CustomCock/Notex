@@ -887,8 +887,12 @@ class MainWindow(QMainWindow):
     def _install_modules(self) -> None:
         """Jedes Modul meldet einen Aktivator an; ausgeschaltete Module hängen nichts ein (siehe core/modules.py)."""
         self._editor_menu_providers: list = []
+        self._analysis_dialogs: dict[str, list] = {}
         self.modules.contribute("hex", self._activate_hex)
         self.modules.contribute("variables", self._activate_variables)
+        self.modules.contribute("strings", lambda: self._activate_analysis(
+            "strings", "Strings extrahieren …", "Ctrl+Alt+S", "text-search", self.show_strings,
+            "strings zeichenketten ascii utf-16 binär extrahieren"))
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -1077,6 +1081,41 @@ class MainWindow(QMainWindow):
         dialog = VariableEditDialog(self, variable, [v.name for v in service.variables], service.prefix)
         if dialog.exec():
             service.upsert(dialog.result_variable(), old_name=name)
+
+    def _activate_analysis(self, key: str, title: str, shortcut: str, icon_name: str, opener, keywords: str):
+        """Gemeinsamer Aktivator für Datei-Analysen: Menü Datei, Palette, Kürzel, Baum-Kontextmenü."""
+        action = self._module_action(title, shortcut, lambda: opener(), self.file_menu)
+        self.registry.add(f"analysis:{key}", title.replace(" …", ""), lambda: opener(), category="Dateianalyse",
+                          shortcut=shortcut, keywords=keywords)
+
+        def tree_entry(menu, path: Path) -> None:
+            menu.addAction(icon(icon_name), title, lambda: opener(path))
+        self.sidebar.tree.menu_providers.append(tree_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault(key, [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove(f"analysis:{key}")
+            if tree_entry in self.sidebar.tree.menu_providers:
+                self.sidebar.tree.menu_providers.remove(tree_entry)
+            for dialog in list(dialogs_open):          # „keine Panels“: offene Analysefenster schließen
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def _open_analysis(self, key: str, factory, path: Path | None) -> None:
+        target = self._analysis_target(path)
+        if target is None:
+            return
+        dialog = factory(target)
+        self._analysis_dialogs.setdefault(key, []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get(key, []).remove(d)
+                                if d in self._analysis_dialogs.get(key, []) else None)
+        dialog.show()
+
+    def show_strings(self, path: Path | None = None) -> None:
+        from notex.ui.strings_dialog import StringsDialog
+        self._open_analysis("strings", lambda target: StringsDialog(self, target, self.config), path)
 
     def show_in_hex(self, path: Path, offset: int, length: int = 1) -> None:
         """Sprung aus Strings/Eingebettete Dateien/Entropie an eine Stelle der Datei (Modul Hex & Dateianalyse)."""

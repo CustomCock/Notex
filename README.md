@@ -346,6 +346,18 @@ PDFs öffnen als eigener Tab (nur lesen):
 ![PDF mit Zitat](docs/45-pdf-quote.png)
 
 
+## Strings
+
+Modul „Strings“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Strings extrahieren …**, Menü Datei oder
+`Ctrl+Alt+S` (aktuelle Datei):
+
+- Findet druckbare Zeichenketten in ASCII und UTF-16LE (optional UTF-16BE) mit Offset; Mindestlänge einstellbar
+  (Standard 4). Die Datei wird im Hintergrund gestreamt – auch mehrere GB, mit Fortschritt und Abbrechen.
+- Liste mit Filter (Text oder Regex) und Kategorie. Interessante Treffer sind hervorgehoben: URLs, E-Mails,
+  IP-Adressen, Pfade (Windows/UNC/Unix), Registry-Schlüssel, Base64-verdächtige Blöcke.
+- Doppelklick springt in die Hex-Ansicht (Treffer markiert), „Als .txt exportieren“ speichert die gefilterte Liste.
+- Mehr als 200 000 Treffer werden abgeschnitten (Hinweis in der Statuszeile).
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -663,6 +675,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+Alt+V | Variablen verwalten |
 | Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
 | Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen (Modul Hex & Dateianalyse) |
+| Ctrl+Alt+S | Strings extrahieren (Modul Strings) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
