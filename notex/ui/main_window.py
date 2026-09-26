@@ -912,6 +912,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("ioc", self._activate_ioc)
         self.modules.contribute("ports", self._activate_ports)
         self.modules.contribute("ip_conflicts", self._activate_ip_conflicts)
+        self.modules.contribute("rdap", self._activate_rdap)
         self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1572,6 +1573,58 @@ class MainWindow(QMainWindow):
         dialog.show_assignments(self._ip_assignments())
         dialog.show()
         self.refresh_ip_index()
+
+    # ---- Modul: RDAP/ASN -------------------------------------------------------------------------
+    _rdap_client = None
+
+    def _activate_rdap(self):
+        """RDAP/ASN nur auf ausdrücklichen Klick: Palette/Kürzel und Kontextmenü für IP, Domain oder AS-Nummer."""
+        action = self._action("RDAP / ASN abfragen …", "Ctrl+Alt+R", lambda: self.rdap_lookup())
+        self.edit_menu.addAction(action)
+        self.registry.add("rdap:lookup", "RDAP / ASN abfragen (IP, Domain, AS-Nummer)", lambda: self.rdap_lookup(),
+                          category="Netzwerk", shortcut="Ctrl+Alt+R",
+                          keywords="rdap whois asn inhaber netzblock abuse registrar ip domain")
+        self._editor_menu_providers.append(self._rdap_menu)
+
+        def undo() -> None:
+            self.edit_menu.removeAction(action)
+            self._drop_actions([action])
+            self.registry.remove("rdap:lookup")
+            if self._rdap_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._rdap_menu)
+        return undo
+
+    def _rdap_menu(self, editor, menu) -> None:
+        from notex.core import rdap
+        cursor = editor.textCursor()
+        token = rdap.token_at(cursor.block().text(), cursor.positionInBlock()) if not cursor.hasSelection() else \
+            cursor.selectedText().strip()[:120]
+        if not token:
+            return
+        try:
+            kind, value = rdap.classify(token)
+        except rdap.RdapError:
+            return
+        reason = rdap.local_reason(value) if kind == "ip" else None
+        label = f"RDAP: {token}" + (f" ({reason} – keine Abfrage)" if reason else "")
+        action = menu.addAction(icon("globe-lock"), label + "\tCtrl+Alt+R", lambda: self.rdap_lookup(token, editor))
+        action.setEnabled(reason is None)
+
+    def rdap_lookup(self, query: str | None = None, editor=None) -> None:
+        from notex.core import rdap
+        from notex.ui.rdap_dialog import RdapDialog
+        editor = editor or self.tabs.current_editor()
+        if query is None and editor is not None and not getattr(editor, "locked", False):
+            cursor = editor.textCursor()
+            query = cursor.selectedText().strip()[:120] if cursor.hasSelection() else \
+                (rdap.token_at(cursor.block().text(), cursor.positionInBlock()) or "")
+        if query and editor is not None and rdap.needs_confirmation(editor.path):
+            if not dialogs.confirm(self, "RDAP-Abfrage", f"„{query}“ stammt aus einer verschlüsselten Notiz und wird "
+                                   "an öffentliche Registries (IANA, RIR, RIPEstat) gesendet. Trotzdem abfragen?"):
+                return
+        if self._rdap_client is None:
+            self._rdap_client = rdap.Client()          # Sitzungs-Cache für die Laufzeit der App
+        RdapDialog(self, self._rdap_client, query or "", editor).show()
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
     def _activate_ioc(self):

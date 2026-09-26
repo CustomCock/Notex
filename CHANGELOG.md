@@ -12,6 +12,9 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Modul IP-Konflikte: IP-Zuordnungen aus Tabellen und „IP Host“/„Host: IP“ in allen Notizen (ohne .ntx),
   IP-Übersicht nach Subnetz (`Ctrl+Shift+Alt+I`) mit Konflikten, Sprung zur Stelle, Subnetz-Auswertung mit
   Ausschlussbereichen und „Nächste freie IP kopieren“; Konflikte im Editor unterwellt
+- Modul RDAP/ASN (nur auf Klick): Karte zu IP, Domain oder AS-Nummer über den IANA-Bootstrap (Netzblock, Inhaber,
+  Land, Abuse-Kontakt, Daten; Registrar/Nameserver bei Domains), ASN über RIPEstat; private/reservierte Adressen
+  werden nie abgefragt; Sitzungs-Cache, Mindestabstand und Retry-After; „Als Markdown einfügen“ (`Ctrl+Alt+R`)
 
 ## [1.9.0] – 2026-09-26
 

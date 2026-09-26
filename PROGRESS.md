@@ -285,6 +285,14 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   „File-Watcher“ = file_saved/file_opened/status_changed der Tabs + inkrementeller Ordnerabgleich beim Öffnen der
   Übersicht bzw. „Aktualisieren“ (Qt-Watcher auf ganzen Bäumen ist unter Windows unzuverlässig und teuer).
   Konflikte werden mit Warn-Icon markiert, weil das Stylesheet Baum-Textfarben festlegt.
+- I3 RDAP/ASN: `core/rdap.py` (classify inkl. entschärfter Werte, local_reason – reserviert VOR privat prüfen, weil
+  Python 240.0.0.0/4 als „private“ führt; Bootstrap mit längstem Präfix und https bevorzugt; parse_ip/autnum/domain
+  inkl. verschachtelter Entities (Abuse unter Registrant), cidr0 oder summarize_address_range; Client mit injizierbarem
+  fetch/sleep/clock → Tests ohne Netz, Cache je URL nur im Speicher, 1 s je Host, 429 + Retry-After (> 30 s → Meldung)).
+  **Entscheidung ASN-Quelle: RIPEstat prefix-overview** (frei, ohne Schlüssel, weltweit aus RIS-BGP-Daten, JSON über
+  HTTPS) statt Team Cymru (DNS-TXT – bräuchte eine DNS-Bibliothek) oder ipinfo/ipapi (Schlüssel/Limits/Lizenz).
+  `ui/rdap_dialog.py` (QThread; beim Schließen wird nicht gewartet, der Thread hängt sich ans Fenster und räumt sich
+  weg). Kontextmenü zeigt private IPs ausgegraut mit Grund; .ntx → Rückfrage vor dem Senden.
 
 ## Offen
 

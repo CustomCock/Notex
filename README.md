@@ -524,6 +524,26 @@ werden neu gelesen).
 ![IP-Übersicht](docs/58-ip-overview.png)
 
 
+## RDAP und ASN
+
+Modul „RDAP/ASN“ (Standard aus; geht nur auf ausdrücklichen Klick ins Netz). Rechtsklick auf eine IP, Domain
+(auch aus URL/E-Mail, auch entschärft wie `evil[.]example[.]com`) oder AS-Nummer → **RDAP: …**, oder `Ctrl+Alt+R`
+bzw. Palette „RDAP / ASN abfragen“ (Markierung oder Wert unter dem Cursor, sonst Eingabefeld).
+
+- Die Karte zeigt Netzblock (CIDR), Name/Handle, Inhaber samt Adresse, Land, Abuse-Kontakt, Registrierungs- und
+  Änderungsdatum, das announcierte BGP-Präfix und die **ASN mit AS-Namen**; bei Domains Registrar, Status,
+  Nameserver, DNSSEC und Ablaufdatum. „Als Markdown einfügen“ hängt eine Tabelle samt Quelle und Abfragezeit an die
+  aktuelle Zeile, „Kopieren“ legt sie in die Zwischenablage.
+- Ablauf: IANA-Bootstrap (`data.iana.org/rdap/…`, RFC 9224) → zuständige Registry (ARIN, RIPE, APNIC, LACNIC,
+  AFRINIC, Registry der TLD). Die ASN zu einer IP kommt von der **RIPEstat Data API** (`stat.ripe.net`,
+  „prefix-overview“): kostenlos, ohne Schlüssel, weltweite BGP-Sicht; der AS-Name zusätzlich per RDAP.
+- **Private und reservierte Adressen** (RFC 1918, Loopback, Link-Local, CGNAT, Dokumentationsnetze, Multicast, ULA …)
+  erkennt Notex lokal und fragt sie nie ab.
+- Ergebnisse bleiben für die Sitzung im Speicher (nichts auf Platte); je Server mindestens 1 s Abstand, „429 Too
+  Many Requests“ wird mit Retry-After respektiert, Zeitlimit 10 s. Die Abfrage läuft im Hintergrund.
+- Aus verschlüsselten Notizen fragt Notex vor dem Senden nach.
+
+
 ## IOCs entschärfen
 
 Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
@@ -875,6 +895,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+Y | YARA-Regel testen (Modul YARA) |
 | Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
 | Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
+| Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
