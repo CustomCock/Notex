@@ -442,6 +442,44 @@ Modul „YARA“ (Standard aus, bringt yara-python mit). `.yar`/`.yara`-Dateien 
   verfolgt, höchstens 20 000 Trefferstellen.
 
 
+## Zeitleiste und Beweismittel
+
+Modul „Zeitleiste & Beweismittel“ (Standard aus).
+
+**Zeitleisten** sind normale Markdown-Notizen mit einer Tabelle – lesbar in jeder Vorschau, im Verlauf
+vergleichbar, von Hand editierbar. Erkannt werden sie am Frontmatter:
+
+```markdown
+---
+notex: zeitleiste
+titel: Vorfall Webserver
+---
+| Zeit | Quelle | Beschreibung | Tags |
+|---|---|---|---|
+| 2026-09-26T14:03:11+02:00 | auth.log | Fehlgeschlagener Login root von 203.0.113.5 | #ssh #bruteforce |
+```
+
+- **Neue Zeitleiste**: Palette „Neue Zeitleiste“ (Vorlage `Zeitleiste.md`).
+- **Zur Zeitleiste hinzufügen** (`Ctrl+Alt+Z`, Rechtsklick im Editor): nimmt die aktuelle Zeile (oder die erste
+  markierte) und erkennt den Zeitstempel – ISO 8601/RFC 3339, syslog (`Sep 26 14:03:11`), Apache/nginx
+  (`[26/Sep/2026:14:03:11 +0200]`), deutsch (`26.09.2026 14:03`), US/Windows (`9/26/2026 2:03:11 PM`), Unix-Zeit am
+  Zeilenanfang. Ohne Zeitzone gilt die Systemzeit. Quelle = Dateiname, Beschreibung = Rest der Zeile; alles ist vor
+  dem Einfügen änderbar, Ziel-Zeitleiste wählbar (oder neu). Eingefügt wird chronologisch.
+- **Zeitleiste anzeigen** (`Ctrl+Shift+Alt+Z`): chronologische Liste mit Filter nach Quelle, Tag und Text; Zeit in
+  UTC, lokal oder wie gespeichert; Doppelklick springt zur Zeile; „Als Markdown kopieren“ und „CSV exportieren“
+  (jeweils die gefilterte Liste in der gewählten Zeitdarstellung).
+- In der Datei stehen Zeiten als ISO 8601 mit Offset. Bewusst keine Zonennamen wie „Europe/Berlin“ – Windows hat
+  dafür keine eingebaute Datenbank.
+- Aus verschlüsselten Notizen (`.ntx`) wird nichts übernommen (der Klartext landete sonst unverschlüsselt in der
+  Zeitleiste).
+
+**Beweismittel (Chain of Custody)**: Palette „Beweismittel: neu“ legt eine Notiz aus der Vorlage `Beweismittel.md` an
+(ID, Beschreibung, Fundort, Zeitpunkt, sichergestellt von, Art der Sicherung, Aufbewahrung, Prüfsummen, Übergaben).
+„Beweismittel: Prüfsummen einfügen …“ berechnet MD5, SHA-1 und SHA-256 einer gewählten Datei im Hintergrund und trägt
+sie in die Tabelle unter „Prüfsummen“ ein; „Beweismittel: Übergabe eintragen“ hängt eine Zeile mit der aktuellen Zeit
+an die Übergaben an und setzt den Cursor in „Von“.
+
+
 ## IOCs entschärfen
 
 Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
@@ -789,6 +827,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
 | Ctrl+Alt+M | Metadaten anzeigen / entfernen (Modul Metadaten) |
 | Ctrl+Alt+Y | YARA-Regel testen (Modul YARA) |
+| Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |

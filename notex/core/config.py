@@ -109,6 +109,10 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
         "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
     },
+    "timeline": {             # Modul Zeitleiste: zuletzt benutzte Zeitleiste, Zeitanzeige (utc | local | original)
+        "last": "",
+        "mode": "utc",
+    },
     "yara": {                 # Modul YARA: zuletzt benutzte Regel und Ziel
         "last_rule": "",
         "last_target": "",

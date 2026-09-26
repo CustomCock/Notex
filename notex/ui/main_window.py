@@ -908,6 +908,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("metadata", lambda: self._activate_analysis(
             "metadata", "Metadaten anzeigen …", "Ctrl+Alt+M", "scan-eye", self.show_metadata,
             "metadaten exif gps kamera autor pdf office docx entfernen bereinigen xmp iptc"))
+        self.modules.contribute("timeline", self._activate_timeline)
         self.modules.contribute("ioc", self._activate_ioc)
         self.modules.contribute("yara", self._activate_yara)
 
@@ -1098,6 +1099,221 @@ class MainWindow(QMainWindow):
         dialog = VariableEditDialog(self, variable, [v.name for v in service.variables], service.prefix)
         if dialog.exec():
             service.upsert(dialog.result_variable(), old_name=name)
+
+    # ---- Modul: Zeitleiste & Beweismittel --------------------------------------------------------
+    def _activate_timeline(self):
+        actions = [self._module_action("Zeitleiste anzeigen …", "Ctrl+Shift+Alt+Z", lambda: self.show_timeline(),
+                                       self.file_menu),
+                   self._action("Zur Zeitleiste hinzufügen …", "Ctrl+Alt+Z", lambda: self.add_to_timeline())]
+        self.edit_menu.addAction(actions[1])
+        keywords = "zeitleiste timeline forensik ereignis chronologie vorfall"
+        evidence = "beweismittel chain of custody sicherstellung forensik"
+        commands = {
+            "timeline:show": ("Zeitleiste anzeigen", lambda: self.show_timeline(), "Ctrl+Shift+Alt+Z", keywords),
+            "timeline:add": ("Zur Zeitleiste hinzufügen (aktuelle Zeile)", lambda: self.add_to_timeline(), "Ctrl+Alt+Z",
+                             keywords),
+            "timeline:new": ("Neue Zeitleiste", lambda: self.new_from_template("Zeitleiste.md"), "", keywords),
+            "evidence:new": ("Beweismittel: neu (Chain of Custody)", lambda: self.new_from_template("Beweismittel.md"),
+                             "", evidence),
+            "evidence:hashes": ("Beweismittel: Prüfsummen einfügen …", lambda: self.insert_evidence_hashes(), "",
+                                evidence + " prüfsumme hash sha256 md5"),
+            "evidence:handover": ("Beweismittel: Übergabe eintragen", lambda: self.add_handover(), "",
+                                  evidence + " übergabe"),
+        }
+        for key, (title, slot, shortcut, words) in commands.items():
+            self.registry.add(key, title, slot, category="Zeitleiste & Beweismittel", shortcut=shortcut, keywords=words)
+        self._editor_menu_providers.append(self._timeline_menu)
+        dialogs_open: list = self._analysis_dialogs.setdefault("timeline", [])
+
+        def undo() -> None:
+            self.edit_menu.removeAction(actions[1])
+            self._drop_actions(actions)
+            for key in commands:
+                self.registry.remove(key)
+            if self._timeline_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._timeline_menu)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def _timeline_menu(self, editor, menu) -> None:
+        from notex.core import timeline as tl
+        action = menu.addAction(icon("clock-4"), "Zur Zeitleiste hinzufügen …\tCtrl+Alt+Z",
+                                lambda: self.add_to_timeline(editor))
+        if not tl.can_take_from(editor.path):
+            action.setEnabled(False)
+            action.setToolTip("Aus verschlüsselten Notizen wird nichts in eine unverschlüsselte Zeitleiste kopiert")
+
+    def _timeline_candidates(self) -> list[Path]:
+        from notex.core import timeline as tl
+        found = tl.find_timelines(self.root)
+        last = Path(self.config.get("timeline", {}).get("last", "") or ".")
+        if last in found:
+            found.remove(last)
+            found.insert(0, last)
+        return found
+
+    def add_to_timeline(self, editor=None) -> None:
+        """Aktuelle Zeile (bzw. erste Zeile der Auswahl) als Eintrag vorschlagen – Zeit aus der Zeile erkannt."""
+        from notex.core import timeline as tl
+        from notex.ui.timeline_dialog import EntryDialog
+        editor = editor or self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Erst eine Datei öffnen und die Zeile anklicken", "info")
+            return
+        if not tl.can_take_from(editor.path):
+            self.toast.show_message("Aus verschlüsselten Notizen wird nichts in eine Zeitleiste kopiert", "lock")
+            return
+        cursor = editor.textCursor()
+        if cursor.hasSelection():
+            line = cursor.selection().toPlainText().strip().split("\n")[0]
+        else:
+            line = cursor.block().text()
+        is_timeline = tl.is_timeline(editor.toPlainText()[:4000])
+        entry = tl.entry_from_line("" if is_timeline else line, "" if is_timeline else editor.path.name)
+        candidates = self._timeline_candidates()
+        if is_timeline and editor.path not in candidates:
+            candidates.insert(0, editor.path)
+        dialog = EntryDialog(self, entry, candidates, editor.path if is_timeline else None)
+        if not dialog.exec():
+            return
+        target = dialog.target_path()
+        if target is None:
+            name = dialogs.ask_text(self, "Neue Zeitleiste", "Name:", "Zeitleiste")
+            if not name:
+                return
+            target = self.root / (name if name.lower().endswith(".md") else f"{name}.md")
+            if not fileops.is_within(target.resolve(), self.root.resolve()) or target.exists():
+                dialogs.warn(self, "Neue Zeitleiste", f"„{target.name}“ gibt es schon oder liegt außerhalb von data/.")
+                return
+            try:
+                fileops.atomic_write_bytes(target, tl.new_text(target.stem).encode("utf-8"))
+            except OSError as error:
+                dialogs.warn(self, "Neue Zeitleiste", str(error))
+                return
+            self.file_index.request_rescan()
+        self.add_timeline_entry(target, dialog.entry())
+
+    def add_timeline_entry(self, path: Path, entry) -> None:
+        """In die Zeitleiste einfügen – offen: im Editor (ein Undo-Schritt), sonst direkt in die Datei."""
+        from notex.core import timeline as tl
+        self.config.setdefault("timeline", {})["last"] = str(path)
+        editor = self.tabs.editor_for(path)
+        if editor is not None:
+            new, _line = tl.add_entry(editor.toPlainText(), entry)
+            self.tabs.replace_text_keep_cursor(editor, new)
+        else:
+            try:
+                from notex.core.encoding import encode_text
+                original = read_text_file(path)
+                new, _line = tl.add_entry(original.text, entry)
+                fileops.atomic_write_bytes(path, encode_text(new, original.encoding, original.eol))
+            except (OSError, UnicodeDecodeError) as error:
+                dialogs.warn(self, "Zeitleiste", str(error))
+                return
+        self.toast.show_message(f"Eintrag in „{path.name}“ eingefügt ({tl.display(entry.time, 'utc')})", "clock-4")
+
+    def show_timeline(self) -> None:
+        from notex.core import timeline as tl
+        from notex.ui.timeline_dialog import TimelineDialog
+        editor = self.tabs.current_editor()
+        if editor is None or not tl.is_timeline(editor.toPlainText()[:4000]):
+            candidates = self._timeline_candidates()
+            if not candidates:
+                self.toast.show_message("Noch keine Zeitleiste – Palette „Neue Zeitleiste“", "info")
+                return
+            names = [str(p.relative_to(self.root)) if fileops.is_within(p, self.root) else str(p) for p in candidates]
+            chosen = names[0] if len(names) == 1 else dialogs.choose(self, "Zeitleiste anzeigen", "Zeitleiste:", names)
+            if chosen is None:
+                return
+            editor = self.tabs.open_file(candidates[names.index(chosen)])
+            if editor is None:
+                return
+        dialog = TimelineDialog(self, editor)
+        self._analysis_dialogs.setdefault("timeline", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("timeline", []).remove(d)
+                                if d in self._analysis_dialogs.get("timeline", []) else None)
+        dialog.show()
+
+    def _evidence_editor(self):
+        editor = self.tabs.current_editor()
+        if editor is None or self._in_data_view() or editor.isReadOnly() or getattr(editor, "locked", False):
+            self.toast.show_message("Erst die Beweismittel-Notiz öffnen (beschreibbar)", "info")
+            return None
+        return editor
+
+    def insert_evidence_hashes(self) -> None:
+        """Datei wählen, MD5/SHA-1/SHA-256 im Hintergrund berechnen, als Zeilen in „## Prüfsummen“ einfügen."""
+        from PySide6.QtWidgets import QFileDialog, QProgressDialog
+        from notex.core import hashing
+        from notex.ui.analysis_dialog import AnalysisWorker
+        editor = self._evidence_editor()
+        if editor is None:
+            return
+        chosen, _ = QFileDialog.getOpenFileName(self, "Prüfsummen berechnen für", str(self.root))
+        if not chosen:
+            return
+        path = Path(chosen)
+        progress = QProgressDialog(f"Prüfsummen für „{path.name}“ …", "Abbrechen", 0, 1000, self)
+        progress.setWindowTitle("Beweismittel")
+        progress.setMinimumDuration(400)
+        worker = AnalysisWorker(lambda report, cancelled: hashing.hash_file(path, ("md5", "sha1", "sha256"),
+                                                                            report, cancelled))
+        worker.progress.connect(progress.setValue)
+        progress.canceled.connect(lambda: setattr(worker, "cancel", True))
+
+        def done(result, error: str) -> None:
+            worker.wait()
+            progress.close()
+            self._hash_worker = None
+            if result is None:
+                if error:
+                    dialogs.warn(self, "Prüfsummen", error)
+                return
+            self._insert_hash_rows(editor, path, result)
+        worker.done.connect(done)
+        self._hash_worker = worker
+        worker.start()
+
+    _hash_worker = None
+
+    def _insert_hash_rows(self, editor, path: Path, digests: dict[str, str]) -> None:
+        from notex.core import hashing
+        from notex.core import timeline as tl
+        text = editor.toPlainText()
+        rows = [[hashing.LABELS[name], digests[name], path.name] for name in ("md5", "sha1", "sha256")]
+        placed = True
+        for row in rows:
+            result = tl.append_row(text, "Prüfsummen", row)
+            if result is None:
+                placed = False
+                break
+            text = result[0]
+        if placed:
+            self.tabs.replace_text_keep_cursor(editor, text)
+        else:                                     # keine Prüfsummen-Tabelle: an der Cursorposition einfügen
+            table = "| Algorithmus | Wert | Datei |\n|---|---|---|\n" + "".join(
+                "| " + " | ".join(tl.escape_cell(c) for c in row) + " |\n" for row in rows)
+            cursor = editor.textCursor()
+            editor._grouped(lambda: cursor.insertText(("\n" if cursor.positionInBlock() else "") + table))
+        self.toast.show_message(f"MD5, SHA-1, SHA-256 von „{path.name}“ eingefügt", "hash")
+
+    def add_handover(self) -> None:
+        from datetime import datetime
+        from notex.core import timeline as tl
+        editor = self._evidence_editor()
+        if editor is None:
+            return
+        now = datetime.now().astimezone().replace(second=0, microsecond=0)
+        result = tl.append_row(editor.toPlainText(), "Übergaben", [tl.iso(now), "", "", "", ""])
+        if result is None:
+            self.toast.show_message("Keine Tabelle unter „## Übergaben“ – Vorlage „Beweismittel“ nutzen", "info")
+            return
+        text, line = result
+        self.tabs.replace_text_keep_cursor(editor, text)
+        row = text.split("\n")[line]
+        editor.goto_line(line + 1, row.index(" | ", 2) + 3)          # Cursor in die Spalte „Von“
 
     # ---- Modul: YARA ----------------------------------------------------------------------------
     def _activate_yara(self):
@@ -1861,6 +2077,12 @@ class MainWindow(QMainWindow):
                 return
         try:
             template = (folder / name).read_text(encoding="utf-8-sig")
+        except FileNotFoundError:
+            from notex.core.templates import DEFAULT_TEMPLATES
+            template = DEFAULT_TEMPLATES.get(name)
+            if template is None:
+                dialogs.warn(self, "Vorlage", f"Vorlage „{name}“ nicht gefunden")
+                return
         except (OSError, UnicodeDecodeError) as error:
             dialogs.warn(self, "Vorlage", str(error))
             return

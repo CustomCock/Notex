@@ -255,6 +255,14 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   (.yar/.yara in Baum + Syntax). `ui/yara_dialog.py`, MainWindow._activate_yara/test_yara/mark_yara_error
   (Editor.set_problem, gelöscht beim nächsten Tippen). FileTree.folder_menu_providers (neu, für Ordner).
   Vorlagen: `LATER_TEMPLATES` + config templates.installed – neue Standardvorlagen einmalig in alte Ordner.
+- H3 Zeitleiste & Beweismittel: **Format-Entscheidung** Markdown + Frontmatter `notex: zeitleiste` + Tabelle
+  (statt eigenem Format): lesbar in Vorschau/anderen Editoren, diffbar im Verlauf, Pipes als `\|` maskiert. Zeiten
+  ISO 8601 mit Offset; keine IANA-Namen (Windows-Python ohne tzdata hat keine Zonen-DB) – Anzeige UTC / Systemzeit /
+  wie gespeichert. `core/timeline.py` (parse, add_entry chronologisch vor dem ersten späteren Eintrag,
+  detect_timestamp für ISO/CLF/deutsch/US/syslog/Datum/Epoch mit Falsch-Positiv-Tests, Export MD/CSV, append_row für
+  Beweismittel-Tabellen, find_timelines liest je .md max. 4 KB). .ntx-Regel: `can_take_from` sperrt die Übernahme aus
+  .ntx (Aktion ausgegraut). UI `ui/timeline_dialog.py`; Einfügen in offene Zeitleiste über den Editor (Undo), sonst
+  atomar in die Datei mit Original-Encoding/Zeilenenden. Vorlagen `Zeitleiste.md`, `Beweismittel.md` (LATER_TEMPLATES).
 
 ## Offen
 

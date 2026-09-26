@@ -12,6 +12,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Modul YARA (`Ctrl+Alt+Y`): Syntax-Highlighting für .yar/.yara, „Regel testen“ gegen Datei oder Ordner (rekursiv)
   mit Trefferliste (Regel, Datei, Offset, String, Treffer), Doppelklick → Hex-Ansicht, Syntaxfehler mit Zeile im
   Editor markiert; Baum-Kontextmenü auch für Ordner; Vorlage „YARA-Regel.yar“
+- Modul Zeitleiste & Beweismittel: Zeitleisten-Notizen (Markdown mit Frontmatter), „Zur Zeitleiste hinzufügen“
+  (`Ctrl+Alt+Z`) mit Zeitstempel-Erkennung aus Log-/Textzeilen, Ansicht mit Filtern und UTC/lokal (`Ctrl+Shift+Alt+Z`),
+  Export als Markdown-Tabelle und CSV; Vorlage „Beweismittel.md“ (Chain of Custody) mit „Prüfsummen einfügen“ und
+  „Übergabe eintragen“
 - Vorlagen: später hinzugekommene Standardvorlagen landen einmalig auch in bestehenden `templates/`-Ordnern
 - Abhängigkeit yara-python 4.5.4 (Apache-2.0, libyara BSD-3; Linux-Wheel mit OpenSSL-1.1-libcrypto)
 - Modul IOC entschärfen (Standard an): Rechtsklick → Umwandeln, `Ctrl+Alt+D` / `Ctrl+Shift+Alt+D` – URLs, Domains,

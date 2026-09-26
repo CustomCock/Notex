@@ -52,6 +52,30 @@ LATER_TEMPLATES: dict[str, str] = {
         "        $hex  = { 4D 5A 90 00 }\n        $re   = /https?:\\/\\/[a-z0-9.-]+\\/gate\\.php/\n\n"
         "    condition:\n        any of them\n}\n"
     ),
+    "Zeitleiste.md": (
+        "---\nnotex: zeitleiste\ntitel: {{title}}\n---\n# Zeitleiste: {{title}}\n\n"
+        "Einträge: Rechtsklick in einer Datei/Logzeile → „Zur Zeitleiste hinzufügen“ oder Ctrl+Alt+Z. "
+        "Ansicht mit Filter und Zeitzone: Ctrl+Shift+Alt+Z.\n\n"
+        "| Zeit | Quelle | Beschreibung | Tags |\n|---|---|---|---|\n"
+    ),
+    "Beweismittel.md": (
+        "# Beweismittel B-{{date:%Y%m%d}}-{{cursor}}\n\n"
+        "| Feld | Wert |\n|---|---|\n"
+        "| Beweismittel-ID | B-{{date:%Y%m%d}}- |\n"
+        "| Beschreibung |  |\n"
+        "| Fundort |  |\n"
+        "| Zeitpunkt der Sicherstellung | {{date:%Y-%m-%d}} {{time}} (Zeitzone angeben) |\n"
+        "| Sichergestellt von |  |\n"
+        "| Art der Sicherung | Original / forensisches Abbild / logische Kopie |\n"
+        "| Aufbewahrungsort |  |\n\n"
+        "## Prüfsummen\n\n"
+        "Einfügen: Command Palette → „Beweismittel: Prüfsummen einfügen“ (berechnet MD5, SHA-1, SHA-256).\n\n"
+        "| Algorithmus | Wert | Datei |\n|---|---|---|\n|  |  |  |\n\n"
+        "## Übergaben\n\n"
+        "Neue Zeile mit aktueller Zeit: Command Palette → „Beweismittel: Übergabe eintragen“.\n\n"
+        "| Wann | Von | An | Zweck | Unterschrift |\n|---|---|---|---|---|\n|  |  |  |  |  |\n\n"
+        "## Notizen\n\n"
+    ),
 }
 DEFAULT_TEMPLATES.update(LATER_TEMPLATES)
 
