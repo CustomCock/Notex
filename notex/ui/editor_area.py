@@ -326,12 +326,8 @@ class EditorArea(QWidget):
             getattr(group, method)(*args)
 
     def set_font_size(self, size: int) -> None:
-        self.groups[0].set_font_size(size)   # gibt font_size_changed weiter
-        for group in self.groups[1:]:
-            group.font_size = self.groups[0].font_size
-            for page in group.pages():
-                page.editor.set_font_size(group.font_size)
-                page.refresh_width()
+        for group in self.groups:
+            group.set_font_size(size, local=True)   # jede Gruppe klemmt gleich und meldet font_size_changed
 
     def zoom(self, direction: int) -> None:
         self.set_font_size(self.groups[0].font_size + direction)
@@ -361,15 +357,24 @@ class EditorArea(QWidget):
         self._all("apply_preview_settings")
 
     def toggle_toolbar(self) -> None:
-        self.groups[0].toggle_toolbar()
-        for group in self.groups[1:]:
-            group._on_toolbar_toggled(self.groups[0].toolbar_visible)
+        self.groups[0]._on_toolbar_toggled(not self.groups[0].toolbar_visible)   # verteilt auf alle Gruppen
 
     def save_all(self) -> None:
         self._all("save_all")
 
     def confirm_close_all(self) -> bool:
-        return all(group.confirm_close_all() for group in self.groups)
+        """Vor dem Beenden: je geändertem Dokument genau einmal fragen, auch wenn es in beiden Gruppen offen ist."""
+        asked: set[int] = set()
+        for group in self.groups:
+            for editor in group.editors():
+                if not editor.is_dirty or id(editor.document()) in asked:
+                    continue
+                asked.add(id(editor.document()))
+                self.set_active(group)
+                group.setCurrentWidget(group.page_for(editor))
+                if not group._ask_save(editor):
+                    return False
+        return True
 
     def close_paths_under(self, path: Path) -> None:
         self._all("close_paths_under", path)

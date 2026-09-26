@@ -363,6 +363,12 @@ für die Volltextsuche (Default 5 MB).
 - Sehr große Dateien (mehrere hundert MB) sind nicht das Ziel; getestet sind 5-MB-Logdateien.
 - Rechtschreibung kennt nur Deutsch und Englisch; weitere Hunspell-Wörterbücher lassen sich nach
   `notex/dictionaries/` legen, werden aber nicht in der Oberfläche angeboten.
+- Die Markdown-Vorschau nutzt Qts Rich-Text-Engine, kein Browser: CSS wird nur teilweise
+  unterstützt (z. B. keine abgerundeten Codeblöcke, keine Fußnoten, kein Mermaid/LaTeX).
+  Scroll-Sync arbeitet proportional, nicht zeilengenau.
+- Der geteilte Editor hat höchstens zwei Gruppen.
+- Regex-Timeout gilt pro Zeile; eine Suche über viele Dateien mit einem gerade noch schnellen
+  Muster kann trotzdem einige Sekunden dauern (sie läuft im Hintergrund und ist abbrechbar).
 
 ## Entwicklung
 
@@ -390,9 +396,11 @@ Im Dev-Modus liegen `data/` und `config.json` im Projektordner (beide in `.gitig
 python -m pytest
 ```
 
-Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche, Encoding-Erkennung,
-atomares Speichern, Config und Theme-Dateien (auch kaputte), Rechtschreibregeln und
--Backends sowie den LanguageTool-Client gegen einen Fake-Server.
+Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche (Abfragesprache, Regex,
+Timeout, Ersetzen), Encoding-Erkennung, atomares Speichern, Config und Theme-Dateien (auch
+kaputte), Rechtschreibregeln und -Backends, den LanguageTool-Client gegen einen Fake-Server,
+Fuzzy-Suche, Wiki-Links, Syntax-Lexing, Markdown-Renderer mit Sanitizer und den Zustand des
+geteilten Editors.
 
 ### Design-System
 
@@ -410,10 +418,12 @@ main.py                 Einstieg
 notex/
   paths.py              App-Ordner ermitteln (EXE-Ordner bzw. Projektordner)
   app.py                QApplication, Theme, Hauptfenster
-  core/                 Qt-frei: config, encoding, fileops, search, theme_model,
-                        theme_store, spell, spell_rules, grammar
-  ui/                   Fenster und Widgets (Baum, Tabs, Blatt, Suche, Statusleiste, Toast,
-                        Einstellungen, Rechtschreib-Highlighter, Grammatik-Service)
+  core/                 Qt-frei: config, encoding, fileops, search, theme_model, theme_store,
+                        spell, spell_rules, grammar, text_ops, fuzzy, actions, file_index,
+                        wikilinks, syntax, markdown, split_state, recent, ipc, winreg_assoc
+  ui/                   Fenster und Widgets (Baum, Tabs, Editorgruppen, Blatt, Vorschau, Suche,
+                        Ersetzen in Dateien, Palette, Backlinks, Statusleiste, Toast,
+                        Einstellungen, Highlighter, Grammatik-Service)
   dictionaries/         Hunspell-Wörterbücher de_DE, en_US (mit Lizenzen)
   theme/                tokens.py, dark.qss, Fonts- und Icon-Lader
   assets/               App-Icon, Fonts, Lucide-Icons (mit Lizenzen)

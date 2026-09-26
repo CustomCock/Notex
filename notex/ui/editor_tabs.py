@@ -386,7 +386,11 @@ class EditorTabs(QTabWidget):
             editor.path = new / rel if editor.path != old else new
             self._refresh_title(editor)
 
-    def set_font_size(self, size: int) -> None:
+    def set_font_size(self, size: int, local: bool = False) -> None:
+        """Zoom gilt für alle Gruppen des geteilten Editors; `local` nur für den Aufruf aus EditorArea."""
+        if self.area is not None and not local:
+            self.area.set_font_size(size)
+            return
         self.font_size = max(MIN_FONT_SIZE, min(MAX_FONT_SIZE, size))
         for page in self.pages():
             page.editor.set_font_size(self.font_size)
@@ -495,13 +499,18 @@ class EditorTabs(QTabWidget):
             self._apply_spell_to(editor)
 
     # ---- Bearbeitungsleiste ---------------------------------------------------------
-    def _on_toolbar_toggled(self, expanded: bool) -> None:
+    def _on_toolbar_toggled(self, expanded: bool, local: bool = False) -> None:
+        """Leiste auf- oder zuklappen – in allen Gruppen des geteilten Editors gleich."""
+        if self.area is not None and not local:
+            for group in self.area.groups:
+                group._on_toolbar_toggled(expanded, local=True)
+            return
         if expanded != self.toolbar_visible:
             self.toolbar_visible = expanded
             self.config["toolbar_visible"] = expanded
-            for page in self.pages():
-                if page.toolbar is not None and page.toolbar.expanded != expanded:
-                    page.toolbar.set_expanded(expanded)
+        for page in self.pages():
+            if page.toolbar is not None and page.toolbar.expanded != expanded:
+                page.toolbar.set_expanded(expanded)
 
     def toggle_toolbar(self) -> None:
         self._on_toolbar_toggled(not self.toolbar_visible)

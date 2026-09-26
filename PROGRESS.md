@@ -15,7 +15,7 @@ der Repo-Besitzer pushen.
 | 1.0.0 | Explorer + Editor, Design-System, Themes, Rechtschreibung/Grammatik, Toolbar, Dateizuordnung, Einzelinstanz | released |
 | 1.1.0 | Block A: Lizenzen, Config-Autosave, Quick Open / Command Palette, Wiki-Links + Backlinks, Syntax-Highlighting | released |
 | 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
-| 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | offen |
+| 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Branch, Tag `v1.2.0` durch Besitzer |
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | offen |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | offen |
 
@@ -44,12 +44,20 @@ der Repo-Besitzer pushen.
 - Warnung beim Start aus einem temporären Ordner (ZIP nicht entpackt): Daten würden dort verloren gehen.
 - README: Update-Anleitung (Pfad aktualisieren), `build.bat` erwähnt.
 
-## Offen
+### 1.2.0 – Block B
+- B1 Markdown-Vorschau: `core/markdown.py` (markdown-it-py, html=False, eigener Renderer mit Link-/Bild-Whitelist,
+  Aufgaben mit Zeilen-Mapping, Wiki-Links, Fence-Highlighting über `core/syntax`), `ui/preview.py` (QTextBrowser,
+  `setOpenLinks(False)`, `loadResource` nur Notizordner + freigegebene Bilder, Bild-Fetch im Thread mit 8-MB-Limit),
+  `EditorPage` mit Modi edit/preview/split und proportionalem Scroll-Sync. Ctrl+Shift+V.
+- B2 Split View: `ui/editor_area.py` (EditorArea mit 1–2 `EditorTabs`-Gruppen, Attribut-/Signal-Weiterleitung),
+  `Editor(share_with=…)` teilt QTextDocument/Undo/Highlighter, Highlighter prüft sichtbare Bereiche aller Ansichten,
+  Tab-Drag über eigenes MIME, `core/split_state.py` für config.json. Ctrl+\, Ctrl+Alt+\, Ctrl+Alt+→.
+- B3 Suche: `core/search.py` mit Abfragesprache (AND, Phrase, ext:/path:/-path:), Regex mit Timeout (Modul `regex`),
+  Ganzes Wort, Mehrfach-Spans; `ui/replace_dialog.py` (Ctrl+Shift+H) mit Häkchen je Zeile.
+- Selbstprüfung am Blockende: Zoom/Toolbar-Klappen/Beenden-Rückfrage gruppenübergreifend korrigiert; lokaler
+  PyInstaller-Build geprüft (neue Module im Archiv, Build +2 MB), 127 Tests grün.
 
-### Block B – 1.2.0
-- Markdown-Vorschau: markdown-it-py → HTML → QTextBrowser. Kein JS, keine Remote-Ressourcen automatisch (externe Bilder als Platzhalter mit „Laden“), Links nur per Klick im Browser, HTML sanitisieren. Ctrl+Shift+V wechselt Bearbeiten/Vorschau/Split, Checkboxen klickbar, Scroll-Sync.
-- Split View (Ctrl+\): zwei Editorgruppen, Tabs per Drag zwischen Gruppen, gleiches Dokument in beiden, vertikal optional.
-- Suche: Regex-Chip (ungültige Regex roter Rahmen, Timeout gegen katastrophales Backtracking), Filter `ext:`/`path:`/`-path:`/`"Phrase"`/AND, „Ganzes Wort“, Suchen & Ersetzen über mehrere Dateien mit Vorschau-Checkboxen.
+## Offen
 
 ### Block C – 1.3.0
 - Lokale Versionshistorie in `history/` (komprimiert, dedupliziert, Ausdünnung, Größenlimit, Diff-Panel, Wiederherstellen, folgt Umbenennungen).
@@ -66,6 +74,9 @@ der Repo-Besitzer pushen.
 - Dateiindex: Baum-Signale + 60-s-Intervall, externe Änderungen erscheinen in Ctrl+P mit Verzug.
 - Grammatik braucht einen LanguageTool-Server. Kontextmenü unter Windows 11 nur im klassischen Menü.
 - Windows-spezifische Teile (Registry, DWM-Titelleiste, EXE-Build) sind in der Linux-Entwicklungsumgebung nur per Fake-Registry testbar.
+- Vorschau: Qt-Rich-Text statt Browser (Teilmenge von CSS), Scroll-Sync proportional statt zeilengenau.
+- Split View: höchstens zwei Gruppen; Tab-Drag startet, wenn der Tab senkrecht aus der Leiste gezogen wird.
+- Regex-Timeout gilt pro Zeile (0,25 s), nicht für die ganze Suche.
 
 ## Entscheidungen
 
@@ -83,10 +94,13 @@ der Repo-Besitzer pushen.
 | Lizenz | MIT für Notex; Qt/PySide6 LGPLv3 dynamisch gebunden, Texte liegen bei | keine Konflikte; de_DE-Wörterbuch (GPL) als bloße Aggregation dokumentiert |
 | Config | DEFAULTS-Deep-Merge mit Typprüfung, `extensions_version` für einmalige Migrationen, Autosave 1 s atomar | kaputte/alte Configs dürfen nie den Start verhindern |
 | Abhängigkeiten | nur bei Bedarf, in `requirements.txt` gepinnt (Untergrenze + Major-Obergrenze) | Build-Größe (~95 MB ZIP) im Blick |
-| Markdown-Rendering (Block B) | **markdown-it-py** → HTML → `QTextBrowser`, eigener Sanitizer (Whitelist Tags/Attribute, keine `javascript:`-URLs, `setOpenLinks(False)`, Remote-Bilder nur auf Klick) | kein QtWebEngine (Größe, JS-Angriffsfläche); Entscheidung wird bei Umsetzung bestätigt |
+| Markdown-Rendering | **markdown-it-py** (`html=False`) → eigener Token-Renderer → `QTextBrowser`; Links nur http(s)/mailto/#/relativ im Notizordner, Bilder lokal aus dem Notizordner oder extern erst nach Klick; eigene Schemata `notex-open:`/`notex-toggle:`/`notex-load:`/`notex-file:` | kein QtWebEngine (+~100 MB, JS-Angriffsfläche); eigener Renderer statt HTML-Sanitizer, weil nie fremdes HTML durchgereicht wird – bestätigt |
+| Split View | EditorArea mit höchstens zwei `EditorTabs`, gleiche Datei = geteiltes `QTextDocument` | ein Dokument heißt ein Undo-Stack und kein Auseinanderlaufen der Inhalte |
+| Regex-Timeout | Modul `regex` (Apache-2.0), 0,25 s pro Zeile; Fallback auf `re` ohne Timeout | `re` kennt kein Timeout; Thread-Abbruch würde katastrophales Backtracking nicht stoppen |
 | Kryptografie (Block C, vorläufig) | `cryptography`: AES-256-GCM, KDF Argon2id (`cryptography>=43`, OpenSSL ≥ 3.2 in den Wheels) mit m=64 MiB, t=3, p=1, 16-Byte-Salt, 12-Byte-Nonce, Header (Magic, Version, KDF-Parameter, Salt) als AAD; Fallback scrypt (n=2^17, r=8, p=1) falls Argon2id nicht verfügbar | keine eigene Kryptografie; Parameter werden im Header gespeichert, damit sie später erhöht werden können |
 
 ## Nächster Schritt
 
-1. Block B beginnen mit der Markdown-Vorschau (Core: Renderer + Sanitizer in `notex/core/markdown.py`, Tests), dann
-   Split View, dann Suche. Nach Block B anhalten, Zusammenfassung, Release 1.2.0.
+1. Auf „weiter“ des Besitzers warten (Block B ist abgeschlossen, Release 1.2.0 per Merge + Tag durch den Besitzer).
+2. Block C beginnen mit der Versionshistorie (`notex/core/history.py`: Snapshot-Speicher in `history/`, zlib,
+   Dedup per SHA-256, Ausdünnung, Größenlimit, Umbenennungen), dann verschlüsselte Notizen `.ntx`.

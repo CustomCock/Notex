@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.2.0] – unveröffentlicht
+## [1.2.0] – 2026-09-26
 
 ### Hinzugefügt
 - Markdown-Vorschau (Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt): markdown-it-py rendert

@@ -1,6 +1,6 @@
 """Notex – portabler Explorer + Editor für Textdateien."""
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 APP_NAME = "Notex"
 APP_ID = "Notex.Notex"          # AppUserModelID: Taskleisten-Gruppierung und Icon unter Windows
 PROG_ID = "Notex.TextFile"      # ProgID für die Dateizuordnung
