@@ -85,6 +85,24 @@ Menüs, Toolbar, Einstellungsseiten, Theme-Presets und Blatt-Varianten, Toggles 
 Zustand. Zuletzt benutzte Befehle stehen oben. Neue Features melden sich an einer zentralen
 Registry an und tauchen automatisch auf.
 
+## Wiki-Links und Backlinks
+
+In jeder Textdatei verlinkt `[[notizen]]` auf die Datei `notizen.*` irgendwo in `data/`
+(Name ohne Endung, Groß-/Kleinschreibung egal; bei Mehrdeutigkeit gewinnt der kürzeste Pfad,
+`[[ordner/notizen]]` zielt explizit). `[[notizen|Anzeigetext]]` zeigt anderen Text,
+`[[notizen#Überschrift]]` springt zur Überschrift. Links sind im Akzent unterstrichen, kaputte
+Links gestrichelt und gedämpft. **Ctrl+Klick** öffnet das Ziel; bei einem kaputten Link bietet
+Notex an, die Datei anzulegen. Nach `[[` erscheint ein Vorschlags-Popup mit Dateien, nach `#`
+mit den Überschriften der Zieldatei (Enter oder Tab übernimmt). In Codeblöcken und Inline-Code
+zählen Links nicht.
+
+**Ctrl+Shift+K** zeigt das Backlinks-Panel (unter dem Blatt oder rechts, einstellbar): alle
+Dateien, die auf die aktuelle Datei verlinken, mit Zeile und Kontext, Klick springt hin.
+Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Text vorkommt, mit
+„verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt Notex „X Links in Y
+Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
+offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
+
 ## Bearbeitungsleiste
 
 Direkt über dem Blatt sitzt eine schmale Leiste in Blattbreite. Der kleine Chevron darunter
@@ -230,6 +248,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Alt+P | Blatt zentrieren / volle Breite |
 | Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
+| Ctrl+Shift+K | Backlinks-Panel |
+| Ctrl+Klick | Wiki-Link öffnen (bzw. Ziel anlegen) |
 | Ctrl+, | Einstellungen |
 | Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |
 | Ctrl+Shift+Alt+S | Speichern unter |

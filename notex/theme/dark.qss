@@ -728,3 +728,41 @@ QLabel#PaletteHint {
     font-size: @fs_smallpx;
     padding: 0 @sp_xspx;
 }
+
+/* Backlinks-Panel, Autovervollständigung */
+QWidget#Backlinks {
+    background: @sidebar;
+    border-top: 1px solid @border;
+}
+QLabel#SectionTitle {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+    font-weight: 600;
+}
+QListWidget#BacklinksList {
+    background: @sidebar;
+    border: none;
+    padding: 0 @sp_xspx;
+}
+QListWidget#BacklinksList::item {
+    padding: 3px @sp_xspx;
+    border-radius: @r_controlpx;
+    color: @text;
+}
+QListWidget#BacklinksList::item:selected {
+    background: @selection;
+}
+QListWidget#CompletionPopup {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_controlpx;
+    padding: 3px;
+    color: @text;
+}
+QListWidget#CompletionPopup::item {
+    padding: 3px @sp_smpx;
+    border-radius: 4px;
+}
+QListWidget#CompletionPopup::item:selected {
+    background: @selection;
+}

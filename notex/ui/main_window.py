@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence, QTextCursor
 from PySide6.QtWidgets import QMainWindow, QSplitter, QStackedWidget, QVBoxLayout, QWidget
 
 from notex import APP_NAME
@@ -31,6 +31,12 @@ from notex.core.config import config_digest
 from notex.core.theme_model import PAPER_VARIANTS, PRESETS, apply_paper_variant, theme_from_preset
 from notex.ui.file_index_service import FileIndexService
 from notex.ui.palette import PaletteOverlay
+from notex.ui.link_index_service import LinkIndexService
+from notex.ui.backlinks import BacklinksPanel
+from notex.ui.completion import CompletionPopup
+from notex.core.wikilinks import find_heading_line, link_name, rewrite_links, unlinked_mentions
+from notex.core.encoding import read_text_file as _read_text_file
+from notex.core.fileops import save_text_file
 from notex.core.recent import add_recent, prune_recent
 from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe
 from notex.ui.about_dialog import AboutDialog
@@ -57,6 +63,14 @@ class MainWindow(QMainWindow):
         self.tabs = EditorTabs(root, config)
         self.tabs.font_size = config["font_size"]
         self.tabs.paper_mode = config["paper_mode"]
+        self.links = LinkIndexService(root)
+        self.tabs.resolve_link = self.links.resolve
+        self.backlinks = BacklinksPanel()
+        self._completions: dict[int, CompletionPopup] = {}
+        self._relink_timer = QTimer(self)
+        self._relink_timer.setSingleShot(True)
+        self._relink_timer.setInterval(300)
+        self._relink_timer.timeout.connect(self._after_index_update)
         self.find_bar = FindBar(self.tabs.current_editor)
         self.empty_state = EmptyState()
         self.toast = Toast(self)
@@ -80,7 +94,14 @@ class MainWindow(QMainWindow):
         self.editor_stack = QStackedWidget()
         self.editor_stack.addWidget(self.empty_state)
         self.editor_stack.addWidget(self.tabs)
-        editor_layout.addWidget(self.editor_stack, 1)
+        # Backlinks-Panel: unten (unter dem Blatt) oder rechts, per Einstellung
+        self.editor_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.editor_splitter.addWidget(self.editor_stack)
+        self.editor_splitter.addWidget(self.backlinks)
+        self.editor_splitter.setStretchFactor(0, 1)
+        self.editor_splitter.setCollapsible(0, False)
+        self.backlinks.setVisible(bool(config.get("backlinks_visible", False)))
+        editor_layout.addWidget(self.editor_splitter, 1)
         editor_layout.addWidget(self.find_bar)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -121,9 +142,19 @@ class MainWindow(QMainWindow):
         self.sidebar.settings_requested.connect(self.open_settings)
         tree.path_renamed.connect(self._on_path_renamed)
         tree.path_deleted.connect(self.tabs.close_paths_under)
+        tree.path_deleted.connect(lambda p: (self.links.remove(self.tabs.relative(p)), self.file_index.request_rescan()))
 
         self.tabs.status_changed.connect(self._update_status)
         self.tabs.file_opened.connect(self._on_file_opened)
+        self.tabs.link_activated.connect(self._on_link_activated)
+        self.tabs.completion_requested.connect(self._on_completion_requested)
+        self.tabs.file_saved.connect(self._on_saved_for_links)
+        self.tabs.currentChanged.connect(lambda _i: self._refresh_backlinks())
+        self.file_index.updated.connect(self._on_file_index_updated)
+        self.links.updated.connect(lambda: self._relink_timer.start())
+        self.backlinks.open_requested.connect(lambda rel, line: self.tabs.open_file(self.root / rel, line=line))
+        self.backlinks.link_requested.connect(self._link_mention)
+        self.backlinks.closed.connect(lambda: self.set_backlinks_visible(False))
         self.tabs.files_dropped.connect(lambda paths: self.open_external([Path(p) for p in paths]))
         self.tabs.file_closed.connect(lambda _p: self._refresh_open_files())
         self.sidebar.open_files.activated.connect(lambda path: self.tabs.open_file(path))
@@ -138,6 +169,7 @@ class MainWindow(QMainWindow):
         self.tabs.file_saved.connect(self.watcher.mark_saved)
         self.tabs.file_saved.connect(lambda path: self.toast.show_message(f"Gespeichert · {path.name}"))
         self.watcher.file_changed_externally.connect(self._on_external_change)
+        self.watcher.file_changed_externally.connect(lambda p: None if self.tabs.is_external(p) else self.links.update_path(self.tabs.relative(p)))
         self.watcher.file_removed_externally.connect(self._on_external_remove)
         self.status.spell_toggled.connect(self.toggle_spellcheck)
         self.status.grammar_toggled.connect(self.toggle_grammar)
@@ -186,6 +218,9 @@ class MainWindow(QMainWindow):
         self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
         view_menu.addAction(self.sidebar_action)
         view_menu.addAction(self._action("Suche in Dateien", "Ctrl+Shift+F", self.focus_search))
+        self.backlinks_action = self._action("Backlinks", "Ctrl+Shift+K", lambda: self.set_backlinks_visible(not self.backlinks.isVisible()), checkable=True)
+        self.backlinks_action.setChecked(bool(self.config.get("backlinks_visible", False)))
+        view_menu.addAction(self.backlinks_action)
         view_menu.addSeparator()
         self.paper_action = self._action("Blatt zentrieren", "Alt+P", self.toggle_paper_mode, checkable=True)
         self.paper_action.setChecked(self.config["paper_mode"])
@@ -508,6 +543,8 @@ class MainWindow(QMainWindow):
         self.find_bar.retheme()
         self.status.retheme()
         self.sidebar.open_files.retheme()
+        self.backlinks.retheme()
+        self.tabs.relink_all()
         self.anim_action.setChecked(anim.reduced())
         self.sidebar.tree.setAnimated(not anim.reduced())
         self._update_status()
@@ -584,6 +621,7 @@ class MainWindow(QMainWindow):
     # ---- Reaktionen auf Baum / Watcher -----------------------------------------
     def _on_path_renamed(self, old: Path, new: Path) -> None:
         self.tabs.rename_open_file(old, new)
+        QTimer.singleShot(0, lambda: self._update_links_after_rename(old, new))
         # Watcher auf die neuen Pfade umhängen
         for editor in self.tabs.editors():
             if editor.path == new or new in editor.path.parents:
@@ -677,6 +715,204 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    # ---- Wiki-Links und Backlinks ------------------------------------------------------
+    def _on_file_index_updated(self) -> None:
+        self.links.set_files(self.file_index.index.files)
+        if not self.links.index.outgoing:
+            self.links.rebuild(self.file_index.index.files)   # erster Aufbau im Hintergrund
+        else:
+            self._relink_timer.start()
+
+    def _after_index_update(self) -> None:
+        self.tabs.relink_all()
+        self._refresh_backlinks()
+
+    def _on_saved_for_links(self, path: Path) -> None:
+        if not self.tabs.is_external(path):
+            editor = self.tabs.editor_for(path)
+            if editor is not None:
+                self.links.update_text(self.tabs.relative(path), editor.toPlainText())
+
+    def set_backlinks_visible(self, visible: bool) -> None:
+        self.backlinks.setVisible(visible)
+        self.backlinks_action.setChecked(visible)
+        self.config["backlinks_visible"] = visible
+        if visible:
+            self._refresh_backlinks()
+
+    def apply_backlinks_position(self) -> None:
+        horizontal = self.config.get("backlinks_position") == "right"
+        self.editor_splitter.setOrientation(Qt.Orientation.Horizontal if horizontal else Qt.Orientation.Vertical)
+        total = self.editor_splitter.width() if horizontal else self.editor_splitter.height()
+        self.editor_splitter.setSizes([int(total * 0.7), int(total * 0.3)])
+
+    def _refresh_backlinks(self) -> None:
+        if not self.backlinks.isVisible():
+            return
+        editor = self.tabs.current_editor()
+        if editor is None or self.tabs.is_external(editor.path):
+            self.backlinks.set_data([], [], "")
+            return
+        rel = self.tabs.relative(editor.path)
+        backlinks = self.links.index.backlinks(rel)
+        self.backlinks.set_data(backlinks, self._scan_mentions(rel), link_name(rel))
+
+    def _scan_mentions(self, rel: str, limit_files: int = 400) -> list:
+        """Unverlinkte Erwähnungen des Dateinamens in anderen Dateien (kleine Ordner synchron, gedeckelt)."""
+        name = link_name(rel)
+        result = []
+        for other in self.file_index.index.files[:limit_files]:
+            if other == rel:
+                continue
+            editor = self.tabs.editor_for(self.root / other)
+            try:
+                text = editor.toPlainText() if editor is not None else _read_text_file(self.root / other).text
+            except (OSError, UnicodeDecodeError):
+                continue
+            if name.lower() not in text.lower():
+                continue
+            lines = text.split("\n")
+            for line, start, end in unlinked_mentions(text, name):
+                result.append((other, line, start, end, lines[line - 1].strip()[:100]))
+        return result
+
+    def _link_mention(self, rel: Path, line: int, start: int, end: int) -> None:
+        """Erwähnung in einer Datei in einen [[Link]] verwandeln (im offenen Tab oder direkt in der Datei)."""
+        path = self.root / rel
+        editor = self.tabs.editor_for(path)
+        current = self.tabs.current_editor()
+        target_name = link_name(self.tabs.relative(current.path)) if current else ""
+        if editor is not None:
+            block = editor.document().findBlockByNumber(line - 1)
+            cursor = QTextCursor(editor.document())
+            cursor.setPosition(block.position() + start)
+            cursor.setPosition(block.position() + end, QTextCursor.MoveMode.KeepAnchor)
+            word = cursor.selectedText()
+            editor._grouped(lambda: cursor.insertText(f"[[{target_name}|{word}]]" if word != target_name else f"[[{word}]]"))
+        else:
+            try:
+                tf = _read_text_file(path)
+                lines = tf.text.split("\n")
+                word = lines[line - 1][start:end]
+                lines[line - 1] = lines[line - 1][:start] + (f"[[{target_name}|{word}]]" if word != target_name else f"[[{word}]]") + lines[line - 1][end:]
+                save_text_file(path, "\n".join(lines), tf.encoding, tf.eol)
+                self.links.update_text(str(rel).replace("\\", "/"), "\n".join(lines))
+            except (OSError, IndexError) as error:
+                dialogs.warn(self, "Verlinken", str(error))
+                return
+        self._refresh_backlinks()
+
+    def _on_link_activated(self, editor, span) -> None:
+        if span.resolved:
+            target = self.tabs.open_file(self.root / span.resolved)
+            if target is not None and span.heading:
+                line = find_heading_line(target.toPlainText(), span.heading)
+                if line:
+                    target.goto_line(line)
+            return
+        # Kaputter Link: Datei anlegen, Ordner wählbar (Standard: Ordner der aktuellen Datei)
+        default_folder = editor.path.parent if not self.tabs.is_external(editor.path) else self.root
+        if not dialogs.confirm(self, "Link-Ziel anlegen", f"„{span.target}“ existiert noch nicht.",
+                               yes="Datei anlegen", informative=f"Neue Datei {span.target}.md im Ordner {self.tabs.relative(default_folder) or 'data'}?"):
+            return
+        from PySide6.QtWidgets import QFileDialog
+        folder = QFileDialog.getExistingDirectory(self, "Ordner für die neue Datei", str(default_folder)) if False else str(default_folder)
+        name = span.target.replace("\\", "/").rsplit("/", 1)[-1]
+        new_path = Path(folder) / f"{name}.md"
+        if "/" in span.target:
+            new_path = self.root / f"{span.target}.md"
+        try:
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            if not new_path.exists():
+                new_path.write_text(f"# {name}\n\n", encoding="utf-8")
+        except OSError as error:
+            dialogs.warn(self, "Datei anlegen", str(error))
+            return
+        self.file_index.request_rescan()
+        self.tabs.open_file(new_path)
+
+    def _on_completion_requested(self, editor, kind: str, text: str) -> None:
+        popup = self._completions.get(id(editor))
+        if popup is None:
+            popup = CompletionPopup(editor)
+            popup.chosen.connect(lambda value, e=editor: e.complete_with(value))
+            self._completions[id(editor)] = popup
+        if kind == "file":
+            hits = self.file_index.index.search(text, self.config.get("recent_files", []), limit=40)
+            entries = [(link_name(h.relative) if self.links.resolve(link_name(h.relative)) == h.relative else h.relative.rsplit(".", 1)[0],
+                        h.relative) for h in hits if not h.external]
+            popup.show_items(entries, "file-text")
+        else:
+            target, _, prefix = text.partition("\x00")
+            rel = self.links.resolve(target)
+            if rel is None:
+                popup.hide()
+                return
+            open_editor = self.tabs.editor_for(self.root / rel)
+            try:
+                content = open_editor.toPlainText() if open_editor else _read_text_file(self.root / rel).text
+            except (OSError, UnicodeDecodeError):
+                popup.hide()
+                return
+            from notex.core.wikilinks import headings
+            from notex.core.fuzzy import match as fuzzy_match
+            entries = [(title, title) for _line, title in headings(content) if fuzzy_match(prefix, title) is not None]
+            popup.show_items(entries, "heading")
+
+    def _update_links_after_rename(self, old: Path, new: Path) -> None:
+        """Datei oder Ordner umbenannt/verschoben: betroffene Links in anderen Dateien anpassen (mit Nachfrage)."""
+        if self.tabs.is_external(new) or self.tabs.is_external(old):
+            return
+        old_rel, new_rel = self.tabs.relative(old), self.tabs.relative(new)
+        moved: list[tuple[str, str]] = []
+        if new.is_dir():
+            for rel in self.links.index.files:
+                if rel.startswith(old_rel + "/"):
+                    moved.append((rel, new_rel + rel[len(old_rel):]))
+        else:
+            moved.append((old_rel, new_rel))
+        plan: dict[str, list[tuple[str, str]]] = {}
+        for o, n in moved:
+            for source, count in self.links.index.sources_linking_to(o).items():
+                mapped = dict(moved).get(source, source)
+                plan.setdefault(mapped, []).append((o, n))
+        for o, n in moved:
+            self.links.rename(o, n)
+        self.file_index.request_rescan()
+        if not plan:
+            return
+        total = sum(len(v) for v in plan.values())
+        preview = "\n".join(f"• {source}" for source in sorted(plan)[:12]) + ("\n…" if len(plan) > 12 else "")
+        if not dialogs.confirm(self, "Links anpassen", f"{total} Link(s) in {len(plan)} Datei(en) auf „{new.name}“ umschreiben?",
+                               yes="Anpassen", no="So lassen", informative=preview):
+            return
+        files = list(self.links.index.files)
+        for source, pairs in plan.items():
+            path = self.root / source
+            editor = self.tabs.editor_for(path)
+            try:
+                if editor is not None:
+                    was_clean = not editor.is_dirty
+                    text = editor.toPlainText()
+                    for o, n in pairs:
+                        text, _ = rewrite_links(text, files + [o], o, n)
+                    if text != editor.toPlainText():
+                        self.tabs.replace_text_keep_cursor(editor, text)
+                        if was_clean:
+                            self.tabs.save_editor(editor)   # gespeicherte Tabs bleiben gespeichert
+                    self.links.update_text(source, text)
+                else:
+                    tf = _read_text_file(path)
+                    text = tf.text
+                    for o, n in pairs:
+                        text, _ = rewrite_links(text, files + [o], o, n)
+                    if text != tf.text:
+                        save_text_file(path, text, tf.encoding, tf.eol)
+                    self.links.update_text(source, text)
+            except (OSError, UnicodeDecodeError) as error:
+                dialogs.warn(self, "Links anpassen", f"{source}: {error}")
+        self.toast.show_message(f"{total} Links in {len(plan)} Dateien angepasst", "link")
 
     # ---- Command Palette / Quick Open --------------------------------------------------
     def _build_registry(self) -> None:
@@ -791,6 +1027,7 @@ class MainWindow(QMainWindow):
         side = self.config["sidebar"]
         self.splitter.setSizes([side["width"], max(200, win["width"] - side["width"])])
         self.set_sidebar_visible(side["visible"])
+        self.apply_backlinks_position()
         self.sidebar.tree.restore_expanded(self.config["expanded_folders"])
 
         for entry in self.config["open_tabs"]:
@@ -852,6 +1089,7 @@ class MainWindow(QMainWindow):
             return
         self.sidebar.stop_search()
         self.file_index.shutdown()
+        self.links.shutdown()
         self.tabs.shutdown()
         self.save_state()
         event.accept()

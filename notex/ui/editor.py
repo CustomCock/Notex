@@ -44,6 +44,8 @@ class LineNumberArea(QWidget):
 class Editor(QTextEdit):
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
     files_dropped = Signal(list)   # Dateien aufs Blatt gezogen -> öffnen statt Pfad einfügen
+    link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
+    completion_requested = Signal(str, str)   # ("file", Präfix) oder ("heading", Ziel) nach "[[" bzw. "#"
 
     def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None) -> None:
         super().__init__()
@@ -221,6 +223,59 @@ class Editor(QTextEdit):
 
     def keyPressEvent(self, event) -> None:
         self._grouped(lambda: super(Editor, self).keyPressEvent(event))
+        self._maybe_complete()
+
+    def _maybe_complete(self) -> None:
+        """Nach "[[" Dateien vorschlagen, nach "#" innerhalb eines Links die Überschriften des Ziels."""
+        cursor = self.textCursor()
+        before = cursor.block().text()[: cursor.positionInBlock()]
+        start = before.rfind("[[")
+        if start < 0 or "]]" in before[start:]:
+            return
+        inner = before[start + 2:]
+        if "#" in inner:
+            target, _, prefix = inner.partition("#")
+            self.completion_requested.emit("heading", target + "\x00" + prefix)
+        elif "|" not in inner:
+            self.completion_requested.emit("file", inner)
+
+    def complete_with(self, text: str) -> None:
+        """Ersetzt den angefangenen Link-Teil hinter "[[" bzw. "#" durch `text` und schließt mit "]]"."""
+        cursor = self.textCursor()
+        block_text = cursor.block().text()
+        col = cursor.positionInBlock()
+        before = block_text[:col]
+        start = before.rfind("[[")
+        if start < 0:
+            return
+        hash_pos = before.rfind("#", start)
+        replace_from = hash_pos + 1 if hash_pos > start else start + 2
+        after = block_text[col:]
+        closing = "" if after.startswith("]]") else "]]"
+        edit = QTextCursor(self.document())
+        edit.setPosition(cursor.block().position() + replace_from)
+        edit.setPosition(cursor.block().position() + col, QTextCursor.MoveMode.KeepAnchor)
+        self._grouped(lambda: edit.insertText(text + closing))
+        if closing:
+            self.setTextCursor(edit)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and event.modifiers() & Qt.KeyboardModifier.ControlModifier \
+                and self.highlighter is not None:
+            cursor = self.cursorForPosition(event.position().toPoint())
+            span = self.highlighter.link_at(cursor.block(), cursor.positionInBlock())
+            if span is not None:
+                self.link_activated.emit(span)
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        super().mouseMoveEvent(event)
+        over_link = False
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier and self.highlighter is not None:
+            cursor = self.cursorForPosition(event.position().toPoint())
+            over_link = self.highlighter.link_at(cursor.block(), cursor.positionInBlock()) is not None
+        self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.IBeamCursor)
 
     def insertFromMimeData(self, source) -> None:
         if source.hasUrls() and any(u.isLocalFile() for u in source.urls()):

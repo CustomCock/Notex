@@ -7,6 +7,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 ### Hinzugefügt
 - Quick Open (Ctrl+P): Fuzzy-Suche über alle Dateien, `:Zeile` und `Datei:Zeile`, Dateiindex im Hintergrund
 - Command Palette (Ctrl+Shift+P): alle Befehle mit Kategorie und Kürzel, zuletzt benutzte oben, zentrale Registry
+- Wiki-Links `[[Datei]]`, `[[Datei|Text]]`, `[[Datei#Überschrift]]` mit Auflösung über data/, Ctrl+Klick,
+  Anlegen fehlender Ziele, Autovervollständigung nach `[[` und `#`
+- Backlinks-Panel (Ctrl+Shift+K) mit unverlinkten Erwähnungen und „verlinken“; Links werden beim
+  Umbenennen/Verschieben nach Rückfrage in allen Dateien angepasst
 - LICENSE (MIT) und THIRD_PARTY_LICENSES.md, Lizenztexte im Build-Ordner
 
 ### Geändert

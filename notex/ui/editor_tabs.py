@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter
+from PySide6.QtGui import QColor, QIcon, QPainter, QTextCursor
 from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
 from notex.core import fileops
@@ -67,6 +67,8 @@ class EditorTabs(QTabWidget):
     font_size_changed = Signal(int)
     text_font_changed = Signal(str)     # Familie ("" = Standard)
     files_dropped = Signal(list)        # Dateien aufs Blatt gezogen
+    link_activated = Signal(object, object)     # Editor, LinkSpan
+    completion_requested = Signal(object, str, str)   # Editor, Art, Text
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
 
     def __init__(self, root: Path, config: dict | None = None) -> None:
@@ -82,6 +84,7 @@ class EditorTabs(QTabWidget):
         self.font_size = FONT_SIZE.editor
         self.paper_mode = True
         self.editor_actions: dict = {}          # QActions aus dem Hauptfenster für die Bearbeitungsleiste
+        self.resolve_link = lambda target: None  # setzt das Hauptfenster (Link-Index)
         self.open_font_settings = lambda: None  # setzt das Hauptfenster
         self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
         self.line_numbers = bool(self.config.get("line_numbers", True))
@@ -165,6 +168,12 @@ class EditorTabs(QTabWidget):
             editor.textChanged.connect(self.status_changed.emit)
             editor.zoom_requested.connect(self.zoom)
             editor.files_dropped.connect(self.files_dropped)
+            editor.link_activated.connect(lambda span, e=editor: self.link_activated.emit(e, span))
+            editor.completion_requested.connect(lambda kind, text, e=editor: self.completion_requested.emit(e, kind, text))
+            if editor.highlighter is not None:
+                editor.highlighter.resolve_link = self.resolve_link
+                editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
+                editor.highlighter.relink()   # der erste Durchlauf lief noch ohne Resolver
             toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             toolbar.visibility_changed.connect(self._on_toolbar_toggled)
@@ -432,6 +441,23 @@ class EditorTabs(QTabWidget):
         if editor is not None:
             editor.set_eol(eol)
             self.status_changed.emit()
+
+    def relink_all(self) -> None:
+        """Nach Änderungen am Datei-/Link-Index: Link-Zustände (kaputt/ok) neu zeichnen."""
+        for editor in self.editors():
+            if editor.highlighter is not None:
+                editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
+                editor.highlighter.relink()
+
+    def replace_text_keep_cursor(self, editor: Editor, new_text: str) -> None:
+        """Ganzen Text ersetzen (z. B. Link-Umschreibung) als ein Undo-Schritt, Cursor bleibt möglichst."""
+        position = editor.textCursor().position()
+        cursor = QTextCursor(editor.document())
+        cursor.select(QTextCursor.SelectionType.Document)
+        editor._grouped(lambda: cursor.insertText(new_text))
+        c = editor.textCursor()
+        c.setPosition(min(position, len(new_text)))
+        editor.setTextCursor(c)
 
     def grammar_note(self) -> str:
         return self.grammar.note if self.config.get("grammar", {}).get("enabled") else ""

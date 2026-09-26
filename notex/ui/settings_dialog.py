@@ -329,6 +329,17 @@ class SettingsDialog(QDialog):
         page.section("Text")
         page.note("Zeilen werden immer an der Blattbreite umgebrochen, auch lange URLs oder Hashes. "
                   "Horizontal scrollen gibt es nicht – der Text ist immer vollständig sichtbar.")
+        page.section("Wiki-Links")
+        self.wiki_box = QCheckBox("[[Links]] hervorheben und auflösen (Ctrl+Klick öffnet)")
+        self.wiki_box.toggled.connect(lambda on: (self.config.__setitem__("wiki_links", on), self.window_.tabs.relink_all()) if not self._loading else None)
+        page.row("", self.wiki_box)
+        self.backlinks_box = QComboBox()
+        self.backlinks_box.addItem("Unter dem Blatt", "bottom")
+        self.backlinks_box.addItem("Rechts neben dem Blatt", "right")
+        self.backlinks_box.currentIndexChanged.connect(
+            lambda i: (self.config.__setitem__("backlinks_position", self.backlinks_box.itemData(i)),
+                       self.window_.apply_backlinks_position()) if not self._loading else None)
+        page.row("Backlinks-Panel", self.backlinks_box)
         page.section("Baum")
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setToolTip("Dateiendungen, die im Baum erscheinen, mit Leerzeichen getrennt")
@@ -393,6 +404,8 @@ class SettingsDialog(QDialog):
         self.editor_size_spin.setValue(theme["font"]["editor_size"])
         self.line_height_spin.setValue(theme["font"]["line_height"])
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
+        self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
+        self.backlinks_box.setCurrentIndex(max(0, self.backlinks_box.findData(cfg.get("backlinks_position", "bottom"))))
         self._refresh_theme_list()
         self._loading = False
 
