@@ -34,8 +34,8 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("strings", "Strings", "Druckbare Zeichenketten aus Binärdateien (ASCII, UTF-16)", "keine", False, "G"),
     ModuleInfo("embedded", "Eingebettete Dateien", "Dateien in Dateien finden und extrahieren", "keine", False, "G"),
     ModuleInfo("entropy", "Entropie", "Entropie-Kurve über eine Datei", "keine", False, "G"),
-    ModuleInfo("metadata", "Metadaten", "EXIF, PDF- und Office-Metadaten anzeigen und entfernen",
-               "Pillow, pypdf", False, "H"),
+    ModuleInfo("metadata", "Metadaten", "EXIF/GPS, PDF- und Office-Metadaten anzeigen und entfernen",
+               "pypdf", False, "H"),
     ModuleInfo("yara", "YARA", "YARA-Regeln hervorheben und gegen Dateien testen", "yara-python", False, "H"),
     ModuleInfo("timeline", "Zeitleiste & Beweismittel", "Zeitleisten-Notizen und Chain-of-Custody-Vorlage",
                "keine", False, "H"),
@@ -51,7 +51,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("pcap", "PCAP-Übersicht", "Mitschnitte (.pcap/.pcapng) zusammenfassen", "dpkt", False, "K"),
 ]
 BY_KEY = {m.key: m for m in MODULES}
-ANALYSIS_MODULES = ("strings", "embedded", "entropy")   # arbeiten auf beliebigen (Binär-)Dateien
+ANALYSIS_MODULES = ("strings", "embedded", "entropy", "metadata")   # arbeiten auf beliebigen (Binär-)Dateien
 
 
 def show_all_files(config: dict) -> bool:

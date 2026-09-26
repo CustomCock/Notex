@@ -238,6 +238,15 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Pfad bleibt; schon Entschärftes wird erkannt. refang per Ersetzungstabelle (auch [dot], (.), {.}, [at], h[xx]p).
   UI: MainWindow._activate_ioc (Bearbeiten → Umwandeln, Kontextmenü-Gruppe, Palette), Einstellung
   `ioc.skip_code`. Nur im Editor-Dokument → .ntx-Regel erfüllt (nichts auf Platte).
+- H1 Metadaten: `core/metadata.py`, `ui/metadata_dialog.py`. **Entscheidung Bibliotheken:** Bilder mit eigenem
+  Parser (TIFF/EXIF-IFDs mit Grenzen- und Schleifenschutz, JPEG-Segmente per mmap, PNG-Chunks, WebP-RIFF, IPTC-IIM)
+  statt Pillow – Pillow kostet ~10 MB und kodiert JPEG beim Speichern neu; so bleibt das Entfernen verlustfrei.
+  PDF mit **pypdf 6.19.0** (BSD-3, reines Python, ~1 MB im Build): Info, XMP, Verschlüsselung; beim Entfernen
+  `compress_identical_objects(remove_unreferenced=True)` – sonst blieben Info/XMP als verwaiste Objekte in der
+  Datei (vom Test gefunden). Office über zipfile/ElementTree (XML > 8 MB oder mit `<!ENTITY` wird nicht geparst).
+  JPEG: echtes Bildende über SOS-Scan (Füllbytes FF00, RST, Segmente zwischen Scans) → Daten dahinter (MPF, Trailer)
+  werden gemeldet und entfernt; APP0/APP2-ICC/APP14 bleiben. Kopie mit open("xb"), danach verify() (liest die Kopie
+  neu). Grenzen: TIFF/HEIC nicht bereinigt; Namen im Office-/PDF-Inhalt bleiben (nur gemeldet).
 
 ## Offen
 

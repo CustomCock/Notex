@@ -905,6 +905,9 @@ class MainWindow(QMainWindow):
         self.modules.contribute("entropy", lambda: self._activate_analysis(
             "entropy", "Entropie anzeigen …", "Ctrl+Alt+E", "activity", self.show_entropy,
             "entropie verschlüsselt komprimiert zufall kurve"))
+        self.modules.contribute("metadata", lambda: self._activate_analysis(
+            "metadata", "Metadaten anzeigen …", "Ctrl+Alt+M", "scan-eye", self.show_metadata,
+            "metadaten exif gps kamera autor pdf office docx entfernen bereinigen xmp iptc"))
         self.modules.contribute("ioc", self._activate_ioc)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1203,6 +1206,10 @@ class MainWindow(QMainWindow):
     def show_entropy(self, path: Path | None = None) -> None:
         from notex.ui.entropy_dialog import EntropyDialog
         self._open_analysis("entropy", lambda target: EntropyDialog(self, target), path)
+
+    def show_metadata(self, path: Path | None = None) -> None:
+        from notex.ui.metadata_dialog import MetadataDialog
+        self._open_analysis("metadata", lambda target: MetadataDialog(self, target), path)
 
     def show_in_hex(self, path: Path, offset: int, length: int = 1) -> None:
         """Sprung aus Strings/Eingebettete Dateien/Entropie an eine Stelle der Datei (Modul Hex & Dateianalyse)."""

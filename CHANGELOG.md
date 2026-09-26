@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 ## [1.9.0] – unveröffentlicht
 
 ### Hinzugefügt
+- Modul Metadaten (`Ctrl+Alt+M`): EXIF inkl. GPS (OpenStreetMap nur auf Klick), XMP, IPTC, PNG-Text; PDF-Info, XMP
+  und Speicherstände; Office-Eigenschaften und Namen aus Kommentaren/Änderungsverfolgung. Kopieren, als Markdown
+  einfügen, „Metadaten entfernen“ als geprüfte Kopie (Bilder verlustfrei ohne Neukodierung)
+- Abhängigkeit pypdf 6.19.0 (BSD-3, reines Python) für PDF-Metadaten
 - Modul IOC entschärfen (Standard an): Rechtsklick → Umwandeln, `Ctrl+Alt+D` / `Ctrl+Shift+Alt+D` – URLs, Domains,
   IPv4/IPv6 und E-Mails in Auswahl oder Datei entschärfen (hxxp, [.], [@], [:]) und wieder scharf machen; Dateinamen,
   Versionen und schon Entschärftes bleiben unverändert, Code-Blöcke optional ausgenommen

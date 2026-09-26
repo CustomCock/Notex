@@ -229,7 +229,7 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 | Variablen | an | – |
 | Hex & Dateianalyse (Hex-Ansicht, Dateityp, Prüfsummen) | an | – |
 | Strings, Eingebettete Dateien, Entropie | aus | – |
-| Metadaten | aus | Pillow, pypdf |
+| Metadaten | aus | pypdf (gebündelt) |
 | YARA | aus | yara-python |
 | Zeitleiste & Beweismittel | aus | – |
 | IOC entschärfen | an | – |
@@ -244,7 +244,7 @@ Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in de
 öffnen Binärdateien wieder im Texteditor.
 
 Der Baum zeigt normalerweise nur die eingestellten Dateiendungen (Einstellungen → Editor → Baum). Solange eines der
-Analyse-Module Strings, Eingebettete Dateien oder Entropie an ist, zeigt er **alle Dateien** – damit sich auch
+Analyse-Module Strings, Eingebettete Dateien, Entropie oder Metadaten an ist, zeigt er **alle Dateien** – damit sich auch
 `.exe`, `.zip` oder `.pcap` per Rechtsklick untersuchen lassen. Dauerhaft geht das über „Alle Dateien anzeigen“.
 
 ![Einstellungen → Module](docs/46-settings-modules.png)
@@ -401,6 +401,27 @@ Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **En
 - Gestreamt im Hintergrund mit Fortschritt und Abbrechen – auch für mehrere GB.
 
 ![Entropie](docs/53-entropy.png)
+
+
+## Metadaten
+
+Modul „Metadaten“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Metadaten anzeigen …**, Menü Datei oder
+`Ctrl+Alt+M` (aktuelle Datei):
+
+- **Bilder** (JPEG, PNG, WebP, TIFF): EXIF mit Kamera, Objektiv, Seriennummern, Software, Aufnahme-/Änderungszeit,
+  Ausrichtung, **GPS** (Koordinaten, Höhe, Zeit – „In OpenStreetMap öffnen“ öffnet erst auf Klick den Browser),
+  eingebettetes Vorschaubild, XMP, IPTC, JPEG-Kommentare, PNG-Textfelder, Daten hinter dem Bildende.
+- **PDF**: Autor, Titel, Programm, Erzeuger, Erstell-/Änderungsdatum, eigene Felder, XMP; Anzahl der Speicherstände
+  (ältere Fassungen samt Metadaten stecken bei inkrementellem Speichern noch in der Datei).
+- **Office** (docx/xlsx/pptx): Autor, zuletzt geändert von, Revision, Zeiten, Firma, Vorlage, Bearbeitungszeit,
+  eigene Eigenschaften, Vorschaubild – und Namen, die im Inhalt stecken (Kommentar-Autoren, Änderungsverfolgung).
+- **Kopieren** (markierte Zeilen oder alle) und **Als Markdown einfügen** (Tabelle an der Cursorposition der Notiz).
+- **Metadaten entfernen …** zeigt vorher, was entfernt wird und was bleibt, legt eine **Kopie**
+  `<name>_ohne_Metadaten.<endung>` an (nie überschrieben, Original bleibt) und prüft sie danach. JPEG/PNG/WebP werden
+  dabei nicht neu kodiert – nur die Metadaten-Segmente fallen weg, die Bilddaten bleiben Byte für Byte gleich. PDFs
+  werden neu geschrieben (ohne Info, XMP und ältere Speicherstände). TIFF und verschlüsselte PDFs werden nur angezeigt.
+
+Grau = bleibt beim Entfernen (Formatangabe oder Teil des Inhalts), gelb = GPS.
 
 
 ## IOCs entschärfen
@@ -748,6 +769,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+S | Strings extrahieren (Modul Strings) |
 | Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
 | Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
+| Ctrl+Alt+M | Metadaten anzeigen / entfernen (Modul Metadaten) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |

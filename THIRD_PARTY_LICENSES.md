@@ -19,6 +19,7 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 | mdurl | 0.1.x | MIT | https://github.com/executablebooks/mdurl | `licenses/LICENSE-mdurl.txt` |
 | regex (mrab-regex) | 2024+ | Apache License 2.0 (Teile CNRI-Python) | https://github.com/mrabarnett/mrab-regex | `licenses/LICENSE-regex.txt` |
 | PyYAML | 6.0.3 | MIT License | https://pyyaml.org | `licenses/LICENSE-PyYAML.txt` |
+| pypdf | 6.19.0 | BSD 3-Clause | https://github.com/py-pdf/pypdf | `licenses/LICENSE-pypdf.txt` |
 | cryptography (pyca) | 44–51 | Apache License 2.0 oder BSD 3-Clause (wahlweise) | https://cryptography.io | `licenses/LICENSE-cryptography.txt` |
 | OpenSSL (in cryptography enthalten) | 3.x | Apache License 2.0 | https://www.openssl.org | `licenses/LICENSE-cryptography.txt` (Apache-Text) |
 | cffi | 1.x/2.x | MIT | https://cffi.readthedocs.io | `licenses/LICENSE-cffi.txt` |
