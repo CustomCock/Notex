@@ -178,6 +178,40 @@ def compose(window, popup, name: str, offset: QPoint) -> None:
     print("gespeichert:", OUT / f"{name}.png")
 
 
+def _sample_pdf(path: Path) -> None:
+    """Kleines PDF mit Text und Lesezeichen (ohne Zusatzwerkzeug)."""
+    pages = [["Einleitung", "Notex liest PDFs nur und zeigt Lesezeichen links an. Markierter Text", "wird als Zitat mit Quelle in die Notiz im anderen Teil eingefuegt."],
+             ["Kapitel Zwei", "Hier steht das Suchwort Quokka einmal."], ["Kapitel Drei", "Schluss."]]
+    n = len(pages)
+    page_ids = [5 + i * 2 for i in range(n)]
+    content_ids = [6 + i * 2 for i in range(n)]
+    out_ids = [5 + n * 2 + i for i in range(n)]
+    objs = {1: "<< /Type /Catalog /Pages 2 0 R /Outlines 4 0 R /PageMode /UseOutlines >>",
+            2: "<< /Type /Pages /Kids [%s] /Count %d >>" % (" ".join(f"{p} 0 R" for p in page_ids), n),
+            3: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            4: f"<< /Type /Outlines /First {out_ids[0]} 0 R /Last {out_ids[-1]} 0 R /Count {n} >>"}
+    for i, lines in enumerate(pages):
+        ops = ["BT /F1 22 Tf 72 760 Td (%s) Tj ET" % lines[0]]
+        ops += ["BT /F1 12 Tf 72 %d Td (%s) Tj ET" % (720 - 16 * k, line) for k, line in enumerate(lines[1:])]
+        stream = "\n".join(ops)
+        objs[content_ids[i]] = f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream"
+        objs[page_ids[i]] = (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents {content_ids[i]} 0 R "
+                             f"/Resources << /Font << /F1 3 0 R >> >> >>")
+        prev = f"/Prev {out_ids[i - 1]} 0 R " if i else ""
+        nxt = f"/Next {out_ids[i + 1]} 0 R " if i + 1 < n else ""
+        objs[out_ids[i]] = f"<< /Title ({lines[0]}) /Parent 4 0 R {prev}{nxt}/Dest [{page_ids[i]} 0 R /XYZ 0 800 0] >>"
+    data = b"%PDF-1.4\n"
+    offsets = {}
+    for key in sorted(objs):
+        offsets[key] = len(data)
+        data += f"{key} 0 obj\n{objs[key]}\nendobj\n".encode("latin-1")
+    xref, count = len(data), max(objs) + 1
+    data += f"xref\n0 {count}\n0000000000 65535 f \n".encode()
+    data += b"".join(f"{offsets[k]:010d} 00000 n \n".encode() for k in range(1, count))
+    data += f"trailer\n<< /Size {count} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    path.write_bytes(data)
+
+
 def main() -> int:
     write_sample()
     httpd = HTTPServer(("127.0.0.1", 0), FakeLanguageTool)
@@ -414,7 +448,7 @@ def main() -> int:
             later_rel(1300, lambda: compose_card(card, "36-lookup-disambiguation"))
             later_rel(1500, lambda: card.show_error("wikipedia", "Serendipität", "offline", anchor))
             later_rel(1800, lambda: compose_card(card, "37-lookup-error"))
-            later_rel(2000, lambda: (card.close(), window.close(), app.quit()))
+            later_rel(2000, lambda: (card.close(), block_f_shots()))
 
         def compose_card(card, name):
             origin = window.mapFromGlobal(card.geometry().topLeft())
@@ -425,8 +459,125 @@ def main() -> int:
 
         later(7600, lookup_shots)
 
+    def block_f_shots():
+        """Block F: Bild, CSV-Tabelle, JSON-Baum/-Fehler, Hex + Typwarnung, Prüfsummen, Live-Log, PDF mit Zitat."""
+        from PySide6.QtGui import QColor, QLinearGradient
+        from notex.ui.hash_dialog import HashDialog
+
+        def later_rel(ms, fn):
+            QTimer.singleShot(ms, fn)
+
+        files = data / "Dateien"
+        files.mkdir(exist_ok=True)
+        image = QImage(640, 400, QImage.Format.Format_RGB32)
+        painter = QPainter(image)
+        gradient = QLinearGradient(0, 0, 640, 400)
+        gradient.setColorAt(0, QColor("#2f4a66"))
+        gradient.setColorAt(1, QColor("#c9a46a"))
+        painter.fillRect(image.rect(), gradient)
+        painter.end()
+        image.save(str(files / "skizze.png"))
+        (files / "preise.csv").write_text("Produkt;Preis;Menge;Lager\nÄpfel;3,50;10;Nord\nBirnen;12,00;2;Süd\n"
+                                          "\"Kiwi; grün\";1,20;100;Nord\nMango;2,75;18;West\nFeigen;7,90;4;Süd\n",
+                                          encoding="utf-8")
+        (files / "team.json").write_text('{"team":"Notex","users":[{"name":"Ada","rolle":"Admin","aktiv":true},'
+                                         '{"name":"Linus","tags":["kernel","git"],"alter":36}],"version":1.10}\n',
+                                         encoding="utf-8")
+        (files / "kaputt.json").write_text('{\n  "name": "Notex",\n  "tags": ["a", "b",]\n}\n', encoding="utf-8")
+        (files / "rechnung.pdf").write_bytes(b"MZ" + b"\x00" * 58 + b"\x40\x00\x00\x00" + b"PE\x00\x00"
+                                             + bytes(range(256)) * 6 + b"This program cannot be run in DOS mode.")
+        (files / "server.log").write_text("".join(
+            f"2026-09-26 10:{i:02d}:00 {'ERROR' if i % 9 == 0 else 'WARN' if i % 5 == 0 else 'INFO'} "
+            f"{'Verbindung zur Datenbank verloren' if i % 9 == 0 else 'Antwortzeit hoch' if i % 5 == 0 else 'Anfrage ok'}"
+            f" (#{i})\n" for i in range(60)), encoding="utf-8")
+        _sample_pdf(files / "Bericht.pdf")
+        window.resize(1280, 800)
+
+        def shot_image():
+            window.tabs.open_file(files / "skizze.png")
+            later_rel(300, lambda: save(window, "38-image-tab"))
+            later_rel(500, shot_csv)
+
+        def shot_csv():
+            window.tabs.open_file(files / "preise.csv")
+            window.set_preview_mode("table")
+            view = window.tabs.current_page().data_view
+            view._sort_by(1)
+            later_rel(300, lambda: save(window, "39-csv-table"))
+            later_rel(500, shot_json)
+
+        def shot_json():
+            window.tabs.open_file(files / "team.json")
+            window.set_preview_mode("tree")
+            view = window.tabs.current_page().data_view
+            view._expand_levels(2)
+            users = view.tree.topLevelItem(0).child(1)
+            view.tree.setCurrentItem(users.child(1).child(0) if users.child(1).childCount() else users)
+            later_rel(300, lambda: save(window, "40-json-tree"))
+            later_rel(500, lambda: window.tabs.open_file(files / "kaputt.json"))
+            later_rel(1400, lambda: save(window, "41-json-error"))
+            later_rel(1600, shot_hex)
+
+        def shot_hex():
+            window.tabs.open_file(files / "rechnung.pdf")
+            viewer = window.tabs.current_viewer()
+            viewer.area.anchor = 0x40
+            viewer.area.set_cursor(0x43, extend=True)
+            later_rel(300, lambda: save(window, "42-hex-view"))
+            later_rel(500, shot_hash)
+
+        def shot_hash():
+            dialog = HashDialog(window, files / "skizze.png")
+            dialog.show()
+
+            def finish():
+                dialog.compare.setText(dialog.fields["sha256"].text().upper())
+                dialog.move(window.geometry().center() - dialog.rect().center())
+                compose(window, dialog, "43-checksums", window.mapFromGlobal(dialog.geometry().topLeft()))
+                dialog.close()
+                shot_live()
+            later_rel(600, finish)
+
+        def shot_live():
+            window.toggle_live(files / "server.log")
+            view = window.tabs.current_page().data_view
+            view.level_box.setCurrentIndex(1)
+            view._apply_filter()
+            with open(files / "server.log", "a", encoding="utf-8") as handle:
+                handle.write("2026-09-26 11:00:00 ERROR Festplatte fast voll (#60)\n")
+            later_rel(900, lambda: save(window, "44-live-log"))
+            later_rel(1100, lambda: (window.toggle_live(), shot_pdf()))
+
+        def shot_pdf():
+            window.tabs.open_file(files / "Bericht.pdf")
+            viewer = window.tabs.current_viewer()
+            if not window.tabs.is_split:
+                window.toggle_split()
+            window.tabs.set_active(window.tabs.groups[1])
+            note = data / "Projekte/Notex/zitate.md"
+            note.write_text("# Zitate\n\nAus dem Bericht:\n", encoding="utf-8")
+            editor = window.tabs.open_file(note)
+            cursor = editor.textCursor()
+            cursor.movePosition(cursor.MoveOperation.End)
+            editor.setTextCursor(cursor)
+            canvas = viewer.canvas
+            canvas.selection = canvas._select(0, (70, 110), (400, 140))
+            canvas.selection_page = 0
+            canvas.selection_changed.emit()
+            viewer.quote()
+            later_rel(900, lambda: save(window, "45-pdf-quote"))
+            later_rel(1100, finish_all)
+
+        def finish_all():
+            for editor in window.tabs.editors():
+                editor.document().setModified(False)
+            window.close()
+            app.quit()
+
+        shot_image()
+
     later(500, s_empty)
-    later(60000, app.quit)
+    later(90000, app.quit)
     code = app.exec()
     httpd.shutdown()
     httpd.server_close()

@@ -899,6 +899,7 @@ QFrame#DataBar QLineEdit, QFrame#DataBar QComboBox {
     background: @bg;
 }
 QLabel#DataInfo {
+    background: transparent;
     color: @text_muted;
     font-size: @fs_smallpx;
 }
@@ -918,6 +919,15 @@ QTableView#CsvTable QHeaderView::section {
     border-bottom: 1px solid @paper_line;
     border-right: 1px solid @paper_line;
     padding: 2px @sp_smpx;
+}
+QTableView#CsvTable QHeaderView {
+    background: @paper;
+    border: none;
+}
+QTableView#CsvTable QHeaderView::section:vertical {
+    border-right: 1px solid @paper_line;
+    border-bottom: none;
+    padding: 0 @sp_smpx;
 }
 QTableView#CsvTable QTableCornerButton::section {
     background: @paper;
@@ -972,6 +982,10 @@ QTreeWidget#DataTree::item:hover:!selected {
 }
 QTreeWidget#DataTree::item:disabled {
     color: @paper_muted;
+}
+QTreeWidget#DataTree QHeaderView {
+    background: @paper;
+    border: none;
 }
 QTreeWidget#DataTree QHeaderView::section {
     background: @paper;

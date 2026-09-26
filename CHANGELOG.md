@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.6.0] – unveröffentlicht
+## [1.6.0] – 2026-09-26
 
 ### Hinzugefügt
 - Bilder: Ctrl+V mit Bild bzw. Bilddateien auf eine .md ziehen legt das Bild in assets/ neben der Notiz ab und

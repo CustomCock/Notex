@@ -23,7 +23,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
-| 1.6.0 | Block F: Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | in Arbeit |
+| 1.6.0 | Block F: Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün (Tests + Builds Win/Linux), lokal getaggt, kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -111,8 +111,9 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   wiktionary.org); Parser auf die dokumentierten Wikitext-Formate gebaut und mit realistischen Auszügen getestet.
 - Screenshot-Skript: virtueller Full-HD-Bildschirm (offscreen war 800×600 und kürzte Menüs).
 
-### 1.6.0 – Block F (in Arbeit)
-- Baseline Build-Größen (Build-Check-Artefakte v1.4/1.5): Windows-ZIP ≈ 96,2 MB, Linux-tar.gz ≈ 91,4 MB.
+### 1.6.0 – Block F
+- Build-Größen (Build-Check-Artefakte): vorher Windows-ZIP ≈ 96,2 MB, Linux-tar.gz ≈ 91,4 MB; nach F6
+  Windows ≈ 96,7 MB, Linux ≈ 92,6 MB (Qt6Pdf lag über das PDF-Bildformat-Plugin schon großteils im Build).
 - F6 vorab gemessen: QtPdf+QtPdfWidgets Windows 5,0 MB entpackt / ≈ 2,7 MB in der ZIP, Linux ≈ 5 MB entpackt
   (QtNetwork ist wegen der Einzelinstanz ohnehin dabei) → unter 25 MB, wird umgesetzt.
 - F1 Bilder: `core/images.py` (asset_name, assets_dir, relative/encodierte Links, image_links inkl. <…>-Links und <img>,
@@ -157,6 +158,8 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   QPdfSearchModel, QPdfBookmarkModel. Laden über QBuffer (≤ 256 MB) → keine Dateisperre. Nur QtPdf, kein
   QtPdfWidgets. build.py: QtPdf nicht mehr ausgeschlossen, Hidden-Import. Zitat: EditorArea.pdf_quote →
   MainWindow._insert_pdf_quote (Notiz im anderen Teil, sonst Zwischenablage). Split auch aus Viewer-Tabs.
+- CI-Fix: Grammatik-Rate-Limit schläft bis der Mindestabstand wirklich erreicht ist (Windows-Uhr ≈16 ms).
+- Screenshots 38–45 (Bild, CSV, JSON-Baum/-Fehler, Hex, Prüfsummen, Live-Log, PDF-Zitat) in README eingebunden.
 - Nebenbei: großes Öffnen beschleunigt (Highlighter während `load()` ausgesetzt, `schedule_reset` fasst Laden +
   Resolver zu einem Durchlauf zusammen, hängende Einrückung nur bei geänderter Schriftmetrik). 100k Zeilen:
   Öffnen ~2 s + ~1 s Einfärben (vorher ~12 s), Tabelle 0,5 s, Sortieren 0,2 s, Filtern 0,05 s.
@@ -208,9 +211,13 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 
 ## Nächster Schritt
 
-Alle vier Blöcke (A–D) sind umgesetzt. Offen ist nur, was der Besitzer entscheidet:
-1. Release: Branch nach `main` mergen und `v1.4.0` taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
-   (Tags v1.2.0–v1.4.0 existieren nur lokal in der Arbeitsumgebung.)
+Blöcke A–F sind umgesetzt (1.6.0 lokal getaggt, kein Release). **Gestoppt nach Block F** – weiter mit Block G
+(1.7.0: Umwandeln-Menü, Snippets, ▶ Python-Blöcke, Regex-Tester), sobald der Besitzer „weiter“ schreibt.
+Danach H (1.8.0: Karteikarten, Aufgaben, Gliederung, Fokus/Pomodoro) und I (1.9.0: Git-Backup, Export).
+
+Offen beim Besitzer:
+1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
+   (Tags ab v1.2.0 existieren nur lokal in der Arbeitsumgebung.)
 2. Aufräumen auf GitHub: Release/Tag „main“ löschen, Repo-Beschreibung „Textdateien“.
 3. Ideen für später (nicht beauftragt): Kürzel für Split View auf deutscher Tastatur prüfen (Ctrl+\ = Ctrl+AltGr+ß),
    Tab-Überlauf der Bearbeitungsleiste im Blatt-Modus, Mermaid/Fußnoten in der Vorschau.

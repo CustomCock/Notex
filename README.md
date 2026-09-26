@@ -215,6 +215,9 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 - **Aufräumen:** „Unbenutzte Bilder finden …“ (Menü Datei, Command Palette) listet Bilder ohne Verweis mit
   Vorschau; nur Angekreuztes kommt in den Papierkorb. Gelöscht wird nie automatisch.
 
+![Bild-Tab](docs/38-image-tab.png)
+
+
 ## CSV als Tabelle
 
 `.csv`- und `.tsv`-Dateien lassen sich mit `Ctrl+Shift+V` (oder „CSV/TSV: Als Tabelle anzeigen“ in der Command
@@ -234,6 +237,9 @@ Datenformate öffnet CSV/TSV auf Wunsch direkt als Tabelle.
 - Große Dateien (100 000 Zeilen) laufen über ein Tabellenmodell, das nur sichtbare Zellen zeichnet.
 - Verschlüsselte Notizen (`.ntx`) bekommen keine Tabellenansicht.
 
+![CSV als Tabelle](docs/39-csv-table.png)
+
+
 ## JSON und YAML
 
 Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Palette):
@@ -250,6 +256,11 @@ Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Pal
 - **YAML** wird ausschließlich sicher gelesen und geschrieben (`safe_load`/`safe_dump` – keine Python-Objekte, kein
   Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
 - Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
+
+| Baum | Fehler |
+|---|---|
+| ![JSON-Baum](docs/40-json-tree.png) | ![JSON-Fehler](docs/41-json-error.png) |
+
 
 ## PDF
 
@@ -274,6 +285,9 @@ PDFs öffnen als eigener Tab (nur lesen):
   Passwortgeschützte PDFs fragen nach dem Passwort (es wird nirgends gespeichert).
 - Technik: QtPdf (PDFium), ohne QtWebEngine; der Build wächst dadurch um wenige MB.
 
+![PDF mit Zitat](docs/45-pdf-quote.png)
+
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -289,6 +303,9 @@ Textdatei:
   der Editor den aktuellen Stand der Datei. Start nur bei gespeichertem Tab.
 - Einstellungen → Editor → Datenformate: „.log-Dateien direkt live verfolgen“.
 - Nicht für verschlüsselte Notizen (`.ntx`).
+
+![Live verfolgen](docs/44-live-log.png)
+
 
 ## Hex-Ansicht, Dateityp und Prüfsummen
 
@@ -307,6 +324,11 @@ Textdatei:
   Lesedurchgang im Hintergrund, jede mit Kopierknopf. „Vergleichen mit …“ nimmt auch `SHA256: …`, Doppelpunkt-
   Schreibweise oder eine `sha256sum`-Zeile an und zeigt grün (stimmt) oder rot (weicht ab).
 - Bei `.ntx` zeigen Hex-Ansicht und Prüfsummen nur den verschlüsselten Inhalt der Datei – nie Klartext.
+
+| Hex + Typwarnung | Prüfsummen |
+|---|---|
+| ![Hex](docs/42-hex-view.png) | ![Prüfsummen](docs/43-checksums.png) |
+
 
 ## Nachschlagen
 
@@ -582,6 +604,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
 | Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |
+| Ctrl+Shift+Alt+Q | PDF-Markierung als Zitat in die Notiz im anderen Teil einfügen |
 | Ctrl+C / Ctrl+V / Entf (in der Tabelle) | Zellen als Tab-getrennten Block kopieren / einfügen / leeren |
 | Ctrl+\ | Editor teilen / Teilung aufheben |
 | Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |

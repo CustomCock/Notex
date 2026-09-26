@@ -65,3 +65,10 @@ def test_snap_to_lines() -> None:
 
 def test_clean_selection_pdfium_hyphen_marker() -> None:
     assert clean_selection("Die Silben￾\r\ntrennung") == "Die Silbentrennung"
+
+
+def test_ntx_is_never_handed_to_the_pdf_view() -> None:
+    """.ntx-Regel: eine verschlüsselte Notiz wird nie als PDF gelesen – auch nicht „bericht.pdf.ntx“."""
+    from notex.core import filetype, fileops
+    assert fileops.is_encrypted_path("bericht.pdf.ntx")
+    assert filetype.detect(b"NOTEXENC\x01\x01" + b"%PDF-1.7" + b"\x00" * 32, "bericht.pdf.ntx").key == "ntx"

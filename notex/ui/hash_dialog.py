@@ -112,6 +112,7 @@ class HashDialog(QDialog):
         self.progress.setValue(1000)
         for name, value in result.items():
             self.fields[name].setText(value)
+            self.fields[name].setCursorPosition(0)          # Anfang zeigen (SHA-512 ist länger als das Feld)
         self._compare(self.compare.text())
 
     def _compare(self, text: str) -> None:

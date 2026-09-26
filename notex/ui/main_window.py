@@ -254,6 +254,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
         file_menu.addAction(self._action("Live verfolgen ein/aus", "Ctrl+Shift+Alt+F", lambda: self.toggle_live()))
         file_menu.addAction(self._action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()))
+        self._action("PDF: Markierung als Zitat einfügen", "Ctrl+Shift+Alt+Q", self.quote_from_pdf)
         file_menu.addAction(self._action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums()))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
@@ -888,6 +889,32 @@ class MainWindow(QMainWindow):
             self.toast.show_message("Keine Datei zum Anzeigen", "info")
             return
         self.tabs.open_viewer(Path(path), "hex")
+
+    def _current_pdf(self):
+        viewer = self.tabs.current_viewer() if self.tabs.current_editor() is None else None
+        if viewer is None or getattr(viewer, "kind", "") != "pdf":
+            for group in getattr(self.tabs, "groups", []):     # im Split: der PDF-Tab der anderen Gruppe
+                candidate = group.current_viewer()
+                if candidate is not None and getattr(candidate, "kind", "") == "pdf":
+                    return candidate
+            return None
+        return viewer
+
+    def quote_from_pdf(self) -> None:
+        viewer = self._current_pdf()
+        if viewer is None:
+            self.toast.show_message("Kein PDF offen", "info")
+        elif not viewer.canvas.selected_text():
+            self.toast.show_message("Erst im PDF Text markieren", "info")
+        else:
+            viewer.quote()
+
+    def toggle_pdf_outline(self) -> None:
+        viewer = self._current_pdf()
+        if viewer is not None and viewer.outline_button.isEnabled():
+            viewer.outline_button.toggle()
+        elif viewer is not None:
+            self.toast.show_message("Dieses PDF hat keine Lesezeichen", "info")
 
     def _insert_pdf_quote(self, viewer, markdown: str) -> None:
         """Zitat aus dem PDF in die Notiz, die im ANDEREN Teil der geteilten Ansicht aktiv ist. Ohne Teilung:
@@ -2003,6 +2030,10 @@ class MainWindow(QMainWindow):
                           keywords="json yaml jsonpath pfad kopieren baum")
         self.registry.add("file:live", "Live verfolgen (Log) ein/aus", lambda: self.toggle_live(), category="Datei",
                           shortcut="Ctrl+Shift+Alt+F", keywords="tail follow log live mitlesen logdatei")
+        self.registry.add("pdf:quote", "PDF: Markierung als Zitat in Notiz einfügen", self.quote_from_pdf, category="PDF",
+                          shortcut="Ctrl+Shift+Alt+Q", keywords="pdf zitat quote markierung notiz quelle")
+        self.registry.add("pdf:outline", "PDF: Lesezeichen ein/aus", self.toggle_pdf_outline, category="PDF",
+                          keywords="pdf lesezeichen inhaltsverzeichnis outline bookmarks")
         self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
                           shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
         self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),

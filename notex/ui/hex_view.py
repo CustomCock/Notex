@@ -229,10 +229,11 @@ class _HexArea(QAbstractScrollArea):
                             else QRect(ax, y, self.cw - 1, self.lh - 1)
                         painter.setPen(QColor(COLORS.accent))
                         painter.drawRect(rect)
-                painter.setPen(zero if byte == 0 else text)
+                selected = offset == self.cursor or (start <= offset < end and length > 1)
+                painter.setPen(text if selected or byte else zero)
                 painter.drawText(hx, y + self.ascent, f"{byte:02X}")
                 printable = 0x20 <= byte < 0x7F
-                painter.setPen(text if printable else muted)
+                painter.setPen(text if printable or selected else muted)
                 painter.drawText(ax, y + self.ascent, chr(byte) if printable else "·")
         if not self.paged.size:
             painter.setPen(muted)
@@ -316,8 +317,10 @@ class HexPage(ViewerPage):
             shortcut = QShortcut(QKeySequence(sequence), self)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(slot)
-        if self.warning:
-            self.info.setText("⚠ " + self.warning)
+        self.search_field.setMinimumWidth(200)
+        if self.warning:                          # ausführlich steht es in der Statusleiste
+            self.info.setText("⚠ Endung passt nicht zum Inhalt")
+            self.info.setToolTip(self.warning)
 
     # ---- Aktionen -------------------------------------------------------------------------------
     def focus_goto(self) -> None:
