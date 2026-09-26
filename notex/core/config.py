@@ -105,6 +105,11 @@ DEFAULTS: dict[str, Any] = {
         "full_text": False,
         "regex": False,       # Chip „.*“: regulärer Ausdruck
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
+        "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
+    },
+    "variables": {            # Modul Variablen – Definitionen liegen in variables.json neben der App
+        "prefix": "§",
+        "copy": "values",     # Ctrl+C: "values" (Werte einsetzen) oder "tokens"
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
                    ".xml", ".html", ".css", ".js", ".sql", ".ntx", ".tsv",

@@ -267,6 +267,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Beenden", "Ctrl+Q", self.close))
 
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
+        self.edit_menu = edit_menu
         edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.open_find(False)))
         edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.open_find(True)))
         edit_menu.addAction(self._action("Ersetzen in Dateien …", "Ctrl+Shift+H", self.open_replace_in_files))
@@ -885,7 +886,9 @@ class MainWindow(QMainWindow):
     # ---- Module ---------------------------------------------------------------------------------
     def _install_modules(self) -> None:
         """Jedes Modul meldet einen Aktivator an; ausgeschaltete Module hängen nichts ein (siehe core/modules.py)."""
+        self._editor_menu_providers: list = []
         self.modules.contribute("hex", self._activate_hex)
+        self.modules.contribute("variables", self._activate_variables)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -929,6 +932,151 @@ class MainWindow(QMainWindow):
                 self.sidebar.tree.menu_providers.remove(tree_entries)
             self._update_status()
         return undo
+
+    # ---- Modul: Variablen -----------------------------------------------------------------------
+    def _activate_variables(self):
+        from notex.paths import app_root
+        from notex.ui.editor import Editor
+        from notex.ui.variables_service import VariableService
+        service = VariableService(app_root() / "variables.json", self.config)
+        self.variable_service = service
+        Editor.variables = service
+        service.changed.connect(self._refresh_variables)
+        self._refresh_variables()
+        submenu = self.edit_menu.addMenu("Variablen")
+        actions = [self._action("Variable einfügen", "Ctrl+Alt+V", self._insert_variable),
+                   self._action("Variablen verwalten …", "Ctrl+Shift+Alt+V", lambda: self.open_settings("Variablen")),
+                   self._action("Alle Variablen in dieser Datei durch Werte ersetzen", None, self._replace_all_variables),
+                   self._action("Variablen in Auswahl entfernen", None, self._escape_selected_variables)]
+        for action in actions:
+            submenu.addAction(action)
+        commands = {
+            "var:insert": ("Variable einfügen", self._insert_variable, "Ctrl+Alt+V"),
+            "var:manage": ("Variablen verwalten …", lambda: self.open_settings("Variablen"), "Ctrl+Shift+Alt+V"),
+            "var:replace_all": ("Alle Variablen in dieser Datei durch Werte ersetzen", self._replace_all_variables, ""),
+            "var:escape_selection": ("Variablen in Auswahl entfernen", self._escape_selected_variables, ""),
+        }
+        for key, (title, slot, shortcut) in commands.items():
+            self.registry.add(key, title, slot, category="Variablen", shortcut=shortcut,
+                              keywords="variable textbaustein platzhalter § token wert")
+        self._editor_menu_providers.append(self._variable_menu)
+        self.sidebar.variable_source = lambda: self.variable_service
+        self.sidebar.in_values.setVisible(True)
+
+        def undo() -> None:
+            Editor.variables = None
+            self.sidebar.variable_source = None
+            self.sidebar.in_values.setVisible(False)
+            service.changed.disconnect(self._refresh_variables)
+            self.variable_service = None
+            for action in actions:
+                self.removeAction(action)
+                action.deleteLater()
+            self.edit_menu.removeAction(submenu.menuAction())
+            submenu.deleteLater()
+            for key in commands:
+                self.registry.remove(key)
+            if self._variable_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._variable_menu)
+            self._refresh_variables()         # Tokens wieder als normaler Text
+        return undo
+
+    variable_service = None
+
+    def _refresh_variables(self) -> None:
+        """Werte/Präfix geändert oder Modul umgeschaltet: alle Editoren und Vorschauen neu zeichnen."""
+        for editor in self.tabs.editors():
+            if editor.highlighter is not None:
+                editor.highlighter.reset()
+            editor.viewport().update()
+        for page in self.tabs.pages():
+            if page.preview is not None and page.view_mode in ("preview", "split"):
+                page._refresh_preview()
+
+    def _insert_variable(self) -> None:
+        editor = self.tabs.current_editor()
+        if editor is not None and not self._in_data_view():
+            editor.insert_variable_prefix()
+
+    def _current_variable_editor(self):
+        editor = self.tabs.current_editor()
+        if editor is None or self.variable_service is None or self._in_data_view():
+            return None
+        if editor.isReadOnly() or getattr(editor, "locked", False):
+            self.toast.show_message("Die Datei ist schreibgeschützt oder gesperrt", "lock")
+            return None
+        return editor
+
+    def _replace_all_variables(self) -> None:
+        from notex.core import variables as vb
+        editor = self._current_variable_editor()
+        if editor is None:
+            return
+        service = self.variable_service
+        new_text, count = vb.replace_all(editor.toPlainText(), service.values, service.prefix)
+        if not count:
+            self.toast.show_message("Keine Variablen in dieser Datei", "info")
+            return
+        self.tabs.replace_text_keep_cursor(editor, new_text)
+        self.toast.show_message(f"{count} Variable(n) durch Werte ersetzt – Ctrl+Z macht es rückgängig", "variable")
+
+    def _escape_selected_variables(self) -> None:
+        from notex.core import variables as vb
+        editor = self._current_variable_editor()
+        if editor is None:
+            return
+        cursor = editor.textCursor()
+        if not cursor.hasSelection():
+            self.toast.show_message("Erst Text markieren", "info")
+            return
+        service = self.variable_service
+        text = editor.toPlainText()
+        new_text, count = vb.escape_all(text, service.values, service.prefix, cursor.selectionStart(), cursor.selectionEnd())
+        if not count:
+            self.toast.show_message("Keine Variablen in der Auswahl", "info")
+            return
+        self.tabs.replace_text_keep_cursor(editor, new_text)
+        self.toast.show_message(f"{count} Variable(n) in normalen Text verwandelt", "variable")
+
+    def _variable_menu(self, editor, menu) -> None:
+        """Kontextmenü-Gruppe „Variable“ für das Vorkommen unter dem Rechtsklick."""
+        from notex.core import variables as vb
+        hit = getattr(editor, "_context_token", None)
+        service = self.variable_service
+        if hit is None or service is None:
+            return
+        token, block = hit
+        writable = not editor.isReadOnly() and not getattr(editor, "locked", False)
+        base = block.position()
+        menu.addSeparator()
+        title = menu.addAction(icon("variable"), f"Variable {service.prefix}{token.name}")
+        title.setEnabled(False)
+
+        def apply(new_line: str) -> None:
+            cursor = QTextCursor(editor.document())
+            cursor.setPosition(base)
+            cursor.setPosition(base + len(block.text()), QTextCursor.MoveMode.KeepAnchor)
+            editor._grouped(lambda: cursor.insertText(new_line))
+
+        line = block.text()
+        if token.escaped:
+            menu.addAction("Wieder als Variable verwenden", lambda: apply(vb.unescape_token(line, token))).setEnabled(writable)
+        else:
+            menu.addAction("Variable entfernen (als normalen Text behalten)",
+                           lambda: apply(vb.escape_token(line, token))).setEnabled(writable)
+            menu.addAction("Durch Wert ersetzen",
+                           lambda: apply(vb.replace_token(line, token, service.values))).setEnabled(writable)
+        menu.addAction(icon("pencil"), "Variable bearbeiten …", lambda: self.edit_variable(token.name))
+
+    def edit_variable(self, name: str) -> None:
+        from notex.ui.variables_dialog import VariableEditDialog
+        service = self.variable_service
+        if service is None:
+            return
+        variable = service.get(name)
+        dialog = VariableEditDialog(self, variable, [v.name for v in service.variables], service.prefix)
+        if dialog.exec():
+            service.upsert(dialog.result_variable(), old_name=name)
 
     def open_as_hex(self, path: Path | None = None) -> None:
         """Beliebige Datei als Hex (nur lesen) – bei .ntx sieht man nur den Geheimtext von der Platte."""
@@ -1294,6 +1442,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QAction
         actions = self.tabs.editor_actions
         writable = not editor.isReadOnly()
+        for provider in self._editor_menu_providers:        # Module (z. B. Variablen) hängen ihre Gruppe ein
+            provider(editor, menu)
         menu.addSeparator()
         keys = ["upper", "lower", "title"] + (["md_bold", "md_italic", "md_code", "md_link"]
                                               if editor.path.suffix.lower() in (".md", ".markdown") else [])
@@ -1951,6 +2101,15 @@ class MainWindow(QMainWindow):
             popup = CompletionPopup(editor)
             popup.chosen.connect(lambda value, e=editor: e.complete_with(value))
             self._completions[id(editor)] = popup
+        if kind == "variable":
+            from notex.core.variables import completions
+            service = self.variable_service
+            if service is None:
+                popup.hide()
+                return
+            entries = [(name, f"{service.prefix}{name}  –  {short}") for name, short in completions(text, service.variables)]
+            popup.show_items(entries, "variable")
+            return
         if kind == "file":
             hits = self.file_index.index.search(text, self.config.get("recent_files", []), limit=40)
             entries = [(link_name(h.relative) if self.links.resolve(link_name(h.relative)) == h.relative else h.relative.rsplit(".", 1)[0],

@@ -82,6 +82,8 @@ class SearchOptions:
     regex: bool = False
     whole_word: bool = False
     case_sensitive: bool = False
+    variable_values: dict | None = None      # „auch in Variablenwerten suchen“: Name → Wert (Modul Variablen)
+    variable_prefix: str = "§"
 
 
 @dataclass
@@ -228,7 +230,10 @@ def _line_match(line_no: int, line: str, spans: list[tuple[int, int]]) -> LineMa
     )
 
 
-def _match_lines(text: str, query: Query, cancel: threading.Event | None) -> list[LineMatch]:
+def _match_lines(text: str, query: Query, cancel: threading.Event | None,
+                 values: dict | None = None, prefix: str = "§") -> list[LineMatch]:
+    """Treffer je Zeile. Mit `values` wird eine Zeile ohne direkten Treffer zusätzlich mit eingesetzten
+    Variablenwerten geprüft (einzeilig, damit die Zeilennummer stimmt); der Treffer zeigt dann die aufgelöste Zeile."""
     matches: list[LineMatch] = []
     for line_no, line in enumerate(text.split("\n"), start=1):
         if cancel is not None and line_no % 2000 == 0 and cancel.is_set():
@@ -236,6 +241,13 @@ def _match_lines(text: str, query: Query, cancel: threading.Event | None) -> lis
         spans = match_spans(query, line)
         if spans:
             matches.append(_line_match(line_no, line, spans))
+        elif values and prefix in line:
+            from notex.core.variables import resolve
+            resolved = resolve(line, values, prefix, single_line=True)
+            if resolved != line:
+                spans = match_spans(query, resolved)
+                if spans:
+                    matches.append(_line_match(line_no, resolved, spans))
     return matches
 
 
@@ -282,7 +294,7 @@ def search(
                     text = decode_bytes(path.read_bytes()).text
                 except (OSError, UnicodeDecodeError):
                     continue
-                lines = _match_lines(text, query, cancel)
+                lines = _match_lines(text, query, cancel, options.variable_values, options.variable_prefix)
                 if lines:
                     file_match = FileMatch(path=path, relative=relative, lines=lines)
                     result.files.append(file_match)

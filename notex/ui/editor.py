@@ -42,6 +42,7 @@ class LineNumberArea(QWidget):
 
 
 class Editor(QTextEdit):
+    variables = None               # VariableService, solange das Modul „Variablen“ an ist (für alle Editoren)
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
     files_dropped = Signal(list)   # Dateien aufs Blatt gezogen -> öffnen statt Pfad einfügen
     link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
@@ -98,6 +99,11 @@ class Editor(QTextEdit):
         self.verticalScrollBar().valueChanged.connect(self.line_numbers.update)
         self.document().contentsChanged.connect(self._on_contents_changed)
         self.cursorPositionChanged.connect(self._refresh_extra_selections)
+        self.cursorPositionChanged.connect(self._snap_to_variables)
+        self._snap_direction = 0
+        self._snapping = False
+        self._completion_kind = ""
+        self._context_token = None
 
         self._loaded_once = False
         self.set_font_size(font_size)
@@ -283,16 +289,72 @@ class Editor(QTextEdit):
             cursor.endEditBlock()
 
     def keyPressEvent(self, event) -> None:
-        self._grouped(lambda: super(Editor, self).keyPressEvent(event))
+        if self.variables is not None:
+            from notex.ui import variable_render
+            if variable_render.handle_delete(self, event):
+                return
+        self._snap_direction = {Qt.Key.Key_Right: 1, Qt.Key.Key_Left: -1}.get(event.key(), 0)
+        try:
+            self._grouped(lambda: super(Editor, self).keyPressEvent(event))
+        finally:
+            self._snap_direction = 0
         self._maybe_complete()
 
+    def _snap_to_variables(self) -> None:
+        """Cursor nie mitten in einem Variablen-Token (es verhält sich wie ein einzelnes Zeichen)."""
+        if self.variables is None or self._snapping:
+            return
+        from notex.ui import variable_render
+        self._snapping = True
+        try:
+            variable_render.snap_cursor(self, self._snap_direction)
+        finally:
+            self._snapping = False
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if self.variables is not None and not self.locked:
+            from notex.ui import variable_render
+            painter = QPainter(self.viewport())
+            variable_render.paint(self, painter)
+            painter.end()
+
+    def viewportEvent(self, event) -> bool:
+        if event.type() == QEvent.Type.ToolTip and self.variables is not None:
+            from PySide6.QtWidgets import QToolTip
+            from notex.ui import variable_render
+            hit = variable_render.token_at_point(self, event.pos())
+            if hit is not None:
+                QToolTip.showText(event.globalPos(), variable_render.tooltip_text(self, hit[0]), self.viewport())
+                return True
+            QToolTip.hideText()
+        return super().viewportEvent(event)
+
+    def createMimeDataFromSelection(self):
+        """Kopieren: Variablen als Werte (Einstellung „Werte“) – Escapes als normales §name."""
+        if self.variables is not None and self.variables.copy_values:
+            from PySide6.QtCore import QMimeData
+            # Eigenes QMimeData: Qts QTextEditMimeData erzeugt den Text immer neu aus dem Dokument (mit Tokens)
+            data = QMimeData()
+            data.setText(self.variables.resolve(self.textCursor().selection().toPlainText()))
+            return data
+        return super().createMimeDataFromSelection()
+
     def _maybe_complete(self) -> None:
-        """Nach "[[" Dateien vorschlagen, nach "#" innerhalb eines Links die Überschriften des Ziels."""
+        """Nach "[[" Dateien vorschlagen, nach "#" innerhalb eines Links die Überschriften des Ziels,
+        nach dem Variablen-Präfix (Standard „§“) die passenden Variablen."""
         cursor = self.textCursor()
         before = cursor.block().text()[: cursor.positionInBlock()]
         start = before.rfind("[[")
         if start < 0 or "]]" in before[start:]:
+            if self.variables is not None:
+                from notex.core.variables import typed_name_before
+                typed = typed_name_before(cursor.block().text(), cursor.positionInBlock(), self.variables.prefix)
+                if typed is not None:
+                    self._completion_kind = "variable"
+                    self.completion_requested.emit("variable", typed)
             return
+        self._completion_kind = "link"
         inner = before[start + 2:]
         if "#" in inner:
             target, _, prefix = inner.partition("#")
@@ -301,7 +363,11 @@ class Editor(QTextEdit):
             self.completion_requested.emit("file", inner)
 
     def complete_with(self, text: str) -> None:
-        """Ersetzt den angefangenen Link-Teil hinter "[[" bzw. "#" durch `text` und schließt mit "]]"."""
+        """Ersetzt den angefangenen Link-Teil hinter "[[" bzw. "#" durch `text` und schließt mit "]]"
+        – bzw. bei Variablen den angefangenen Namen hinter dem Präfix."""
+        if self._completion_kind == "variable" and self.variables is not None:
+            self._complete_variable(text)
+            return
         cursor = self.textCursor()
         block_text = cursor.block().text()
         col = cursor.positionInBlock()
@@ -319,6 +385,25 @@ class Editor(QTextEdit):
         self._grouped(lambda: edit.insertText(text + closing))
         if closing:
             self.setTextCursor(edit)
+
+    def _complete_variable(self, name: str) -> None:
+        from notex.core.variables import typed_name_before
+        cursor = self.textCursor()
+        typed = typed_name_before(cursor.block().text(), cursor.positionInBlock(), self.variables.prefix)
+        if typed is None:
+            return
+        edit = QTextCursor(self.document())
+        edit.setPosition(cursor.position() - len(typed))
+        edit.setPosition(cursor.position(), QTextCursor.MoveMode.KeepAnchor)
+        self._grouped(lambda: edit.insertText(name))
+        self.setTextCursor(edit)
+
+    def insert_variable_prefix(self) -> None:
+        """„Variable einfügen“: Präfix tippen und die Vorschläge öffnen."""
+        if self.variables is None or self.isReadOnly():
+            return
+        self._grouped(lambda: self.textCursor().insertText(self.variables.prefix))
+        self._maybe_complete()
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton and event.modifiers() & Qt.KeyboardModifier.ControlModifier \
@@ -670,6 +755,10 @@ class Editor(QTextEdit):
         """Vorschläge (Rechtschreibung/Grammatik) oben, dann Bearbeiten, Text und Nachschlagen.
         Rechtsklick außerhalb der Markierung setzt den Cursor dorthin – dann gilt das Wort unter dem Mauszeiger."""
         from PySide6.QtGui import QKeySequence
+        self._context_token = None
+        if self.variables is not None:
+            from notex.ui import variable_render
+            self._context_token = variable_render.token_at_point(self, pos)
         click = self.cursorForPosition(pos)
         current = self.textCursor()
         inside = current.hasSelection() and current.selectionStart() <= click.position() <= current.selectionEnd()

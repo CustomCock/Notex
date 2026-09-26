@@ -175,3 +175,15 @@ def test_encrypted_notes_never_searched_in_full_text(tmp_path: Path) -> None:
     assert [m.relative for m in result.files] == ["offen.txt"]
     result = search(tmp_path, "geheim", SearchOptions(by_name=True, full_text=False, extensions=(".ntx",)))
     assert [m.relative for m in result.names] == ["geheim.ntx"]      # Dateiname bleibt auffindbar
+
+
+def test_search_in_variable_values(tmp_path) -> None:
+    from notex.core.search import SearchOptions, search
+    (tmp_path / "brief.md").write_text("Anrede\n§gruss und Tschüss\n\\§gruss bleibt\n", encoding="utf-8")
+    base = SearchOptions(by_name=False, full_text=True, extensions=(".md",))
+    assert search(tmp_path, "§gruss", base).files[0].lines[0].line_no == 2           # Tokens findet man immer
+    assert not search(tmp_path, "herzlich", base).files
+    with_values = SearchOptions(by_name=False, full_text=True, extensions=(".md",),
+                                variable_values={"gruss": "Herzliche\nGrüße"})
+    lines = search(tmp_path, "herzliche grüße", with_values).files[0].lines
+    assert [l.line_no for l in lines] == [2]                                            # Escape (Zeile 3) nicht

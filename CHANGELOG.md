@@ -8,6 +8,11 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Module: Einstellungen → Module schaltet Funktionen einzeln an/aus, sofort und ohne Neustart; ausgeschaltete Module
   hängen nichts ein (Menü, Palette, Kürzel, Panels) und laden keine Bibliotheken. Hex-Ansicht und Prüfsummen sind
   jetzt das Modul „Hex & Dateianalyse“ (Standard an)
+- Variablen: Textbausteine wie §gruss aus variables.json; im Editor erscheint der Wert im Lesefluss (Datei behält das
+  Token), Token verhält sich wie ein Zeichen, Hover, Vorschläge nach dem Präfix (Ctrl+Alt+V), Rechtsklick: entfernen
+  (\§gruss), durch Wert ersetzen, bearbeiten, wieder als Variable verwenden; Palette: alle ersetzen / in Auswahl
+  entfernen; Kopieren setzt Werte ein (einstellbar), Vorschau zeigt Werte, Rechtschreibung ignoriert Tokens, Suche
+  optional auch in Werten; Einstellungen → Variablen mit Import/Export und einstellbarem Präfix
 
 ### Behoben
 - Dateien mit Bytes, die cp1252 nicht kennt (0x81, 0x8D, 0x8F, 0x90, 0x9D), ließen sich im Editor nicht öffnen;

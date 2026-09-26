@@ -23,3 +23,6 @@ templates/
 
 # Eigene Schriften (z. B. SF Pro) – nie ins Repo, nie in den Build
 fonts/user/
+
+# Variablen (Textbausteine) der portablen App – können persönliche Daten enthalten
+variables.json

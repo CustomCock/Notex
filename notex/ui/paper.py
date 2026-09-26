@@ -385,9 +385,19 @@ class EditorPage(QWidget):
 
     def _refresh_preview(self) -> None:
         if self.preview is not None and self.view_mode != "edit":
-            self.preview.set_source(self.editor.toPlainText(), self.editor.path)
+            text = self.editor.toPlainText()
+            service = self.editor.variables
+            self._preview_lines = None
+            if service is not None and service.prefix in text:     # Vorschau zeigt Werte, Escapes als normales §name
+                from notex.core.variables import resolve_with_line_map
+                text, self._preview_lines = resolve_with_line_map(text, service.values, service.prefix)
+            self.preview.set_source(text, self.editor.path)
+
+    _preview_lines: list[int] | None = None
 
     def _toggle_task(self, line: int) -> None:
+        if self._preview_lines is not None and 0 <= line < len(self._preview_lines):
+            line = self._preview_lines[line]           # Zeile der Vorschau → Zeile im Original (mehrzeilige Werte)
         new_text = toggle_task_line(self.editor.toPlainText(), line)
         if new_text is None:
             return

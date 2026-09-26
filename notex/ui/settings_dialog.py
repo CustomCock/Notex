@@ -80,10 +80,10 @@ class SettingsPage(QWidget):
 
 
 class SettingsDialog(QDialog):
-    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "Module", "System",
-                  "Tastenkürzel"]
+    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "Module", "Variablen",
+                  "System", "Tastenkürzel"]
     CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "book-open", "blocks",
-                      "sliders-horizontal", "keyboard"]
+                      "variable", "sliders-horizontal", "keyboard"]
 
     def __init__(self, window, store: ThemeStore) -> None:
         super().__init__(window)
@@ -113,7 +113,8 @@ class SettingsDialog(QDialog):
             self.categories.addItem(QListWidgetItem(icon(icon_name), name))
         self.pages = QStackedWidget()
         for builder in (self._build_appearance, self._build_paper, self._build_font, self._build_editor,
-                        self._build_spelling, self._build_lookup, self._build_modules, self._build_system,
+                        self._build_spelling, self._build_lookup, self._build_modules, self._build_variables,
+                        self._build_system,
                         self._build_shortcuts):
             page = builder()
             page.finish()
@@ -583,6 +584,21 @@ class SettingsDialog(QDialog):
             info.setWordWrap(True)
             page.row(box, info)
             self.module_boxes[module.key] = box
+        return page
+
+    def _build_variables(self) -> SettingsPage:
+        page = SettingsPage()
+        page.section("Variablen")
+        service = getattr(self.window_, "variable_service", None)
+        if service is None:
+            page.note("Das Modul „Variablen“ ist ausgeschaltet (Einstellungen → Module). Tokens wie §gruss erscheinen "
+                      "dann als normaler Text; Dateien bleiben unverändert.")
+            return page
+        from notex.ui.variables_dialog import VariablesPanel
+        page.add(VariablesPanel(self.window_, service))
+        page.note("Im Text steht das Token (§gruss); Notex zeigt den Wert. Nach dem Präfix schlägt Notex passende "
+                  "Variablen vor (Ctrl+Alt+V fügt das Präfix ein). Rechtsklick auf eine Variable: entfernen (bleibt als "
+                  "Text), durch Wert ersetzen oder bearbeiten.")
         return page
 
     def _build_system(self) -> SettingsPage:

@@ -243,6 +243,31 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
 öffnen Binärdateien wieder im Texteditor.
 
+## Variablen
+
+Textbausteine mit Verknüpfung (Modul „Variablen“, Standard an). Einstellungen → **Variablen** (`Ctrl+Shift+Alt+V`):
+Tabelle mit Name, Wert (auch mehrzeilig) und Beschreibung, Suche, Import/Export als JSON. Gespeichert wird in
+`variables.json` neben der App – **unverschlüsselt, also keine Passwörter oder Geheimnisse als Variablen**.
+
+- Schreibst du `§gruss`, steht in der Datei genau das. Notex zeigt im Editor den **Wert** im Lesefluss (dezent
+  hinterlegt); Hover zeigt Name und Wert. Ändert sich ein Wert, ändert sich die Anzeige überall sofort.
+- Namen: Buchstaben (auch Umlaute), Ziffern, Unterstrich – z. B. `§23`, `§gruss`, `§firma_tel`. Das Token endet am
+  ersten anderen Zeichen und zählt nur, wenn genau dieser Name definiert ist (`§23a` bleibt normaler Text, `§234`
+  ist §234 und nicht §23 + „4“). Nicht definierte Tokens sind normaler Text. Präfix einstellbar (Standard `§`).
+- Die Variable verhält sich wie **ein Zeichen**: Pfeiltasten springen darüber, Entf/Rücktaste löschen sie ganz.
+- Nach dem Präfix schlägt Notex passende Variablen vor (Enter übernimmt, Esc lässt den Text, wie er ist);
+  `Ctrl+Alt+V` fügt das Präfix ein und öffnet die Vorschläge.
+- **Rechtsklick** auf eine Variable: „Variable entfernen (als normalen Text behalten)“ – gespeichert als `\§23`,
+  angezeigt als normales „§23“ –, „Durch Wert ersetzen“, „Variable bearbeiten …“. Auf einem entfernten Vorkommen:
+  „Wieder als Variable verwenden“. Palette: „Alle Variablen in dieser Datei durch Werte ersetzen“, „Variablen in
+  Auswahl entfernen“. Alles mit Undo.
+- `Ctrl+C` kopiert die Werte (einstellbar: Werte oder Tokens). Die Markdown-Vorschau zeigt Werte, entfernte
+  Vorkommen als normales §name. Die Rechtschreibprüfung ignoriert Tokens.
+- Die Volltextsuche findet Tokens; der Chip „§“ sucht zusätzlich in den Werten.
+- Keine Rekursion: Variablen in Variablenwerten werden nicht aufgelöst. Funktioniert in allen Textdateien, auch in
+  `.ntx` (aufgelöst wird nur im Speicher). Ist das Modul aus, erscheinen Tokens als normaler Text; Dateien bleiben
+  unverändert – auch bloßes Öffnen und Speichern ändert kein Byte.
+
 ## CSV als Tabelle
 
 `.csv`- und `.tsv`-Dateien lassen sich mit `Ctrl+Shift+V` (oder „CSV/TSV: Als Tabelle anzeigen“ in der Command
@@ -623,6 +648,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle; JSON/YAML: Text ↔ Baum |
 | Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
 | Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
+| Ctrl+Alt+V | Variable einfügen (Präfix + Vorschläge) |
+| Ctrl+Shift+Alt+V | Variablen verwalten |
 | Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
 | Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen (Modul Hex & Dateianalyse) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
