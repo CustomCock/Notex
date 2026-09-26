@@ -116,6 +116,7 @@ class SettingsDialog(QDialog):
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)   # nie seitlich scrollen
             scroll.setWidget(page)
             self.pages.addWidget(scroll)
         self.categories.currentRowChanged.connect(self.pages.setCurrentIndex)

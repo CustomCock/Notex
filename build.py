@@ -14,16 +14,46 @@ from pathlib import Path
 
 import PyInstaller.__main__
 
+from notex import APP_NAME, __version__
+
 ROOT = Path(__file__).resolve().parent
 PACKAGE = ROOT / "notex"
 # PyInstaller trennt Quelle und Ziel mit ";" auf Windows und ":" sonst
 SEP = ";" if sys.platform == "win32" else ":"
 
 
+def write_version_file() -> Path:
+    """Windows-Dateiinfo der EXE (Rechtsklick > Eigenschaften > Details): Produkt, Version, Beschreibung."""
+    parts = [int(p) for p in __version__.split(".")[:3]] + [0]
+    tuple_text = ", ".join(str(p) for p in parts[:4])
+    content = f"""# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=({tuple_text}), prodvers=({tuple_text}), mask=0x3f, flags=0x0, OS=0x40004,
+                    fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', '{APP_NAME}'),
+      StringStruct('FileDescription', '{APP_NAME} – portabler Explorer + Editor für Textdateien'),
+      StringStruct('FileVersion', '{__version__}'),
+      StringStruct('InternalName', '{APP_NAME}'),
+      StringStruct('OriginalFilename', '{APP_NAME}.exe'),
+      StringStruct('ProductName', '{APP_NAME}'),
+      StringStruct('ProductVersion', '{__version__}')])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+"""
+    path = ROOT / "build" / "version_info.txt"
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
 def main() -> None:
     os.chdir(ROOT)
     for stale in (ROOT / "build", ROOT / "dist" / "Notex"):
         shutil.rmtree(stale, ignore_errors=True)
+    version_file = write_version_file()
 
     args = [
         str(ROOT / "main.py"),
@@ -32,6 +62,7 @@ def main() -> None:
         "--clean",
         "--windowed",                       # kein Konsolenfenster
         "--icon", str(PACKAGE / "assets" / "notex.ico"),
+        *(["--version-file", str(version_file)] if sys.platform == "win32" else []),   # Dateiinfo gibt es nur bei Windows-EXEs
         # Nicht-Python-Dateien, die die App zur Laufzeit lädt (Pfad im Bundle wie im Quellbaum)
         "--add-data", f"{PACKAGE / 'theme' / 'dark.qss'}{SEP}notex/theme",
         "--add-data", f"{PACKAGE / 'assets'}{SEP}notex/assets",

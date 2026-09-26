@@ -19,7 +19,7 @@ from notex.ui.find_bar import FindBar
 from notex.ui.sidebar import Sidebar
 from notex.ui.status_bar import StatusBar
 from notex.theme.icons import icon
-from notex.theme.tokens import DURATION, FONT_SIZE
+from notex.theme.tokens import DURATION, FONT_SIZE, SPACING
 from notex.ui import anim
 from notex.core.theme_store import ThemeStore
 from notex.paths import app_root
@@ -391,11 +391,14 @@ class MainWindow(QMainWindow):
         remove = QPushButton("Registrierung entfernen")
         defaults = QPushButton("Windows-Standard-Apps öffnen")
         defaults.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("ms-settings:defaultapps")))
-        buttons = QHBoxLayout()
+        from PySide6.QtWidgets import QGridLayout
+        buttons = QGridLayout()
         buttons.setContentsMargins(0, 0, 0, 0)
-        for button in (register, update, remove, defaults):
-            buttons.addWidget(button)
-        buttons.addStretch(1)
+        buttons.setHorizontalSpacing(SPACING.sm)
+        buttons.setVerticalSpacing(SPACING.sm)
+        for i, button in enumerate((register, update, remove, defaults)):
+            buttons.addWidget(button, i // 2, i % 2)   # zwei Reihen, damit nichts seitlich überläuft
+        buttons.setColumnStretch(2, 1)
         row = QWidget()
         row.setLayout(buttons)
         page.add(row)

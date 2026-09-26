@@ -3,6 +3,16 @@
 Portabler Explorer + Editor für Textdateien unter Windows. Ein Ordner, eine EXE,
 keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich den Zustand.
 
+## Installation
+
+1. Aus den [Releases](https://github.com/CustomCock/Notex/releases) die Datei `Notex-vX.Y.Z.zip` laden.
+2. Entpacken, z. B. nach `C:\Apps\Notex` oder auf einen USB-Stick.
+3. `Notex.exe` starten. Beim ersten Start entstehen `data/` und `config.json` daneben.
+
+Mehr ist nicht nötig. SmartScreen warnt beim ersten Start, weil die EXE nicht signiert ist:
+„Weitere Informationen“ → „Trotzdem ausführen“. Ein Update ist ein Ersetzen von `Notex.exe`
+und `_internal/`; `data/`, `config.json`, `themes/` und `fonts/user/` bleiben liegen.
+
 ![Editor mit geöffneter Datei](docs/03-editor.png)
 
 | Start | Suche | Seitenleiste eingeklappt |
@@ -33,10 +43,34 @@ Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche ent
   Im Explorer anzeigen; Drag & Drop zum Verschieben
 - **Watcher**: extern hinzugefügte Dateien tauchen im Baum auf; wird eine offene Datei
   extern geändert, fragt die App, ob sie neu laden soll
+- **Dateien von außen**: Doppelklick im Explorer, Drag & Drop aufs Fenster oder Ctrl+O öffnen Dateien
+  auch außerhalb von `data/` am Originalort; alle landen in EINEM Fenster (Einzelinstanz)
 - **Zustand** in `config.json`: Fenster, Seitenleiste, aufgeklappte Ordner, offene Tabs,
-  Zoom, Blatt-Modus, Bearbeitungsleiste, Zeilennummern, Such-Chips, Theme
+  Zoom, Blatt-Modus, Bearbeitungsleiste, Zeilennummern, Such-Chips, Theme, zuletzt geöffnet
 - **Design**: matt schwarz/grau, das Blatt weiß und zentriert (Alt+P schaltet auf volle Breite),
   ein einziger dezenter Akzent, kurze Animationen (abschaltbar unter Ansicht)
+
+## Dateien von außen und Dateizuordnung
+
+`Notex.exe "C:\pfad\datei.txt"` öffnet die Datei. Läuft Notex schon, übernimmt die laufende
+Instanz sie als Tab und holt das Fenster nach vorn. Markierst du mehrere Dateien im Explorer und
+drückst Enter, landen alle in einem Fenster. Dateien außerhalb von `data/` werden direkt am
+Originalort bearbeitet, nicht kopiert; sie erscheinen in der Seitenleiste unter „Geöffnet“ mit
+Kontextmenü „In data/ kopieren“, „In data/ verschieben“ und „Im Explorer anzeigen“. Ihre Tabs
+tragen ein kleines Pfeil-Symbol. Schreibgeschützte Dateien melden sich in der Statusleiste,
+Speichern bietet dann „Speichern unter …“ an. **Ctrl+R** zeigt die zuletzt geöffneten Dateien.
+
+Damit ein Doppelklick auf `.txt` Notex startet, registrierst du es in den Einstellungen unter
+**System**: Dateitypen wählen (.txt ist vorausgewählt), „Notex für Dateitypen registrieren“.
+Das schreibt nur in HKCU (kein Admin) und überschreibt keine bestehende Zuordnung: Notex erscheint
+unter „Öffnen mit“, in den Windows-Standard-Apps und im Kontextmenü als „Mit Notex öffnen“
+(unter Windows 11 im klassischen Menü unter „Weitere Optionen anzeigen“). Den Standard für
+`.txt` wählst du selbst in den Windows-Einstellungen; der Button „Windows-Standard-Apps öffnen“
+bringt dich direkt dorthin. „Registrierung entfernen“ räumt alles wieder restlos weg. Wird der
+Notex-Ordner verschoben, weist ein Hinweis beim Start darauf hin, und „Pfad aktualisieren“ schreibt
+den neuen Pfad. Aus dem Dev-Modus (`python main.py`) ist die Registrierung bewusst deaktiviert.
+
+![Einstellungen System](docs/20-settings-system.png)
 
 ## Bearbeitungsleiste
 
@@ -182,6 +216,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+N | Zeilennummern |
 | Alt+P | Blatt zentrieren / volle Breite |
 | Ctrl+, | Einstellungen |
+| Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |
+| Ctrl+Shift+Alt+S | Speichern unter |
 | F7 / Shift+F7 | Rechtschreibung / Grammatik umschalten |
 | F2 / Entf | Umbenennen / In den Papierkorb (im Baum) |
 
@@ -198,6 +234,16 @@ Notex/
 Welche Dateiendungen im Baum erscheinen, steht in `config.json` unter `extensions`
 (Default: `.txt .md .log .csv .json .py .ini`). `fulltext_max_mb` begrenzt die Dateigröße
 für die Volltextsuche (Default 5 MB).
+
+## Bekannte Einschränkungen
+
+- Die Grammatikprüfung braucht einen LanguageTool-Server; ohne Server bleibt sie still aus.
+- Der Kontextmenü-Eintrag erscheint unter Windows 11 nur im klassischen Menü, kein Eintrag im neuen
+  Menü (dafür wäre ein Sparse-Package nötig, das die portable App bewusst nicht mitbringt).
+- Die EXE ist nicht signiert (SmartScreen-Hinweis beim ersten Start).
+- Sehr große Dateien (mehrere hundert MB) sind nicht das Ziel; getestet sind 5-MB-Logdateien.
+- Rechtschreibung kennt nur Deutsch und Englisch; weitere Hunspell-Wörterbücher lassen sich nach
+  `notex/dictionaries/` legen, werden aber nicht in der Oberfläche angeboten.
 
 ## Entwicklung
 

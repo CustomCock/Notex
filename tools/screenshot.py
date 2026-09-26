@@ -256,7 +256,8 @@ def main() -> int:
         dialog.show_category("Rechtschreibung")
         dialog.show()
         offset = QPoint((window.width() - dialog.width()) // 2, (window.height() - dialog.height()) // 2)
-        later(300, lambda: (compose(window, dialog, "15-settings-spelling", offset), dialog.reject(), later(100, s_end)))
+        later(300, lambda: (compose(window, dialog, "15-settings-spelling", offset), dialog.show_category("System")))
+        later(500, lambda: (compose(window, dialog, "20-settings-system", offset), dialog.reject(), later(100, s_end)))
 
     def s_end():
         window.close()
