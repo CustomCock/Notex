@@ -21,7 +21,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
 | 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), kein Release (Besitzer) |
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
-| 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | in Arbeit |
+| 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -77,7 +77,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   Ende-zu-Ende-Test: Marker-Suche über den ganzen App-Ordner inkl. dekomprimierter Historie ohne Treffer.
   `docs/ENCRYPTION.md` liegt auch im Build-Ordner. Build +15 MB (cryptography/OpenSSL).
 
-### 1.4.0 – Block D (in Arbeit)
+### 1.4.0 – Block D
 - D1 Vorlagen: `core/templates.py` (Platzhalter inkl. strftime-Format und Tagesversatz, ISO-Woche/-Jahr,
   `ensure_defaults` legt Woche/Tagesnotiz/Besprechung nur beim allerersten Mal an), `templates/` neben der App,
   Befehle Neue Datei aus Vorlage (Ctrl+Shift+T), Neue Woche (Alt+W), Nächste Woche, Vorlagen-Ordner öffnen, jede
@@ -137,8 +137,9 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 
 ## Nächster Schritt
 
-1. Auf „weiter“ des Besitzers warten (Block C ist abgeschlossen, kein Release).
-2. Block D beginnen mit Vorlagen (`templates/` neben der App, `core/templates.py` für die Platzhalter
-   {{date}} {{time}} {{weekday}} {{week}} {{year}} {{title}} {{cursor}}, Befehl „Neue Woche“), dann Update-Check
-   (GitHub-Releases-API, höchstens 1×/Tag, kein Auto-Download), dann Linux-Support (Plattform-Guards,
-   .desktop/MIME auf Knopfdruck, CI Windows + Ubuntu, tar.gz-Build). Danach Abschlusszusammenfassung.
+Alle vier Blöcke (A–D) sind umgesetzt. Offen ist nur, was der Besitzer entscheidet:
+1. Release: Branch nach `main` mergen und `v1.4.0` taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
+   (Tags v1.2.0–v1.4.0 existieren nur lokal in der Arbeitsumgebung.)
+2. Aufräumen auf GitHub: Release/Tag „main“ löschen, Repo-Beschreibung „Textdateien“.
+3. Ideen für später (nicht beauftragt): Kürzel für Split View auf deutscher Tastatur prüfen (Ctrl+\ = Ctrl+AltGr+ß),
+   Tab-Überlauf der Bearbeitungsleiste im Blatt-Modus, Mermaid/Fußnoten in der Vorschau.

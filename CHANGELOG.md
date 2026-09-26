@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.4.0] – unveröffentlicht
+## [1.4.0] – 2026-09-26
 
 ### Hinzugefügt
 - Vorlagen in `templates/` neben der App (Woche, Tagesnotiz, Besprechung als Start), Platzhalter {{date}} {{time}}

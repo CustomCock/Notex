@@ -1037,6 +1037,9 @@ class MainWindow(QMainWindow):
             dialogs.warn(self, "Neue Datei aus Vorlage", "Vorlagen erzeugen Klartext – für .ntx „Neue verschlüsselte Notiz“ nutzen.")
             return
         path = target_folder / file_name
+        if not fileops.is_within(path.resolve(), self.root.resolve()):
+            dialogs.warn(self, "Neue Datei aus Vorlage", "Der Dateiname führt aus data/ heraus.")
+            return
         if path.exists():
             dialogs.warn(self, "Neue Datei aus Vorlage", f"„{file_name}“ gibt es schon.")
             return
