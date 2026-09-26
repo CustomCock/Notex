@@ -141,6 +141,11 @@ def write_sample() -> None:
 
 
 def save(widget, name: str) -> None:
+    # Die Schritte sind vorab getaktet; läuft einer lang, feuert der nächste sofort – dann nicht mitten
+    # in einer Tab-Überblendung aufnehmen
+    from notex.ui.editor_tabs import FadeOverlay
+    for fade in widget.window().findChildren(FadeOverlay):
+        fade.hide()
     pixmap = widget.grab()
     pixmap.save(str(OUT / f"{name}.png"))
     print("gespeichert:", OUT / f"{name}.png")
