@@ -21,6 +21,10 @@ from notex.ui.status_bar import StatusBar
 from notex.theme.icons import icon
 from notex.theme.tokens import DURATION, FONT_SIZE
 from notex.ui import anim
+from notex.core.theme_store import ThemeStore
+from notex.paths import app_root
+from notex.theme.manager import theme_manager
+from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
 
 QWIDGETSIZE_MAX = 16777215
@@ -34,7 +38,7 @@ class MainWindow(QMainWindow):
         self.config = config
         self._save_config = on_save_config
         self.setWindowTitle(APP_NAME)
-        anim.set_reduced(config["reduce_animations"])
+        self.theme_store = ThemeStore(app_root() / "themes")
 
         self.sidebar = Sidebar(root, config)
         self.tabs = EditorTabs(root)
@@ -78,10 +82,12 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self._build_menu()
         self._restore_window_state()
+        theme_manager().changed.connect(self.retheme)
 
     def _connect_signals(self) -> None:
         tree = self.sidebar.tree
         self.sidebar.open_requested.connect(self._open_from_sidebar)
+        self.sidebar.settings_requested.connect(self.open_settings)
         tree.path_renamed.connect(self._on_path_renamed)
         tree.path_deleted.connect(self.tabs.close_paths_under)
 
@@ -115,6 +121,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))
         file_menu.addAction(self._action("Tab schließen", "Ctrl+W", self.tabs.close_current))
         file_menu.addSeparator()
+        file_menu.addAction(self._action("Einstellungen …", "Ctrl+,", self.open_settings))
+        file_menu.addSeparator()
         file_menu.addAction(self._action("Beenden", "Ctrl+Q", self.close))
 
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
@@ -133,7 +141,7 @@ class MainWindow(QMainWindow):
         self.paper_action.setChecked(self.config["paper_mode"])
         view_menu.addAction(self.paper_action)
         self.anim_action = self._action("Animationen reduzieren", None, self.toggle_animations, checkable=True)
-        self.anim_action.setChecked(self.config["reduce_animations"])
+        self.anim_action.setChecked(not self.config["theme"]["animation"]["enabled"])
         view_menu.addAction(self.anim_action)
         view_menu.addSeparator()
         view_menu.addAction(self._action("Vergrößern", QKeySequence.StandardKey.ZoomIn, lambda: self.tabs.zoom(+1)))
@@ -143,11 +151,37 @@ class MainWindow(QMainWindow):
         self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
 
     def toggle_animations(self) -> None:
-        reduced = not anim.reduced()
-        anim.set_reduced(reduced)
-        self.sidebar.tree.setAnimated(not reduced)
-        self.anim_action.setChecked(reduced)
-        self.config["reduce_animations"] = reduced
+        theme = theme_manager().current()
+        theme["animation"]["enabled"] = not theme["animation"]["enabled"]
+        self.config["theme"] = theme_manager().apply(theme)
+        self.anim_action.setChecked(not theme["animation"]["enabled"])
+
+    def open_settings(self, category: str | None = None) -> None:
+        dialog = SettingsDialog(self, self.theme_store)
+        if category:
+            dialog.show_category(category)
+        dialog.exec()
+
+    def shortcut_list(self) -> list[tuple[str, str]]:
+        """Alle Menüaktionen mit Tastenkürzel, für die Anzeige in den Einstellungen."""
+        result = []
+        for action in self.actions():
+            if action.shortcut().isEmpty() or "(Alternative)" in action.text():
+                continue
+            result.append((action.text().replace("&", "").replace(" …", ""), action.shortcut().toString()))
+        result += [("Umbenennen (im Baum)", "F2"), ("In den Papierkorb (im Baum)", "Entf"),
+                   ("Suche leeren", "Esc"), ("Zoom", "Ctrl+Mausrad")]
+        return result
+
+    def retheme(self) -> None:
+        """Nach einem Theme-Wechsel: alles nachziehen, was Farben/Icons/Abstände selbst hält."""
+        self.sidebar_button.setIcon(icon("panel-left"))
+        self.sidebar.retheme()
+        self.tabs.retheme()
+        self.find_bar.retheme()
+        self.anim_action.setChecked(anim.reduced())
+        self.sidebar.tree.setAnimated(not anim.reduced())
+        self._update_status()
 
     def toggle_paper_mode(self) -> None:
         enabled = not self.tabs.paper_mode

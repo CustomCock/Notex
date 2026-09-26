@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import copy
 import json
+
+from notex.core.theme_model import default_theme
 import os
 import tempfile
 from pathlib import Path
@@ -34,7 +36,17 @@ DEFAULTS: dict[str, Any] = {
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "word_wrap": False,
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
-    "reduce_animations": False,
+    "theme": default_theme(), # das aktive Theme, komplett (Presets/Dateien sind nur Vorlagen)
+    "spellcheck": {
+        "enabled": True,
+        "language": "de",           # "de" | "en" | "both"
+        "extensions": [".txt", ".md"],
+    },
+    "grammar": {
+        "enabled": False,
+        "server_url": "http://localhost:8081",
+        "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
+    },
     "search": {
         "by_name": True,
         "full_text": False,
@@ -67,6 +79,9 @@ def _merge(default: Any, loaded: Any) -> Any:
 
     if isinstance(default, int):
         return loaded if (isinstance(loaded, int) and not isinstance(loaded, bool)) else default
+
+    if isinstance(default, float):
+        return float(loaded) if (isinstance(loaded, (int, float)) and not isinstance(loaded, bool)) else default
 
     if isinstance(default, list):
         return list(loaded) if isinstance(loaded, list) else copy.deepcopy(default)

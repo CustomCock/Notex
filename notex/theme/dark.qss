@@ -378,6 +378,7 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background: @accent;
     border-color: @accent;
+    image: url(@img_check);
 }
 QCheckBox:checked {
     color: @text;
@@ -425,4 +426,133 @@ QLabel#ResultsInfo {
 QLabel#StatusDot {
     color: @text_faint;
     padding: 0;
+}
+
+/* ---------- Einstellungen ---------- */
+QDialog#SettingsDialog {
+    background: @bg;
+}
+QListWidget#SettingsCategories {
+    background: @sidebar;
+    border: none;
+    padding: @sp_smpx;
+    font-size: @fs_uipx;
+    outline: none;
+}
+QListWidget#SettingsCategories::item {
+    padding: 6px @sp_smpx;
+    border-radius: @r_controlpx;
+    color: @text_muted;
+}
+QListWidget#SettingsCategories::item:hover {
+    background: @hover;
+    color: @text;
+}
+QListWidget#SettingsCategories::item:selected {
+    background: @selection;
+    color: @text;
+}
+QWidget#SettingsPage, QScrollArea {
+    background: @bg;
+    border: none;
+}
+QLabel#SettingsSection {
+    color: @text;
+    font-weight: 600;
+    padding-bottom: @sp_xspx;
+}
+QLabel#SettingsNote {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+}
+QFrame#SettingsFooter {
+    background: @sidebar;
+    border-top: 1px solid @border;
+}
+QComboBox, QSpinBox, QDoubleSpinBox, QFontComboBox {
+    background: @surface;
+    color: @text;
+    border: 1px solid transparent;
+    border-radius: @r_controlpx;
+    padding: 4px @sp_smpx;
+    min-height: 20px;
+}
+QComboBox:hover, QSpinBox:hover, QDoubleSpinBox:hover {
+    background: @hover;
+}
+QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border-color: @accent;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+QComboBox::down-arrow {
+    image: url(@img_chevron_down);
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+}
+QComboBox QAbstractItemView {
+    background: @surface;
+    color: @text;
+    border: 1px solid @border;
+    selection-background-color: @hover;
+    outline: none;
+    padding: 4px;
+}
+QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+    width: 16px;
+    border: none;
+    background: transparent;
+}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url(@img_chevron_up);
+    width: 12px;
+    height: 12px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url(@img_chevron_down);
+    width: 12px;
+    height: 12px;
+}
+QSlider::groove:horizontal {
+    height: 4px;
+    background: @surface;
+    border-radius: 2px;
+}
+QSlider::sub-page:horizontal {
+    background: @accent;
+    border-radius: 2px;
+}
+QSlider::handle:horizontal {
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+    background: @text;
+}
+QSlider::handle:horizontal:hover {
+    background: @accent;
+}
+QListWidget {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_controlpx;
+    padding: 4px;
+    outline: none;
+}
+QListWidget::item {
+    padding: 4px @sp_smpx;
+    border-radius: 4px;
+}
+QListWidget::item:hover {
+    background: @hover;
+}
+QListWidget::item:selected {
+    background: @selection;
+    color: @text;
+}
+QColorDialog {
+    background: @bg;
 }

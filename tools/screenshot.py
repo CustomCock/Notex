@@ -28,6 +28,9 @@ from PySide6.QtGui import QImage, QPainter  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from notex.app import create_app, create_window  # noqa: E402
+from notex.core.theme_model import theme_from_preset  # noqa: E402
+from notex.theme.manager import theme_manager  # noqa: E402
+from notex.ui.settings_dialog import SettingsDialog  # noqa: E402
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -137,11 +140,33 @@ def main() -> int:
 
     def s_toast():
         save(window, "08-toast")
+        dialog = SettingsDialog(window, window.theme_store)
+        dialog.show()
+        later(300, lambda: s_settings(dialog))
+
+    def s_settings(dialog):
+        offset = QPoint((window.width() - dialog.width()) // 2, (window.height() - dialog.height()) // 2)
+        compose(window, dialog, "09-settings", offset)
+        dialog.show_category("Blatt")
+        later(150, lambda: (compose(window, dialog, "10-settings-paper", offset), dialog.reject(), later(100, s_presets)))
+
+    def s_presets():
+        window.sidebar.tree.select_path(data / "Projekte/Python/notizen.md")
+        theme_manager().apply(theme_from_preset("Mitternacht", "Sepia"))
+        later(200, lambda: save(window, "11-preset-mitternacht-sepia"))
+        later(400, lambda: theme_manager().apply(theme_from_preset("Warm", "Papier")))
+        later(600, lambda: save(window, "12-preset-warm-papier"))
+        later(800, lambda: theme_manager().apply(theme_from_preset("Graphit", "Dunkel")))
+        later(1000, lambda: save(window, "13-preset-graphit-dunkel"))
+        later(1200, lambda: theme_manager().apply(theme_from_preset("Matt", "Weiß")))
+        later(1400, s_end)
+
+    def s_end():
         window.close()
         app.quit()
 
     later(500, s_empty)
-    later(15000, app.quit)
+    later(25000, app.quit)
     code = app.exec()
     shutil.rmtree(WORK, ignore_errors=True)
     return code

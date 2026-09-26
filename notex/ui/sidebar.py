@@ -18,7 +18,8 @@ from notex.core.search import SearchOptions, SearchResult
 from notex.ui.file_tree import FileTree
 from notex.ui.search_results import SearchResults
 from notex.ui.search_worker import SearchWorker
-from notex.ui.widgets import Chip, SearchField
+from notex.ui.widgets import Chip, IconButton, SearchField
+from notex.theme.icons import icon
 from notex.theme.tokens import SPACING
 
 DEBOUNCE_MS = 250
@@ -26,6 +27,7 @@ DEBOUNCE_MS = 250
 
 class Sidebar(QWidget):
     open_requested = Signal(Path, object)   # Pfad, (line, column, length) oder None
+    settings_requested = Signal()
 
     def __init__(self, root: Path, config: dict[str, Any]) -> None:
         super().__init__()
@@ -57,12 +59,24 @@ class Sidebar(QWidget):
         self.stack.addWidget(self.tree)
         self.stack.addWidget(self.results)
 
+        # Fußzeile mit Zahnrad
+        self.settings_button = IconButton("settings", "Einstellungen  Ctrl+,")
+        self.settings_button.clicked.connect(self.settings_requested)
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.addWidget(self.settings_button)
+        footer.addStretch(1)
+        self._footer = footer
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, 0)
+        layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, SPACING.xs)
         layout.setSpacing(SPACING.sm)
         layout.addWidget(self.search_field)
         layout.addLayout(checks)
         layout.addWidget(self.stack, 1)
+        layout.addLayout(footer)
+        self._layout = layout
+        self._checks = checks
 
         # Debounce: Timer wird bei jedem Tastendruck neu gestartet, sucht erst bei Ruhe
         self._debounce = QTimer(self)
@@ -87,6 +101,15 @@ class Sidebar(QWidget):
             shortcut.activated.connect(self.clear_search)
 
     # ---- Öffentlich -----------------------------------------------------------
+    def retheme(self) -> None:
+        self._layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, SPACING.xs)
+        self._layout.setSpacing(SPACING.sm)
+        self._checks.setSpacing(SPACING.xs)
+        self.search_field.retheme()
+        self.settings_button.setIcon(icon("settings"))
+        self.tree.retheme()
+        self.results.viewport().update()
+
     def focus_search(self) -> None:
         self.search_field.setFocus()
         self.search_field.selectAll()

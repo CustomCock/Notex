@@ -259,5 +259,10 @@ class EditorTabs(QTabWidget):
         for page in self.pages():
             page.set_paper_mode(enabled)
 
+    def retheme(self) -> None:
+        for page in self.pages():
+            page.retheme()
+        self.tab_bar.update()
+
     def open_paths(self) -> list[str]:
         return [self.relative(editor.path) for editor in self.editors()]

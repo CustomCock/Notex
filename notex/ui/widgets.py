@@ -144,6 +144,10 @@ class SearchField(QFrame):
         self.clear_button.setVisible(bool(text))
         self.textChanged.emit(text)
 
+    def retheme(self) -> None:
+        self.icon_label.setPixmap(pixmap("search", 16, COLORS.text_muted, self.devicePixelRatioF()))
+        self.clear_button.setIcon(icon("x"))
+
     def _set_focused(self, focused: bool) -> None:
         self.setProperty("focused", focused)
         self.style().unpolish(self)

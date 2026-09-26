@@ -18,7 +18,6 @@ from notex.ui.editor import Editor
 
 SHADOW_BLUR = 28      # wie weit der Schatten nach außen reicht
 SHADOW_OFFSET_Y = 8
-SHADOW_ALPHA = 150    # Gesamtstärke (Summe der Schichten)
 QWIDGETSIZE_MAX = 16777215
 
 
@@ -51,7 +50,7 @@ def _shadow_pixmap(width: int, height: int, dpr: float) -> QPixmap:
     for i in range(layers):
         inset = i
         # quadratisch ansteigende Deckkraft: außen sehr schwach, innen deutlicher
-        alpha = SHADOW_ALPHA * ((i + 1) / layers) ** 2 / layers * 2
+        alpha = LAYOUT.paper_shadow_alpha * ((i + 1) / layers) ** 2 / layers * 2
         painter.setBrush(QColor(0, 0, 0, max(1, int(alpha))))
         rect = QRectF(inset, inset + SHADOW_OFFSET_Y, width - 2 * inset, height - 2 * inset)
         painter.drawRoundedRect(rect, RADIUS.panel + (layers - i) * 0.5, RADIUS.panel + (layers - i) * 0.5)
@@ -92,6 +91,14 @@ class EditorPage(QWidget):
         self._layout.setStretch(2, 1)
         self.update()
 
+    def retheme(self) -> None:
+        margin = LAYOUT.paper_margin
+        self._layout.setContentsMargins(margin, margin - SHADOW_OFFSET_Y // 2, margin, margin)
+        self._shadow = None
+        self.editor.retheme()
+        self.refresh_width()
+        self.update()
+
     def refresh_width(self) -> None:
         """Nach Zoom: die maximale Breite hängt von der Zeichenbreite ab."""
         self.set_paper_mode(self.paper_mode)
@@ -99,11 +106,11 @@ class EditorPage(QWidget):
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
         geo: QRect = self.frame.geometry()
-        if geo.isEmpty():
+        if geo.isEmpty() or not LAYOUT.paper_shadow or LAYOUT.paper_shadow_alpha <= 0:
             return
         width, height = geo.width() + 2 * SHADOW_BLUR, geo.height() + 2 * SHADOW_BLUR
         dpr = self.devicePixelRatioF()
-        key = (width, height, dpr)
+        key = (width, height, dpr, LAYOUT.paper_shadow_alpha, RADIUS.panel)
         if self._shadow is None or self._shadow_key != key:
             self._shadow = _shadow_pixmap(width, height, dpr)
             self._shadow_key = key

@@ -12,6 +12,7 @@ from notex import APP_NAME
 from notex.core.config import load_config, save_config
 from notex.paths import config_path, data_dir
 from notex.theme.fonts import load_bundled_fonts, ui_font
+from notex.theme.manager import theme_manager
 from notex.theme.theme import load_stylesheet
 from notex.ui.main_window import MainWindow
 from notex.ui.winapi import apply_dark_titlebar
@@ -48,6 +49,7 @@ def create_app(argv: list[str]) -> QApplication:
 def create_window() -> MainWindow:
     root = data_dir()  # legt data/ an, falls es fehlt
     config = load_config(config_path())
+    config["theme"] = theme_manager().apply(config["theme"])   # Tokens + QSS aus dem gespeicherten Theme
     return MainWindow(root, config, on_save_config=lambda cfg: save_config(config_path(), cfg))
 
 

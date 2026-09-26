@@ -79,6 +79,16 @@ class Editor(QTextEdit):
         fmt.setLineHeight(LAYOUT.editor_line_height, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
         cursor.mergeBlockFormat(fmt)
 
+    def retheme(self) -> None:
+        """Schrift, Zeilenhöhe und Farben aus den aktuellen Tokens übernehmen."""
+        self.set_font_size(self._font_size)
+        if self.document().firstBlock().blockFormat().lineHeight() != LAYOUT.editor_line_height:
+            modified = self.document().isModified()
+            self._apply_line_height()
+            self.document().setModified(modified)
+        self._refresh_extra_selections()
+        self.viewport().update()
+
     def replace_content(self, text_file: TextFile) -> None:
         """Inhalt komplett ersetzen (z. B. nach externer Änderung), Cursor möglichst behalten."""
         position = self.textCursor().position()

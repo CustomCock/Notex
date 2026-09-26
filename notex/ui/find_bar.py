@@ -6,6 +6,7 @@ from typing import Callable
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QLabel, QLineEdit, QPushButton, QWidget
 
+from notex.theme.icons import icon
 from notex.ui.widgets import IconButton
 
 from notex.ui.editor import Editor
@@ -72,6 +73,9 @@ class FindBar(QWidget):
             self.find_previous()
             return True
         return super().eventFilter(watched, event)
+
+    def retheme(self) -> None:
+        self.close_button.setIcon(icon("x"))
 
     # ---- Anzeigen / Verstecken ----------------------------------------------
     def open(self, with_replace: bool) -> None:

@@ -68,16 +68,29 @@ class SvgIconEngine(QIconEngine):
 
 
 @lru_cache(maxsize=None)
-def icon(name: str, color: str = COLORS.text_muted, stroke_width: str = "1.75") -> QIcon:
-    """Ein eingefärbtes Lucide-Icon. Standard: gedämpfte Textfarbe, 1.75 px Strich."""
-    return QIcon(SvgIconEngine(name, color, COLORS.text_faint, stroke_width))
+def _icon(name: str, color: str, disabled: str, stroke_width: str) -> QIcon:
+    return QIcon(SvgIconEngine(name, color, disabled, stroke_width))
 
 
-def pixmap(name: str, size: int, color: str = COLORS.text_muted, dpr: float = 1.0) -> QPixmap:
+def icon(name: str, color: str | None = None, stroke_width: str = "1.75") -> QIcon:
+    """Ein eingefärbtes Lucide-Icon. Standard: gedämpfte Textfarbe des aktuellen Themes, 1.75 px Strich."""
+    return _icon(name, color or COLORS.text_muted, COLORS.text_faint, stroke_width)
+
+
+icon.cache_clear = _icon.cache_clear  # type: ignore[attr-defined]
+
+
+def pixmap(name: str, size: int, color: str | None = None, dpr: float = 1.0) -> QPixmap:
     """Fertig gerastertes Icon für eigene paintEvents, DPI-korrekt."""
     pm = icon(name, color).pixmap(QSize(int(size * dpr), int(size * dpr)))
     pm.setDevicePixelRatio(dpr)
     return pm
+
+
+def clear_cache() -> None:
+    """Nach einem Theme-Wechsel: Icons werden beim nächsten Aufruf in den neuen Farben gerendert."""
+    icon.cache_clear()
+    _renderer.cache_clear()
 
 
 class LucideIconProvider(QFileIconProvider):

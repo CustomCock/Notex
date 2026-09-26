@@ -1,4 +1,4 @@
-"""Animations-Helfer. Alles kurz, alles abschaltbar (config "reduce_animations").
+"""Animations-Helfer. Alles kurz, alles abschaltbar (Theme: animation.enabled).
 
 Bei reduzierten Animationen liefern die Helfer sofort den Endzustand – der
 UI-Code muss dafür nichts Besonderes tun.
