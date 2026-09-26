@@ -13,6 +13,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # Die Tests decken nur core/ ab und brauchen kein Qt
-      - run: pip install pytest send2trash
+      # Die Tests decken nur core/ ab und brauchen kein Qt – aber alle Qt-freien Laufzeitpakete aus requirements.txt
+      - run: pip install pytest send2trash "Pygments>=2.17,<3" "markdown-it-py>=3.0,<5" "regex>=2024.5.15"
       - run: python -m pytest -q
