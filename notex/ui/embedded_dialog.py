@@ -65,13 +65,13 @@ class EmbeddedDialog(AnalysisDialog):
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(24)
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for column, width in ((0, 110), (2, 90), (3, 200), (4, 330)):
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        for column, width in ((0, 110), (1, 230), (2, 90), (3, 160)):
             self.table.setColumnWidth(column, width)
         self.table.doubleClicked.connect(self._jump)
         self.table.activated.connect(self._jump)
         hint = QLabel("Doppelklick springt in die Hex-Ansicht. Extrahierte Dateien werden nur gespeichert – nie "
-                      "geöffnet oder ausgeführt. Gelb: Daten hinter dem Ende einer Datei (Anhang, Overlay).")
+                      "geöffnet oder ausgeführt. Gelb: „Anhang“ = Daten hinter dem Ende einer Datei (z. B. PE-Overlay, Text hinter PNG-IEND).")
         hint.setObjectName("SettingsNote")
         hint.setWordWrap(True)
         self.body.addWidget(self.table, 1)

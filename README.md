@@ -358,6 +358,9 @@ Modul „Strings“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Str
 - Doppelklick springt in die Hex-Ansicht (Treffer markiert), „Als .txt exportieren“ speichert die gefilterte Liste.
 - Mehr als 200 000 Treffer werden abgeschnitten (Hinweis in der Statuszeile).
 
+![Strings](docs/51-strings.png)
+
+
 ## Eingebettete Dateien
 
 Modul „Eingebettete Dateien“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Eingebettete Dateien finden …**,
@@ -376,6 +379,9 @@ Menü Datei oder `Ctrl+Alt+F`:
   unbekannter Größe wird bis zum nächsten Fund bzw. Dateiende kopiert.
 - Läuft gestreamt im Hintergrund mit Fortschritt und Abbrechen; höchstens 10 000 Funde.
 
+![Eingebettete Dateien](docs/52-embedded-files.png)
+
+
 ## Entropie
 
 Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Entropie anzeigen …**, Menü Datei oder
@@ -389,6 +395,9 @@ Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **En
 - Kleine Blöcke unterschätzen die Entropie systematisch; Notex korrigiert das je Block (Miller–Madow), damit auch
   1-KB-Blöcke aus Zufallsdaten über 7,5 liegen.
 - Gestreamt im Hintergrund mit Fortschritt und Abbrechen – auch für mehrere GB.
+
+![Entropie](docs/53-entropy.png)
+
 
 ## Live verfolgen (Logs)
 
@@ -433,6 +442,9 @@ Textdatei:
 | Hex + Typwarnung | Prüfsummen |
 |---|---|
 | ![Hex](docs/42-hex-view.png) | ![Prüfsummen](docs/43-checksums.png) |
+
+
+![Hex mit Werte-Zeile und Kopiermenü](docs/50-hex-copy-inspector.png)
 
 
 ## Nachschlagen

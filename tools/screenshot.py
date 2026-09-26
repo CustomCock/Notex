@@ -42,6 +42,7 @@ from notex.app import create_app, create_window  # noqa: E402
 from notex.core.theme_model import theme_from_preset  # noqa: E402
 from notex.theme.manager import theme_manager  # noqa: E402
 from notex.ui.settings_dialog import SettingsDialog  # noqa: E402
+from notex.theme.theme import style_menu  # noqa: E402
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -617,9 +618,73 @@ def main() -> int:
 
             def done():
                 editor.document().setModified(False)
+                forensics_shots()
+            later_rel(400, variables_page)
+
+        def forensics_shots():
+            """Block G (1.8.0): Hex mit Werte-Zeile + Kopiermenü, Strings, Eingebettete Dateien, Entropie."""
+            import io
+            import struct
+            import zipfile
+            import zlib
+            from PySide6.QtWidgets import QMenu
+            for key in ("strings", "embedded", "entropy"):
+                window.modules.set_enabled(key, True)
+
+            def chunk(kind, data):
+                return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+            image = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 64, 64, 8, 2, 0, 0, 0))
+                     + chunk(b"IDAT", zlib.compress(b"\x00" + b"\x30\x60\x90" * 64)) + chunk(b"IEND", b""))
+            archive = io.BytesIO()
+            with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+                z.writestr("notiz.txt", "Treffpunkt: Bahnhof, 18 Uhr")
+            rng = __import__("random").Random(3)
+            noise = bytes(rng.getrandbits(8) for _ in range(40_000)).replace(b"MZ", b"mz").replace(b"BM", b"bm")
+            text = ("Setup-Protokoll: Verbindung zu http://update.example.com/v2/pkg herstellen. "
+                    "Konfiguration in C:\\ProgramData\\Beispiel\\settings.ini, Kontakt support@example.com, "
+                    "Server 192.168.20.14, HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run. ").encode()
+            blob = (b"MZ" + b"\x00" * 62 + text * 30 + "Unicode-Kennung: Notex-Probe".encode("utf-16-le")
+                    + b"\x00" * 20_000 + noise + image + b"ANHANG hinter IEND" + b"\x00" * 64 + archive.getvalue()
+                    + text * 10)
+            sample = files / "probe.bin"
+            sample.write_bytes(blob)
+            viewer = window.tabs.open_viewer(sample, "hex")
+            viewer.select_range(0x60, 4)
+            menu = style_menu(QMenu(viewer.area))
+            for label in ("Kopieren als Hex  (4 Bytes)", "Kopieren als Text (ASCII)", "Kopieren als Base64",
+                          "Kopieren als C-Array"):
+                menu.addAction(label)
+            later_rel(300, lambda: (compose(window, menu, "50-hex-copy-inspector",
+                                            viewer.area.mapTo(window, viewer.area.rect().center())), strings_shot()))
+
+            def dialog_shot(dialog, name, then):
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+
+                def grab():
+                    compose(window, dialog, name, window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    then()
+                later_rel(1200, grab)
+
+            def strings_shot():
+                window.show_strings(sample)
+                dialog = window._analysis_dialogs["strings"][-1]
+                dialog.category.setCurrentIndex(1)
+                dialog_shot(dialog, "51-strings", embedded_shot)
+
+            def embedded_shot():
+                window.show_embedded(sample)
+                dialog_shot(window._analysis_dialogs["embedded"][-1], "52-embedded-files", entropy_shot)
+
+            def entropy_shot():
+                window.show_entropy(sample)
+                dialog = window._analysis_dialogs["entropy"][-1]
+                dialog_shot(dialog, "53-entropy", finish)
+
+            def finish():
                 window.close()
                 app.quit()
-            later_rel(400, variables_page)
 
         shot_image()
 

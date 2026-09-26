@@ -31,7 +31,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
 | 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün, lokal getaggt, bleibt (Besitzer) |
 | 1.7.0 | Neuer Block F: Modul-System, Variablen | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
-| 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | in Arbeit |
+| 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -200,7 +200,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
 - Screenshots 46–49 (Module, Variablen im Editor, Vorschläge, Einstellungen → Variablen).
 
-### 1.8.0 – Block G (in Arbeit)
+### 1.8.0 – Block G
 - G1 (Lücken, Rest stammt aus 1.6.0/F4): hexdata.to_base64/to_c_array/interpret/selection_value, Signaturen TAR
   (ustar @257), PCAP (4 Magics), PCAPNG, EVTX; Hex-Kontextmenü mit Kopierformaten, Werte-Zeile „HexInspector“,
   Auswahlwert in der Statusleiste; HexPage.select_range + MainWindow.show_in_hex/_analysis_target für G2–G4.
@@ -222,6 +222,9 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   die Schwelle 7,5 wäre wertlos; assess() mit Anteilen hoch/niedrig; regions()), `ui/entropy_dialog.py`
   (QPainter-Diagramm nach den Visualisierungsregeln: eine Serie, eine Achse, 2-px-Linie, Raster zurückhaltend,
   Schwelle gestrichelt, Bänder mit Legende, Fadenkreuz-Hover, Bereichsliste als Tabellenansicht). 64 MB: 1,5 s.
+- Build-Größe: keine neuen Abhängigkeiten (bz2/lzma/zlib aus der Standardbibliothek), build.py unverändert → kein
+  Build-Check; Stand wie nach 1.6.0 (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
+- Screenshots 50–53 (Hex mit Werte-Zeile + Kopiermenü, Strings, Eingebettete Dateien, Entropie).
 
 ## Offen
 
@@ -270,8 +273,9 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 
 ## Nächster Schritt
 
-Neuer Block F (1.7.0) fertig, lokal getaggt. **Gestoppt** – weiter mit Block G (1.8.0: Forensik-Basis – Lücken in
-Hex/Dateityp/Prüfsummen, Strings, Eingebettete Dateien, Entropie), sobald der Besitzer „weiter“ schreibt.
+Block G (1.8.0) fertig, lokal getaggt. **Gestoppt** – weiter mit Block H (1.9.0: Metadaten, YARA, Zeitleiste &
+Beweismittel, IOC entschärfen), sobald der Besitzer „weiter“ schreibt. Vorab zu klären in H2: yara-python nur, wenn
+es sich sauber in beide Builds integrieren lässt – sonst melden, bevor Alternativen gebaut werden.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.

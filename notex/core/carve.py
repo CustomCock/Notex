@@ -550,7 +550,7 @@ def _trailers(handle, hits: list[Hit], total: int) -> list[Hit]:
         sample = _read(handle, end, min(gap, 4096))
         if not sample.strip(b"\x00") or not sample.strip(b"\xff"):
             continue                                   # nur Nullen/FF: Füllbytes, kein Anhang
-        extra.append(Hit(end, "trailer", f"Daten hinter dem Ende von {hit.name}", gap,
+        extra.append(Hit(end, "trailer", f"Anhang nach {hit.name}", gap,
                          f"nach 0x{hit.offset:X}", ".bin"))
     return extra
 
