@@ -88,7 +88,7 @@ def main() -> None:
         *[f"--hidden-import=pygments.lexers.{m}" for m in ("python", "data", "configs", "shell", "html", "css",
                                                           "javascript", "sql", "markup", "textfmts", "special")],
         "--hidden-import=pygments.formatters",
-        "--hidden-import=markdown_it", "--hidden-import=mdurl", "--hidden-import=regex", "--hidden-import=yaml", "--hidden-import=cryptography.hazmat.primitives.kdf.argon2",
+        "--hidden-import=markdown_it", "--hidden-import=mdurl", "--hidden-import=regex", "--hidden-import=yaml", "--hidden-import=PySide6.QtPdf", "--hidden-import=cryptography.hazmat.primitives.kdf.argon2",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",
@@ -98,7 +98,6 @@ def main() -> None:
         "--exclude-module", "PySide6.QtMultimedia",
         "--exclude-module", "PySide6.QtCharts",
         "--exclude-module", "PySide6.QtDataVisualization",
-        "--exclude-module", "PySide6.QtPdf",
     ]
     PyInstaller.__main__.run(args)
     # Lizenzen gehören in den Build-Ordner: eigene Lizenz, Übersicht und die Texte der Bibliotheken

@@ -251,6 +251,29 @@ Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Pal
   Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
 - Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
 
+## PDF
+
+PDFs öffnen als eigener Tab (nur lesen):
+
+- Scrollen, Zoom (Seitenbreite, ganze Seite, 50–300 %, `Ctrl+Mausrad`, `Ctrl+Plus/Minus`), Seite springen
+  (`Ctrl+G`, auch Seitenbezeichnungen wie „iv“), Textsuche mit Trefferzähler (`Ctrl+F`, `F3`/`Shift+F3`),
+  Lesezeichen-Leiste (erscheint automatisch, wenn das PDF welche hat).
+- **Text markieren** mit der Maus (rastet auf Textzeilen ein, Doppelklick = Wort, `Ctrl+A` = ganze Seite), `Ctrl+C`
+  kopiert. **„Als Zitat in Notiz einfügen“** (Knopf oder Rechtsklick) schreibt den Text als Markdown-Zitat mit
+  Quelle in die Notiz, die im **anderen Teil der geteilten Ansicht** aktiv ist:
+
+  ```markdown
+  > Der markierte Text …
+  >
+  > — *Bericht.pdf*, S. 3
+  ```
+
+  Ohne Teilung landet das Zitat in der Zwischenablage. Teilen geht jetzt auch aus einem PDF-Tab heraus (`Ctrl+\`).
+- Keine Formulare, keine Skripte, keine Link-Aktionen: Notex zeigt nur an und liest Text aus. Die Datei wird in den
+  Speicher gelesen und gleich wieder geschlossen – umbenennen/verschieben geht auch, während der Tab offen ist.
+  Passwortgeschützte PDFs fragen nach dem Passwort (es wird nirgends gespeichert).
+- Technik: QtPdf (PDFium), ohne QtWebEngine; der Build wächst dadurch um wenige MB.
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -557,6 +580,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
+| Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
+| Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |
 | Ctrl+C / Ctrl+V / Entf (in der Tabelle) | Zellen als Tab-getrennten Block kopieren / einfügen / leeren |
 | Ctrl+\ | Editor teilen / Teilung aufheben |
 | Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |

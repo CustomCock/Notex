@@ -72,6 +72,7 @@ class EditorTabs(QTabWidget):
     link_activated = Signal(object, object)     # Editor, LinkSpan
     preview_link = Signal(object, str)          # Editor, Ziel aus der Markdown-Vorschau
     view_mode_changed = Signal(str)             # "edit" | "preview" | "split" des aktuellen Tabs
+    pdf_quote = Signal(object, str)             # PDF-Viewer, Markdown-Zitat für die Notiz im anderen Teil
     completion_requested = Signal(object, str, str)   # Editor, Art, Text
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
     tabs_emptied = Signal()             # letzter Tab dieser Gruppe geschlossen
@@ -195,6 +196,8 @@ class EditorTabs(QTabWidget):
                 QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
                 return None
             page.status_changed.connect(self.status_changed.emit)
+            if hasattr(page, "quote_requested"):
+                page.quote_requested.connect(lambda text, pg=page: self.pdf_quote.emit(pg, text))
             index = self.addTab(page, path.name)
             self.setTabToolTip(index, self.relative(path))
             self.setTabIcon(index, icon(page.icon_name))

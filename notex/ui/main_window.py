@@ -57,6 +57,11 @@ def _register_viewers() -> None:
     from notex.ui.image_view import ImagePage
     EditorTabs.register_viewer("image", ImagePage)
     EditorTabs.register_viewer("hex", HexPage)
+    try:
+        from notex.ui.pdf_view import PdfPage
+    except ImportError:              # PySide6 ohne QtPdf: PDFs öffnen dann als Hex
+        return
+    EditorTabs.register_viewer("pdf", PdfPage)
 
 
 class MainWindow(QMainWindow):
@@ -180,6 +185,7 @@ class MainWindow(QMainWindow):
         tree.checksums_requested.connect(self.show_checksums)
         tree.follow_requested.connect(self.toggle_live)
         self.tabs.view_mode_changed.connect(self._on_view_mode_changed)
+        self.tabs.pdf_quote.connect(self._insert_pdf_quote)
         tree.path_deleted.connect(lambda p: (self.links.remove(self.tabs.relative(p)), self.file_index.request_rescan()))
 
         self.tabs.status_changed.connect(self._update_status)
@@ -882,6 +888,32 @@ class MainWindow(QMainWindow):
             self.toast.show_message("Keine Datei zum Anzeigen", "info")
             return
         self.tabs.open_viewer(Path(path), "hex")
+
+    def _insert_pdf_quote(self, viewer, markdown: str) -> None:
+        """Zitat aus dem PDF in die Notiz, die im ANDEREN Teil der geteilten Ansicht aktiv ist. Ohne Teilung:
+        Zwischenablage (mit Hinweis) – nie irgendwo ungefragt hineinschreiben."""
+        from PySide6.QtWidgets import QApplication
+        target = None
+        for group in getattr(self.tabs, "groups", []):
+            if viewer not in group.viewers():
+                target = group.current_editor() or target
+        if target is None:
+            QApplication.clipboard().setText(markdown)
+            self.toast.show_message("Zitat in der Zwischenablage – zum direkten Einfügen die Ansicht teilen (Ctrl+\\) "
+                                    "und im anderen Teil eine Notiz öffnen", "clipboard")
+            return
+        if target.locked or target.read_only or self.tabs.is_read_only(target.path):
+            QApplication.clipboard().setText(markdown)
+            self.toast.show_message("Notiz ist gesperrt oder schreibgeschützt – Zitat in der Zwischenablage", "lock")
+            return
+        cursor = target.textCursor()
+        cursor.clearSelection()
+        before = target.toPlainText()[:cursor.position()]
+        prefix = "" if not before or before.endswith("\n\n") else ("\n" if before.endswith("\n") else "\n\n")
+        target._grouped(lambda: cursor.insertText(prefix + markdown + "\n"))
+        target.setTextCursor(cursor)
+        target.ensureCursorVisible()
+        self.toast.show_message(f"Zitat eingefügt in „{target.path.name}“", "quote")
 
     def _on_view_mode_changed(self, mode: str) -> None:
         """Nach „Live verfolgen“: Datei neu beobachten – nach einer Rotation ist es eine andere Datei."""
@@ -1665,12 +1697,16 @@ class MainWindow(QMainWindow):
 
     # ---- Geteilter Editor ----------------------------------------------------------------
     def toggle_split(self) -> None:
-        if self.tabs.current_editor() is None and not self.tabs.is_split:
+        if self.tabs.current_editor() is None and self.tabs.current_viewer() is None and not self.tabs.is_split:
             self.toast.show_message("Erst eine Datei öffnen, dann teilen", "info")
             self.split_action.setChecked(False)
             return
+        from_viewer = self.tabs.current_editor() is None
         split = self.tabs.toggle_split()
         self.split_action.setChecked(split)
+        if split and from_viewer:    # z. B. PDF links, Notiz rechts – für „Als Zitat in Notiz einfügen“
+            self.toast.show_message("Geteilt – im neuen Teil eine Notiz öffnen (Ctrl+P)", "square-split-horizontal")
+            return
         self.toast.show_message("Editor geteilt – Tabs lassen sich zwischen den Gruppen ziehen" if split else "Teilung aufgehoben",
                                 "square-split-horizontal")
 

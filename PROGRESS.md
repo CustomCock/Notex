@@ -150,6 +150,13 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   Level-Highlighter). EditorPage-Modus „live“ (in DATA_MODES, aber nicht im Ctrl+Shift+V-Zyklus); Watcher-Rückfragen
   (geändert/entfernt) für live-Pfade unterdrückt, beim Beenden neu beobachten und Editor von der Platte laden.
   Token `warning`.
+- F6 PDF: `core/pdfdoc.py` (PageLayout, fit-Skalen, snap_to_lines, clean_selection inkl. PDFium-Trennmarker
+  U+FFFE, quote_markdown), `ui/pdf_view.py` – eigene Seitenansicht statt QPdfView (Entscheidung: QPdfView kann
+  keine Textauswahl); QPdfPageRenderer MultiThreaded + Bild-Cache 24, Auswahl über getSelection mit Einrasten auf
+  Zeilenboxen aus getAllText().bounds() (PDFium trifft nur exakt auf Glyphen; Zeichenboxen einzeln wären ~0,2 ms/Zeichen),
+  QPdfSearchModel, QPdfBookmarkModel. Laden über QBuffer (≤ 256 MB) → keine Dateisperre. Nur QtPdf, kein
+  QtPdfWidgets. build.py: QtPdf nicht mehr ausgeschlossen, Hidden-Import. Zitat: EditorArea.pdf_quote →
+  MainWindow._insert_pdf_quote (Notiz im anderen Teil, sonst Zwischenablage). Split auch aus Viewer-Tabs.
 - Nebenbei: großes Öffnen beschleunigt (Highlighter während `load()` ausgesetzt, `schedule_reset` fasst Laden +
   Resolver zu einem Durchlauf zusammen, hängende Einrückung nur bei geänderter Schriftmetrik). 100k Zeilen:
   Öffnen ~2 s + ~1 s Einfärben (vorher ~12 s), Tabelle 0,5 s, Sortieren 0,2 s, Filtern 0,05 s.

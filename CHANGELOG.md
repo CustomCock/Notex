@@ -27,6 +27,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Live verfolgen (Ctrl+Shift+Alt+F) für .log und jede Textdatei: neue Zeilen mit Autoscroll, Pause beim
   Hochscrollen („Pausiert – Ende anspringen“), Rotation/Kürzung erkannt, Filter ERROR / WARN+ / Text / Regex nur für
   die Anzeige, ERROR/WARN farbig, nur lesend, keine „Neu laden?“-Rückfragen während live; optional für .log automatisch
+- PDF-Tab (QtPdf, nur lesen): Scrollen, Zoom, Seitensprung, Textsuche, Lesezeichen, Text markieren und kopieren,
+  „Als Zitat in Notiz einfügen“ (Markdown-Zitat mit Dateiname und Seite in die Notiz im anderen Teil der Ansicht);
+  keine Formulare/Skripte; Datei bleibt nicht gesperrt; Passwort-PDFs fragen nach dem Passwort
+- Teilen (Ctrl+\\) geht auch aus einem Bild-/PDF-/Hex-Tab heraus
 - Neue Abhängigkeit PyYAML 6.0.3 (MIT, exakt gepinnt)
 - UTF-16-Dateien mit BOM werden erkannt (z. B. „Unicode-Text“-Export aus Excel)
 

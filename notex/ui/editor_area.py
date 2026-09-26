@@ -27,7 +27,7 @@ from notex.ui.paper import EditorPage
 SHARED_ATTRS = {"font_size", "paper_mode", "resolve_link", "open_font_settings", "toolbar_visible", "line_numbers",
                 "context_menu_hook", "image_hook"}
 FORWARDED_SIGNALS = ("status_changed", "file_saved", "file_opened", "font_size_changed", "text_font_changed",
-                     "files_dropped", "link_activated", "completion_requested", "preview_link", "view_mode_changed")
+                     "files_dropped", "link_activated", "completion_requested", "preview_link", "view_mode_changed", "pdf_quote")
 
 
 class EditorArea(QWidget):
@@ -42,6 +42,7 @@ class EditorArea(QWidget):
     completion_requested = Signal(object, str, str)
     preview_link = Signal(object, str)
     view_mode_changed = Signal(str)
+    pdf_quote = Signal(object, str)       # PDF-Viewer, Markdown-Zitat
     currentChanged = Signal(int)          # aktiver Tab oder aktive Gruppe hat gewechselt
     split_changed = Signal(bool)          # Teilung an/aus
 
@@ -347,6 +348,10 @@ class EditorArea(QWidget):
             group.set_font_size(size, local=True)   # jede Gruppe klemmt gleich und meldet font_size_changed
 
     def zoom(self, direction: int) -> None:
+        viewer = self.current_viewer() if self.current_editor() is None else None
+        if viewer is not None and hasattr(viewer, "zoom_step"):
+            viewer.zoom_step(direction)            # PDF: Ctrl+Plus/Minus zoomt die Seite
+            return
         self.set_font_size(self.groups[0].font_size + direction)
 
     def set_paper_mode(self, enabled: bool) -> None:
