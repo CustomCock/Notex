@@ -165,6 +165,8 @@ class MainWindow(QMainWindow):
         from notex.core.modules import ModuleRegistry
         self.modules = ModuleRegistry(self.config)
         self._install_modules()
+        self.modules.on_change(lambda _key, _on: self.apply_tree_filter())
+        self.apply_tree_filter()
         self.file_index.request_rescan()
         QTimer.singleShot(1500, self._check_association_path)
         # Zustand regelmäßig sichern: Absturz oder Neustart kostet höchstens die letzte Sekunde
@@ -884,6 +886,10 @@ class MainWindow(QMainWindow):
         return viewer.path if viewer is not None else None
 
     # ---- Module ---------------------------------------------------------------------------------
+    def apply_tree_filter(self) -> None:
+        from notex.core.modules import show_all_files
+        self.sidebar.tree.set_extensions(self.config["extensions"], show_all_files(self.config))
+
     def _install_modules(self) -> None:
         """Jedes Modul meldet einen Aktivator an; ausgeschaltete Module hängen nichts ein (siehe core/modules.py)."""
         self._editor_menu_providers: list = []

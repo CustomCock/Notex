@@ -63,6 +63,7 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "tree_show_all": False,   # Baum: alle Dateien statt nur der Endungen (automatisch an, solange ein Analyse-Modul an ist)
     "modules": {              # Module an/aus (siehe core/modules.py) – Standard: Variablen, Hex, Ports, IOC an
         "variables": True, "hex": True, "strings": False, "embedded": False, "entropy": False, "metadata": False,
         "yara": False, "timeline": False, "ioc": True, "ports": True, "ip_conflicts": False, "rdap": False,

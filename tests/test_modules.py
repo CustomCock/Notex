@@ -68,3 +68,15 @@ def test_shutdown_tears_everything_down() -> None:
     registry.contribute("hex", feature(actions, calls))
     registry.shutdown()
     assert actions.get("hex:open") is None and calls[-1] == "aus"
+
+
+def test_show_all_files_follows_analysis_modules() -> None:
+    from notex.core.modules import show_all_files
+    config: dict = {}
+    ModuleRegistry(config)
+    assert not show_all_files(config)                        # Standard: nur die Endungen
+    config["modules"]["entropy"] = True
+    assert show_all_files(config)
+    config["modules"]["entropy"] = False
+    config["tree_show_all"] = True
+    assert show_all_files(config)

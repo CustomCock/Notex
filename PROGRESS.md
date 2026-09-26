@@ -32,6 +32,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün, lokal getaggt, bleibt (Besitzer) |
 | 1.7.0 | Neuer Block F: Modul-System, Variablen | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 | 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
+| 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | in Arbeit |
 
 ## Erledigt
 
@@ -225,6 +226,11 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Build-Größe: keine neuen Abhängigkeiten (bz2/lzma/zlib aus der Standardbibliothek), build.py unverändert → kein
   Build-Check; Stand wie nach 1.6.0 (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
 - Screenshots 50–53 (Hex mit Werte-Zeile + Kopiermenü, Strings, Eingebettete Dateien, Entropie).
+
+### 1.9.0 – Block H (in Arbeit)
+- Vorab (Rückfrage des Besitzers „wie benutze ich die Tools?“): Binärdateien waren im Baum unsichtbar (nur
+  eingestellte Endungen). `core/modules.show_all_files` – Baum zeigt alle Dateien per Schalter `tree_show_all` oder
+  automatisch, solange ein Analyse-Modul an ist; MainWindow.apply_tree_filter bei Modulwechsel und aus den Einstellungen.
 
 ## Offen
 

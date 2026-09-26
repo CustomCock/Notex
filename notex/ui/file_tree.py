@@ -143,8 +143,8 @@ class FileTree(QTreeView):
             return self.root
         return path if path.is_dir() else path.parent
 
-    def set_extensions(self, extensions: list[str]) -> None:
-        self.model_.setNameFilters([f"*{ext}" for ext in extensions])
+    def set_extensions(self, extensions: list[str], show_all: bool = False) -> None:
+        self.model_.setNameFilters(["*"] if show_all else [f"*{ext}" for ext in extensions])
 
     def retheme(self) -> None:
         self.setIndentation(LAYOUT.tree_indent)

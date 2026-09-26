@@ -243,6 +243,10 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
 öffnen Binärdateien wieder im Texteditor.
 
+Der Baum zeigt normalerweise nur die eingestellten Dateiendungen (Einstellungen → Editor → Baum). Solange eines der
+Analyse-Module Strings, Eingebettete Dateien oder Entropie an ist, zeigt er **alle Dateien** – damit sich auch
+`.exe`, `.zip` oder `.pcap` per Rechtsklick untersuchen lassen. Dauerhaft geht das über „Alle Dateien anzeigen“.
+
 ![Einstellungen → Module](docs/46-settings-modules.png)
 
 

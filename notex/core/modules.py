@@ -51,6 +51,16 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("pcap", "PCAP-Übersicht", "Mitschnitte (.pcap/.pcapng) zusammenfassen", "dpkt", False, "K"),
 ]
 BY_KEY = {m.key: m for m in MODULES}
+ANALYSIS_MODULES = ("strings", "embedded", "entropy")   # arbeiten auf beliebigen (Binär-)Dateien
+
+
+def show_all_files(config: dict) -> bool:
+    """Baum zeigt alle Dateien statt nur der eingestellten Endungen: per Schalter oder automatisch, solange ein
+    Analyse-Modul an ist – sonst ließen sich .exe, .zip, .pcap … im Baum gar nicht anklicken."""
+    if config.get("tree_show_all") is True:
+        return True
+    state = config.get("modules", {})
+    return any(state.get(key, BY_KEY[key].default) is True for key in ANALYSIS_MODULES)
 
 
 def defaults() -> dict[str, bool]:

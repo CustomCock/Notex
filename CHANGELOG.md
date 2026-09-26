@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.9.0] – unveröffentlicht
+
+### Verbessert
+- Baum zeigt alle Dateien, solange ein Analyse-Modul (Strings, Eingebettete Dateien, Entropie) an ist, oder per
+  Schalter „Alle Dateien anzeigen“ – vorher waren .exe/.zip/.pcap im Baum unsichtbar und nicht per Rechtsklick
+  erreichbar
+
 ## [1.8.0] – 2026-09-26
 
 ### Hinzugefügt
