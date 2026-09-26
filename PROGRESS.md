@@ -136,6 +136,13 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   (Befehle + Live-Prüfung: Timer 600 ms, nicht neu gestartet → beim Tippen höchstens alle 0,6 s; Cache nach Pfad,
   weil PySide für `document()` jedes Mal neue Wrapper liefert → `id()` taugt nicht). Editor.set_problem (rote
   Welle), StatusBar.problem_button (auch für Dateityp-Warnungen in F4). Entscheidung: PyYAML==6.0.3 exakt gepinnt.
+- F4 Hex/Typ/Hashes: `core/hexdata.py` (PagedFile: 64-KB-Seiten, LRU 32, Datei nur je Lesevorgang offen –
+  Entscheidung gegen mmap, weil Windows gemappte Dateien nicht umbenennen/löschen lässt; parse_offset,
+  parse_hex_pattern, search_file blockweise mit Überlappung + Umlauf + Abbruch), `core/hashing.py` (ein
+  Lesedurchgang für alle vier, normalize/match_digest), `ui/hex_view.py` (_HexArea selbst gezeichnet,
+  Scrollbalken skaliert ab 1 Mrd. Zeilen, Suche in QThread), `ui/hash_dialog.py`. Baum-Kontextmenü „Als Hex
+  öffnen“/„Prüfsummen …“, Dateityp-Warnung über StatusBar.problem_button, Token `success`. Watcher:
+  `fileops.file_signature` (> 16 MB Größe+mtime+Rand-Hash). 3 GB: Öffnen 0,06 s, Suche bis Ende ~3–17 s im Hintergrund.
 - Nebenbei: großes Öffnen beschleunigt (Highlighter während `load()` ausgesetzt, `schedule_reset` fasst Laden +
   Resolver zu einem Durchlauf zusammen, hängende Einrückung nur bei geänderter Schriftmetrik). 100k Zeilen:
   Öffnen ~2 s + ~1 s Einfärben (vorher ~12 s), Tabelle 0,5 s, Sortieren 0,2 s, Filtern 0,05 s.

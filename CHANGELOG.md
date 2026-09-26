@@ -19,10 +19,17 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   beim Tippen) mit Zeile/Spalte in der Statusleiste und Markierung im Text; JSON token-basiert (Zahlen und Escapes
   bleiben exakt); Baumansicht mit Pfad (`$.users[3].name`) und „Pfad kopieren“; YAML nur safe_load/safe_dump,
   Warnung vor dem Formatieren, wenn Kommentare verloren gingen
+- Hex-Ansicht (nur lesen, automatisch für unbekannte Binärdateien, „Als Hex öffnen“ im Baum): Offset/Hex/ASCII
+  mit synchroner Auswahl, Gehe zu Offset (dezimal/hex), Suche nach Hex-Bytes oder Text im Hintergrund, seitenweises
+  Lesen ohne offenes Handle – mehrere GB öffnen sofort
+- Dateityp per Magic Bytes in der Statusleiste mit Warnung, wenn die Endung nicht passt
+- Prüfsummen (MD5, SHA-1, SHA-256, SHA-512) im Hintergrund mit Fortschritt, kopierbar, „Vergleichen mit …“ grün/rot
 - Neue Abhängigkeit PyYAML 6.0.3 (MIT, exakt gepinnt)
 - UTF-16-Dateien mit BOM werden erkannt (z. B. „Unicode-Text“-Export aus Excel)
 
 ### Verbessert
+- Externe Änderungen werden bei Dateien über 16 MB über Größe, Änderungszeit und Anfang/Ende erkannt statt über einen
+  Hash des ganzen Inhalts (vorher las schon das Öffnen einer 3-GB-Datei alles einmal komplett)
 - Große Dateien öffnen deutlich schneller (100 000 Zeilen: ~12 s → ~2 s): kein Hervorheben während des Ladens,
   ein statt drei Durchläufe danach, Einrückungen nur bei echter Schriftänderung neu berechnet
 

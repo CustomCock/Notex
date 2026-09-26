@@ -18,6 +18,29 @@ def is_encrypted_path(path: Path | str) -> bool:
     return str(path).lower().endswith(ENCRYPTED_SUFFIXES)
 
 
+FULL_HASH_LIMIT = 16 * 1024 * 1024
+EDGE_BYTES = 1024 * 1024
+
+
+def file_signature(path: Path) -> bytes | None:
+    """Fingerabdruck für „extern geändert?“: bis 16 MB SHA-1 über den Inhalt; darüber Größe + Änderungszeit +
+    SHA-1 über das erste und letzte MB – sonst würde jede große Datei (Log, Hex-Tab) beim Öffnen komplett gelesen.
+    None, wenn die Datei nicht lesbar ist."""
+    import hashlib
+    try:
+        stat = path.stat()
+        with open(path, "rb") as handle:
+            if stat.st_size <= FULL_HASH_LIMIT:
+                return hashlib.sha1(handle.read()).digest()
+            hasher = hashlib.sha1(f"{stat.st_size}:{stat.st_mtime_ns}:".encode())
+            hasher.update(handle.read(EDGE_BYTES))
+            handle.seek(max(0, stat.st_size - EDGE_BYTES))
+            hasher.update(handle.read(EDGE_BYTES))
+            return hasher.digest()
+    except OSError:
+        return None
+
+
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     """Schreibt erst eine Temp-Datei im selben Ordner und tauscht sie dann per os.replace ein.
 

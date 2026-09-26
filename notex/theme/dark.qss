@@ -991,3 +991,24 @@ QLabel#DataError {
     font-size: @fs_uipx;
     padding: @sp_lgpx;
 }
+
+/* Prüfsummen-Vergleich: grün = stimmt, rot = weicht ab */
+QLabel#HashVerdict[state="ok"] {
+    color: @success;
+}
+QLabel#HashVerdict[state="bad"] {
+    color: @danger;
+}
+QLineEdit[state="ok"] {
+    border: 1px solid @success;
+}
+QLineEdit[state="bad"] {
+    border: 1px solid @danger;
+}
+/* Hex-Ansicht: gleiche Fläche wie das Blatt */
+QAbstractScrollArea#HexArea {
+    background: @paper;
+    border: none;
+    border-bottom-left-radius: @r_panelpx;
+    border-bottom-right-radius: @r_panelpx;
+}

@@ -251,6 +251,24 @@ Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Pal
   Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
 - Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
 
+## Hex-Ansicht, Dateityp und Prüfsummen
+
+- **Als Hex öffnen** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+H`): Offset | 16 Bytes hex | ASCII,
+  nur lesend. Unbekannte Binärdateien öffnen automatisch so. Auswahl ist in beiden Spalten synchron (Klick, Ziehen,
+  Shift+Pfeile), `Tab` wechselt die Spalte, `Ctrl+C` kopiert als Hex (in der ASCII-Spalte als Text).
+- **Gehe zu Offset** (`Ctrl+G`): dezimal (`1234`) oder hex (`0x4D2`, `4D2h`, `$4D2`).
+- **Suchen** (`Ctrl+F`, `F3` weiter, `Esc` bricht ab): Hex-Bytes (`DE AD BE EF`) oder Text, wahlweise ohne
+  Groß/klein. Die Suche läuft im Hintergrund mit Fortschritt; auch über mehrere GB bleibt die Oberfläche bedienbar.
+- Gelesen wird seitenweise (64 KB, kleiner Cache), die Datei bleibt nicht geöffnet – mehrere GB öffnen sofort, und
+  Umbenennen/Verschieben/Löschen funktioniert auch unter Windows, während der Tab offen ist.
+- **Dateityp** über Magic Bytes (eigene Tabelle: PNG, JPEG, GIF, PDF, ZIP inkl. docx/xlsx/jar/apk, RAR, 7z, GZIP,
+  ELF, PE/EXE, Mach-O, SQLite, .ntx u. a.) steht in der Statusleiste; passt die Endung nicht zum Inhalt (z. B. eine
+  „rechnung.pdf“, die ein Windows-Programm ist), erscheint rechts eine Warnung.
+- **Prüfsummen …** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+C`): MD5, SHA-1, SHA-256, SHA-512 in einem
+  Lesedurchgang im Hintergrund, jede mit Kopierknopf. „Vergleichen mit …“ nimmt auch `SHA256: …`, Doppelpunkt-
+  Schreibweise oder eine `sha256sum`-Zeile an und zeigt grün (stimmt) oder rot (weicht ab).
+- Bei `.ntx` zeigen Hex-Ansicht und Prüfsummen nur den verschlüsselten Inhalt der Datei – nie Klartext.
+
 ## Nachschlagen
 
 Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
@@ -519,6 +537,9 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle; JSON/YAML: Text ↔ Baum |
 | Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
 | Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
+| Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen |
+| Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei |
+| Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+C / Ctrl+V / Entf (in der Tabelle) | Zellen als Tab-getrennten Block kopieren / einfügen / leeren |
 | Ctrl+\ | Editor teilen / Teilung aufheben |
 | Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |

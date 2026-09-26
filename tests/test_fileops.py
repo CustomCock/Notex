@@ -62,3 +62,26 @@ def test_create_rename_move(tmp_path: Path) -> None:
 def test_is_within(tmp_path: Path) -> None:
     assert fileops.is_within(tmp_path / "a" / "b", tmp_path)
     assert not fileops.is_within(tmp_path.parent, tmp_path)
+
+
+def test_file_signature_small_and_large(tmp_path: Path) -> None:
+    import os
+    import time
+    from notex.core import fileops
+    small = tmp_path / "a.txt"
+    small.write_bytes(b"eins")
+    first = fileops.file_signature(small)
+    small.write_bytes(b"zwei")
+    assert fileops.file_signature(small) != first
+    big = tmp_path / "big.bin"
+    with open(big, "wb") as handle:
+        handle.seek(fileops.FULL_HASH_LIMIT + 10)
+        handle.write(b"x")
+    signature = fileops.file_signature(big)
+    assert signature == fileops.file_signature(big)
+    with open(big, "r+b") as handle:          # Änderung in der Mitte: erkannt über die Änderungszeit
+        handle.seek(fileops.FULL_HASH_LIMIT // 2)
+        handle.write(b"y")
+    os.utime(big, ns=(time.time_ns(), time.time_ns() + 1_000_000_000))
+    assert fileops.file_signature(big) != signature
+    assert fileops.file_signature(tmp_path / "fehlt") is None

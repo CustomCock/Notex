@@ -53,8 +53,10 @@ from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 def _register_viewers() -> None:
     """Viewer-Tabs (Bild, später Hex/PDF) bei den Tab-Gruppen anmelden."""
     from notex.ui.editor_tabs import EditorTabs
+    from notex.ui.hex_view import HexPage
     from notex.ui.image_view import ImagePage
     EditorTabs.register_viewer("image", ImagePage)
+    EditorTabs.register_viewer("hex", HexPage)
 
 
 class MainWindow(QMainWindow):
@@ -174,6 +176,8 @@ class MainWindow(QMainWindow):
         self.sidebar.settings_requested.connect(self.open_settings)
         tree.path_renamed.connect(self._on_path_renamed)
         tree.path_deleted.connect(self.tabs.close_paths_under)
+        tree.open_hex_requested.connect(self.open_as_hex)
+        tree.checksums_requested.connect(self.show_checksums)
         tree.path_deleted.connect(lambda p: (self.links.remove(self.tabs.relative(p)), self.file_index.request_rescan()))
 
         self.tabs.status_changed.connect(self._update_status)
@@ -240,6 +244,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
         file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
         file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
+        file_menu.addAction(self._action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()))
+        file_menu.addAction(self._action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums()))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
@@ -771,6 +777,10 @@ class MainWindow(QMainWindow):
     def _on_external_change(self, path: Path) -> None:
         editor = self.tabs.editor_for(path)
         if editor is None:
+            for viewer in self.tabs.viewers():       # Viewer (Hex, Bild …) lesen nur – still neu laden
+                if viewer.path == path and hasattr(viewer, "reload"):
+                    viewer.reload()
+            self._update_status()
             return
         if editor.encrypted:
             self._on_external_change_encrypted(editor)
@@ -851,8 +861,35 @@ class MainWindow(QMainWindow):
         page = self.tabs.current_page()
         return page is not None and page.view_mode in DATA_MODES
 
+    def _current_file(self) -> Path | None:
+        editor = self.tabs.current_editor()
+        if editor is not None:
+            return editor.path
+        viewer = self.tabs.current_viewer()
+        return viewer.path if viewer is not None else None
+
+    def open_as_hex(self, path: Path | None = None) -> None:
+        """Beliebige Datei als Hex (nur lesen) – bei .ntx sieht man nur den Geheimtext von der Platte."""
+        path = path or self._current_file()
+        if path is None or not Path(path).is_file():
+            self.toast.show_message("Keine Datei zum Anzeigen", "info")
+            return
+        self.tabs.open_viewer(Path(path), "hex")
+
+    def show_checksums(self, path: Path | None = None) -> None:
+        from notex.ui.hash_dialog import HashDialog
+        path = path or self._current_file()
+        if path is None or not Path(path).is_file():
+            self.toast.show_message("Keine Datei für Prüfsummen", "info")
+            return
+        HashDialog(self, Path(path)).exec()
+
     def open_find(self, with_replace: bool) -> None:
-        """Ctrl+F/Ctrl+H – in der Tabellen-/Baumansicht springt der Fokus in deren Filterfeld."""
+        """Ctrl+F/Ctrl+H – in der Tabellen-/Baumansicht springt der Fokus in deren Filterfeld, im Hex-Tab ins Suchfeld."""
+        viewer = self.tabs.current_viewer() if self.tabs.current_editor() is None else None
+        if viewer is not None and hasattr(viewer, "focus_search"):
+            viewer.focus_search()
+            return
         if self._in_data_view():
             self.tabs.current_page().data_view.focus_filter()
             return
@@ -1890,6 +1927,10 @@ class MainWindow(QMainWindow):
                           shortcut="Shift+Alt+V", keywords="json yaml validieren syntax fehler lint")
         self.registry.add("data:path", "JSON/YAML: Pfad kopieren", self.structured.copy_path, category="Bearbeiten",
                           keywords="json yaml jsonpath pfad kopieren baum")
+        self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
+                          shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
+        self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),
+                          category="Datei", shortcut="Ctrl+Shift+Alt+C", keywords="hash prüfsumme checksum sha256 md5 vergleichen")
         self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
                           category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
@@ -1954,6 +1995,9 @@ class MainWindow(QMainWindow):
         if viewer is not None:
             relative = self.tabs.relative(viewer.path)
             self.status.update_for_viewer(relative, viewer.status_parts())
+            if getattr(viewer, "warning", ""):
+                self.status.set_problem("⚠ " + viewer.warning, "error",
+                                        tooltip=f"Dateityp laut Inhalt: {viewer.ftype.name}\n{viewer.warning}")
             self.setWindowTitle(f"{relative} – {APP_NAME}")
             return
         if editor is None:

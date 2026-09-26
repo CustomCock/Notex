@@ -51,6 +51,8 @@ class FileTree(QTreeView):
     file_activated = Signal(Path)
     path_renamed = Signal(Path, Path)   # alt, neu – auch bei Verschieben
     path_deleted = Signal(Path)
+    open_hex_requested = Signal(Path)     # Kontextmenü „Als Hex öffnen“
+    checksums_requested = Signal(Path)    # Kontextmenü „Prüfsummen …“
 
     def __init__(self, root: Path, extensions: list[str]) -> None:
         super().__init__()
@@ -337,6 +339,10 @@ class FileTree(QTreeView):
         menu.addAction(icon("folder-plus"), "Neuer Ordner", lambda: self.create_folder(self.folder_for(path)))
         if path is not None:
             menu.addSeparator()
+            if path.is_file():
+                menu.addAction(icon("binary"), "Als Hex öffnen", lambda: self.open_hex_requested.emit(path))
+                menu.addAction(icon("hash"), "Prüfsummen …", lambda: self.checksums_requested.emit(path))
+                menu.addSeparator()
             menu.addAction(icon("pencil"), "Umbenennen\tF2", self.rename_selected)
             menu.addAction(icon("trash"), "In den Papierkorb\tEntf", self.delete_selected)
         menu.addSeparator()
