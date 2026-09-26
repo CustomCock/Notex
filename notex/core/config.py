@@ -34,6 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "open_tabs": [],          # Pfade der offenen Dateien: relativ zu data/ oder absolut (externe)
     "recent_files": [],       # zuletzt geöffnet, absolute Pfade, neueste zuerst (max. 15)
     "association_extensions": [".txt"],   # Auswahl auf der Einstellungsseite „System“
+    "recent_commands": [],    # zuletzt benutzte Befehle der Command Palette (IDs)
     "active_tab": 0,
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)

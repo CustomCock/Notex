@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.1.0] – unveröffentlicht
+
+### Hinzugefügt
+- Quick Open (Ctrl+P): Fuzzy-Suche über alle Dateien, `:Zeile` und `Datei:Zeile`, Dateiindex im Hintergrund
+- Command Palette (Ctrl+Shift+P): alle Befehle mit Kategorie und Kürzel, zuletzt benutzte oben, zentrale Registry
+- LICENSE (MIT) und THIRD_PARTY_LICENSES.md, Lizenztexte im Build-Ordner
+
+### Geändert
+- config.json wird jede Sekunde bei Änderung atomar gesichert, nicht mehr nur beim Beenden
+
 ## [1.0.0] – 2026-09-26
 
 Erstes Release. Notex ist ein portabler Explorer + Editor für Textdateien unter Windows:

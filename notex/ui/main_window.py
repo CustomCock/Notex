@@ -26,7 +26,11 @@ from notex.paths import app_root
 from notex.theme.manager import theme_manager
 from notex.core import fileops
 from notex.core import text_ops as ops
+from notex.core.actions import ActionRegistry
 from notex.core.config import config_digest
+from notex.core.theme_model import PAPER_VARIANTS, PRESETS, apply_paper_variant, theme_from_preset
+from notex.ui.file_index_service import FileIndexService
+from notex.ui.palette import PaletteOverlay
 from notex.core.recent import add_recent, prune_recent
 from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe
 from notex.ui.about_dialog import AboutDialog
@@ -88,9 +92,19 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.splitter)
 
         self.association = build_association()   # None im Dev-Modus oder außerhalb von Windows
+        self.registry = ActionRegistry()
+        self.registry.recent = list(config.get("recent_commands", []))
+        self.file_index = FileIndexService(root, config)
+        self.file_index.attach_tree(self.sidebar.tree)
+        self.palette = PaletteOverlay(self, self.registry, self.file_index.index)
+        self.palette.open_file.connect(self._open_from_palette)
+        self.palette.goto_line.connect(lambda line: self._with_editor(lambda e: e.goto_line(line)))
+        self.palette.run_command.connect(self._run_command)
         self._connect_signals()
         self._build_menu()
         self._build_editor_actions()
+        self._build_registry()
+        self.file_index.request_rescan()
         QTimer.singleShot(1500, self._check_association_path)
         # Zustand regelmäßig sichern: Absturz oder Neustart kostet höchstens die letzte Sekunde
         self._last_saved_state = ""
@@ -664,6 +678,78 @@ class MainWindow(QMainWindow):
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
 
+    # ---- Command Palette / Quick Open --------------------------------------------------
+    def _build_registry(self) -> None:
+        """Alle QActions des Fensters plus Themes/Presets/Einstellungen als Befehle anmelden."""
+        categories = {}
+        for menu_action in self.menuBar().actions():
+            menu = menu_action.menu()
+            if menu is None:
+                continue
+            for action in menu.actions():
+                categories[action] = menu_action.text().replace("&", "")
+        toolbar_categories = {"undo": "Bearbeiten", "redo": "Bearbeiten", "find": "Bearbeiten", "replace": "Bearbeiten"}
+        for key, action in self.tabs.editor_actions.items():
+            categories.setdefault(action, toolbar_categories.get(key, "Editor"))
+        for action in self.actions():
+            text = action.text().replace("&", "").replace(" …", "").strip()
+            if not text or action.isSeparator() or "(Alternative)" in text:
+                continue
+            category = categories.get(action, "Ansicht")
+            self.registry.add(
+                f"action:{id(action)}", text, action.trigger, category=category,
+                shortcut=action.shortcut().toString(),
+                is_checked=(lambda a=action: a.isChecked()) if action.isCheckable() else None,
+            )
+        for name in PRESETS:
+            self.registry.add(f"preset:{name}", f"Preset {name}", lambda n=name: self._apply_preset(n),
+                              category="Theme", keywords="farben oberfläche")
+        for name in PAPER_VARIANTS:
+            self.registry.add(f"paper:{name}", f"Blatt {name}", lambda n=name: self._apply_paper_variant(n),
+                              category="Theme", keywords="blatt papier farbe")
+        for name in SettingsDialog.CATEGORIES:
+            self.registry.add(f"settings:{name}", f"Einstellungen: {name}", lambda n=name: self.open_settings(n),
+                              category="Einstellungen")
+        self.registry.add("palette:files", "Quick Open", lambda: self.show_palette("files"), category="Navigation", shortcut="Ctrl+P")
+        self.registry.add("palette:commands", "Command Palette", lambda: self.show_palette("commands"), category="Navigation", shortcut="Ctrl+Shift+P")
+        self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
+        self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
+        self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
+
+    def register_command(self, id: str, title: str, callback, category: str = "", shortcut: str = "", **kw) -> None:
+        """Für neue Features: ein Befehl, der sofort in der Palette auftaucht."""
+        self.registry.add(id, title, callback, category=category, shortcut=shortcut, **kw)
+
+    def show_palette(self, mode: str) -> None:
+        self.palette.recent_files = [self.tabs.relative(Path(p)) if not self.tabs.is_external(Path(p)) else p
+                                     for p in self.config.get("recent_files", [])]
+        self.file_index.set_externals([p for p in self.config.get("recent_files", []) if self.tabs.is_external(Path(p))])
+        self.palette.open(mode)
+
+    def _open_from_palette(self, path: Path, line) -> None:
+        full = path if path.is_absolute() else self.root / path
+        if full.is_file():
+            self.tabs.open_file(full, line=int(line) if line else None)
+            self.editor_stack.setCurrentWidget(self.tabs)
+
+    def _run_command(self, command_id: str) -> None:
+        self.registry.run(command_id)
+        self.config["recent_commands"] = list(self.registry.recent)
+
+    def _apply_preset(self, name: str) -> None:
+        current = theme_manager().current()
+        preset = theme_from_preset(name)
+        for key, value in preset["colors"].items():
+            if not key.startswith("paper"):
+                current["colors"][key] = value
+        current["name"] = name
+        self.config["theme"] = theme_manager().apply(current)
+        self.toast.show_message(f"Preset {name}", "palette")
+
+    def _apply_paper_variant(self, name: str) -> None:
+        self.config["theme"] = theme_manager().apply(apply_paper_variant(theme_manager().current(), name))
+        self.toast.show_message(f"Blatt {name}", "palette")
+
     def _sync_editor_actions(self) -> None:
         """Checkbare Toolbar-Aktionen an den aktuellen Zustand angleichen."""
         editor = self.tabs.current_editor()
@@ -758,12 +844,14 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if self.toast.isVisible():
             self.toast._place()
+        self.palette.resize_to_parent()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         if not self.tabs.confirm_close_all():
             event.ignore()
             return
         self.sidebar.stop_search()
+        self.file_index.shutdown()
         self.tabs.shutdown()
         self.save_state()
         event.accept()

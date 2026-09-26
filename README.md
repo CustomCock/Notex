@@ -72,6 +72,19 @@ den neuen Pfad. Aus dem Dev-Modus (`python main.py`) ist die Registrierung bewus
 
 ![Einstellungen System](docs/20-settings-system.png)
 
+## Quick Open und Command Palette
+
+**Ctrl+P** öffnet ein Overlay über dem Blatt mit Fuzzy-Suche über alle Dateien in `data/` und die
+zuletzt geöffneten externen Dateien: „ntz“ findet `notizen.md`, getroffene Zeichen sind
+hervorgehoben, zuletzt geöffnete Dateien stehen weiter oben. `:123` springt in der aktuellen
+Datei zu Zeile 123, `notizen:12` öffnet die Datei und springt. Der Dateiindex wird im Hintergrund
+aufgebaut und über den Watcher aktuell gehalten.
+
+**Ctrl+Shift+P** (oder `>` in Quick Open) zeigt alle Befehle der App mit Kategorie und Kürzel:
+Menüs, Toolbar, Einstellungsseiten, Theme-Presets und Blatt-Varianten, Toggles mit aktuellem
+Zustand. Zuletzt benutzte Befehle stehen oben. Neue Features melden sich an einer zentralen
+Registry an und tauchen automatisch auf.
+
 ## Bearbeitungsleiste
 
 Direkt über dem Blatt sitzt eine schmale Leiste in Blattbreite. Der kleine Chevron darunter
@@ -215,6 +228,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |
 | Alt+P | Blatt zentrieren / volle Breite |
+| Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
+| Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+, | Einstellungen |
 | Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |
 | Ctrl+Shift+Alt+S | Speichern unter |

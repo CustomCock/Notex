@@ -696,3 +696,35 @@ QLabel#StatusWarn {
 QDialog#RecentDialog {
     background: @bg;
 }
+
+/* Quick Open / Command Palette */
+QFrame#Palette {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_panelpx;
+}
+QFrame#Palette QWidget {
+    background: transparent;
+}
+QFrame#Palette QFrame#SearchField {
+    background: @bg;
+}
+QListWidget#PaletteList {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+QListWidget#PaletteList::item {
+    padding: 3px @sp_smpx;
+    border-radius: @r_controlpx;
+    color: @text_muted;
+}
+QListWidget#PaletteList::item:selected {
+    background: @selection;
+    color: @text;
+}
+QLabel#PaletteHint {
+    color: @text_faint;
+    font-size: @fs_smallpx;
+    padding: 0 @sp_xspx;
+}
