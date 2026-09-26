@@ -734,8 +734,42 @@ def main() -> int:
                 editor = window.tabs.open_file(note)
                 window.convert_iocs(True)
                 later_rel(400, lambda: (save(window, "57-ioc-defanged"), editor.document().setModified(False),
-                                        finish()))
+                                        block_i_shots(dialog_shot)))
             metadata_shot()
+
+        def block_i_shots(dialog_shot):
+            """Block I (1.10.0): IP-Übersicht, Port nachschlagen, RDAP-Karte (Beispieldaten, kein Netz)."""
+            from notex.core import rdap
+            from notex.ui.ports_dialog import PortDialog
+            from notex.ui.rdap_dialog import RdapDialog
+            from test_rdap import ROUTES, FakeNet
+            for key in ("ip_conflicts", "rdap"):
+                window.modules.set_enabled(key, True)
+            (files / "Netz Büro.md").write_text(
+                "# Netz Büro\n\n| Host | IP | Rolle |\n|---|---|---|\n| router | 10.20.0.1 | Gateway |\n"
+                "| fileserver | 10.20.0.5 | NAS |\n| drucker-og | 10.20.0.20 | |\n| backup | 10.20.0.30 | |\n",
+                encoding="utf-8")
+            (files / "Server.md").write_text("10.20.0.5   web-intern\n10.20.0.40  monitoring\n"
+                                             "10.20.1.10  vpn-gw\n", encoding="utf-8")
+
+            def ip_shot():
+                window.refresh_ip_index(full=True)
+                later_rel(800, open_ip)
+
+            def open_ip():
+                window.show_ip_overview()
+                dialog = window._analysis_dialogs["ip_conflicts"][-1]
+                dialog.network.setText("10.20.0.0/24")
+                dialog.exclusions.setText("10.20.0.100-10.20.0.199")
+                dialog_shot(dialog, "58-ip-overview", port_shot)
+
+            def port_shot():
+                dialog_shot(PortDialog(window, "445"), "59-port-lookup", rdap_shot)
+
+            def rdap_shot():
+                client = rdap.Client(FakeNet(ROUTES), lambda _s: None)
+                dialog_shot(RdapDialog(window, client, "8.8.8.8"), "60-rdap-card", finish)
+            ip_shot()
 
         def finish():
             window.close()

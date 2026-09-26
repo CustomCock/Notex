@@ -500,6 +500,8 @@ Dienst, Protokolle, einen kurzen Hinweis (z. B. „SMB – nie ins Internet“) 
   `notex/assets/ports/iana-ports.tsv.gz` (~150 KB), plus eine eigene Tabelle mit Hinweisen zu gut 80 gängigen Diensten.
   Aktualisieren: `python tools/update_ports.py` (lädt die CSV von iana.org).
 
+![Port nachschlagen](docs/59-port-lookup.png)
+
 
 ## IP-Übersicht und Konflikte
 
@@ -542,6 +544,8 @@ bzw. Palette „RDAP / ASN abfragen“ (Markierung oder Wert unter dem Cursor, s
 - Ergebnisse bleiben für die Sitzung im Speicher (nichts auf Platte); je Server mindestens 1 s Abstand, „429 Too
   Many Requests“ wird mit Retry-After respektiert, Zeitlimit 10 s. Die Abfrage läuft im Hintergrund.
 - Aus verschlüsselten Notizen fragt Notex vor dem Senden nach.
+
+![RDAP-Karte](docs/60-rdap-card.png)
 
 
 ## IOCs entschärfen

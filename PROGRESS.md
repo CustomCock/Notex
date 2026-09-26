@@ -33,7 +33,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.7.0 | Neuer Block F: Modul-System, Variablen | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 | 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 | 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
-| 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | in Arbeit |
+| 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
+| 1.11.0 | Block J: Netzwerk-Scanner | in Arbeit |
 
 ## Erledigt
 
@@ -267,7 +268,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 
 - Screenshots 54–57 (Metadaten, YARA, Zeitleiste, IOC entschärft).
 
-### 1.10.0 – Block I (in Arbeit)
+### 1.10.0 – Block I
 - I1 Port-Infos: `core/ports.py`, Daten `assets/ports/iana-ports.tsv.gz` (11 721 Einträge, 149 KB, Bereiche als
   start–ende), erzeugt mit `tools/update_ports.py` (reproduzierbares gzip, mtime=0). **Quelle:** iana.org ist in der
   Arbeitsumgebung per Netzwerk-Policy gesperrt → CSV von einem GitHub-Spiegel (HackBugs/Computer-Networking,
@@ -293,6 +294,9 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   HTTPS) statt Team Cymru (DNS-TXT – bräuchte eine DNS-Bibliothek) oder ipinfo/ipapi (Schlüssel/Limits/Lizenz).
   `ui/rdap_dialog.py` (QThread; beim Schließen wird nicht gewartet, der Thread hängt sich ans Fenster und räumt sich
   weg). Kontextmenü zeigt private IPs ausgegraut mit Grund; .ntx → Rückfrage vor dem Senden.
+- Screenshots 58–60 (IP-Übersicht, Port nachschlagen, RDAP-Karte mit Beispieldaten aus den Tests).
+
+### 1.11.0 – Block J (in Arbeit)
 
 ## Offen
 

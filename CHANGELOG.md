@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.10.0] – unveröffentlicht
+## [1.10.0] – 2026-09-26
 
 ### Hinzugefügt
 - Modul Port-Infos (Standard an): Tooltip über Portangaben im Editor (Port 3389, :443, 3389/tcp, tcp/445,
