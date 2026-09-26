@@ -34,7 +34,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 | 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
 | 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
-| 1.11.0 | Block J: Netzwerk-Scanner | in Arbeit |
+| 1.11.0 | Block J: Netzwerk-Scanner | nicht begonnen – angehalten, Rücksprache mit dem Besitzer |
 
 ## Erledigt
 
@@ -267,6 +267,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   atomar in die Datei mit Original-Encoding/Zeilenenden. Vorlagen `Zeitleiste.md`, `Beweismittel.md` (LATER_TEMPLATES).
 
 - Screenshots 54–57 (Metadaten, YARA, Zeitleiste, IOC entschärft).
+- Build-Größe (CI-Build-Check, Artefakt-ZIP) nach H mit pypdf + yara-python: Windows ≈ 99,9 MB (vorher 96,7),
+  Linux ≈ 96,7 MB (vorher 92,6). Block I bringt keine Abhängigkeiten, nur ~150 KB Portdaten.
 
 ### 1.10.0 – Block I
 - I1 Port-Infos: `core/ports.py`, Daten `assets/ports/iana-ports.tsv.gz` (11 721 Einträge, 149 KB, Bereiche als
@@ -296,7 +298,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   weg). Kontextmenü zeigt private IPs ausgegraut mit Grund; .ntx → Rückfrage vor dem Senden.
 - Screenshots 58–60 (IP-Übersicht, Port nachschlagen, RDAP-Karte mit Beispieldaten aus den Tests).
 
-### 1.11.0 – Block J (in Arbeit)
+### 1.11.0 – Block J (nicht begonnen)
+- Angehalten nach Block I; Blöcke J und K sind offen.
 
 ## Offen
 
