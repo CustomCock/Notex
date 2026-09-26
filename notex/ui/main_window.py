@@ -450,6 +450,17 @@ class MainWindow(QMainWindow):
                                      "Bitte die ZIP komplett entpacken (Rechtsklick → „Alle extrahieren…“), "
                                      "z. B. nach C:\\Apps\\Notex, und Notex.exe von dort starten.")
             return
+        linux = self._linux_integration()
+        if linux is not None:
+            try:
+                status = linux.status()
+                if status.registered and not status.matches(linux.exe) and dialogs.confirm(
+                        self, "Notex-Ordner verschoben", "Der Starter im Anwendungsmenü zeigt noch auf den alten Ort.",
+                        yes="Neu registrieren", no="Später", informative=f"Registriert: {status.exe_path}\nJetzt hier: {linux.exe}"):
+                    linux.install()
+            except OSError:
+                pass
+            return
         if self.association is None:
             return
         try:
@@ -498,6 +509,11 @@ class MainWindow(QMainWindow):
         page.add(check_widget)
         page.note("Es wird nur die öffentliche Release-Liste abgerufen (api.github.com), ohne Kennung oder "
                   "Nutzungsdaten. Notex lädt und installiert nie etwas selbst – es zeigt nur einen Hinweis.")
+
+        import sys as _sys
+        if _sys.platform.startswith("linux"):
+            self._build_linux_settings(page)
+            return
 
         page.section("Windows-Dateizuordnung")
         status_label = QLabel()
@@ -845,6 +861,79 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    # ---- Linux-Desktop-Integration ----------------------------------------------------------
+    def _linux_integration(self):
+        """DesktopIntegration für die laufende gebaute App, sonst None (Dev-Modus, anderes System)."""
+        import sys as _sys
+        from notex.core.linux_desktop import DesktopIntegration
+        exe = current_exe()
+        if not _sys.platform.startswith("linux") or exe is None:
+            return None
+        import notex
+        return DesktopIntegration(exe, Path(notex.__file__).resolve().parent / "assets" / "notex.png")
+
+    def _build_linux_settings(self, page) -> None:
+        from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+        page.section("Linux-Desktop-Integration")
+        status_label = QLabel()
+        status_label.setObjectName("SettingsNote")
+        status_label.setWordWrap(True)
+        page.add(status_label)
+        register = QPushButton("Im Anwendungsmenü registrieren")
+        remove = QPushButton("Registrierung entfernen")
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(register)
+        row.addWidget(remove)
+        row.addStretch(1)
+        buttons = QWidget()
+        buttons.setLayout(row)
+        page.add(buttons)
+        page.note("Legt nur Dateien in ~/.local/share an (notex.desktop, MIME-Typ für .ntx, Icon) – kein root, "
+                  "nichts systemweit. Danach steht Notex im Anwendungsmenü und unter „Öffnen mit“. Zum Standardprogramm "
+                  "macht man es selbst, z. B. über die Dateieigenschaften oder `xdg-mime default notex.desktop text/plain`. "
+                  "Nach dem Verschieben des Notex-Ordners einfach erneut registrieren.")
+
+        def refresh() -> None:
+            integration = self._linux_integration()
+            if integration is None:
+                status_label.setText("Nicht verfügbar: nur aus der gebauten App (Notex-Ordner mit ausführbarer Datei).")
+                register.setEnabled(False)
+                remove.setEnabled(False)
+                return
+            status = integration.status()
+            if status.registered:
+                moved = "" if status.matches(integration.exe) else "\nAchtung: zeigt auf einen anderen Ort – erneut registrieren."
+                status_label.setText(f"Registriert: {integration.desktop_file}\nProgramm: {status.exe_path}{moved}")
+            else:
+                status_label.setText("Nicht registriert.")
+            register.setText("Erneut registrieren" if status.registered else "Im Anwendungsmenü registrieren")
+            remove.setEnabled(status.registered)
+
+        def do_register() -> None:
+            integration = self._linux_integration()
+            try:
+                integration.install()
+            except OSError as error:
+                dialogs.warn(self, "Registrieren", str(error))
+                return
+            refresh()
+            self.toast.show_message("Notex im Anwendungsmenü registriert", "check")
+
+        def do_remove() -> None:
+            integration = self._linux_integration()
+            try:
+                integration.uninstall()
+            except OSError as error:
+                dialogs.warn(self, "Registrierung entfernen", str(error))
+                return
+            refresh()
+            self.toast.show_message("Registrierung entfernt", "check")
+
+        register.clicked.connect(do_register)
+        remove.clicked.connect(do_remove)
+        refresh()
 
     # ---- Update-Check ------------------------------------------------------------------------
     def check_updates(self, manual: bool = False) -> None:

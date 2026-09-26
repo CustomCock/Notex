@@ -1,10 +1,19 @@
 name: Release
 
-# Bei einem Tag wie v1.0.0: Tests laufen lassen, portable App auf Windows bauen,
-# als ZIP an ein GitHub-Release hängen.
+# Bei einem Tag wie v1.4.0: Tests laufen lassen, portable App für Windows (ZIP) und Linux (tar.gz) bauen
+# und an ein GitHub-Release hängen.
+# Build-Check: Ändert ein Push auf einem Branch den Build (build.py, requirements, dieser Workflow), laufen
+# beide Builds ebenfalls – aber ohne Release, nur mit Artefakten. So fällt ein kaputter Build vor dem Tag auf.
 on:
   push:
     tags: ["v*"]
+    branches: ["**"]
+    paths:
+      - build.py
+      - requirements.txt
+      - requirements-dev.txt
+      - .github/workflows/release.yml
+  workflow_dispatch:
 
 permissions:
   contents: write   # nötig, um das Release anzulegen und Dateien anzuhängen
@@ -32,11 +41,64 @@ jobs:
       - name: ZIP packen
         shell: pwsh
         run: |
-          $name = "Notex-${{ github.ref_name }}.zip"
+          $name = "Notex-${{ github.ref_name }}-windows.zip"
+          if ("${{ github.ref_type }}" -eq "tag") { $name = "Notex-${{ github.ref_name }}.zip" }
+          $name = $name -replace '/', '-'
           Compress-Archive -Path dist/Notex -DestinationPath $name
           "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Artefakt ablegen (manueller Lauf)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: notex-windows
+          path: ${{ env.ASSET }}
+
       - name: Release erstellen und ZIP anhängen
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+          generate_release_notes: true
+
+  build-linux:
+    # 22.04 statt latest: älteres glibc, damit der Build auch auf älteren Distributionen startet
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Systempakete (Enchant für die Rechtschreibung, Qt-Laufzeit für den Build-Check)
+        run: sudo apt-get update && sudo apt-get install -y libenchant-2-2 hunspell-de-de libxcb-cursor0 libegl1
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements-dev.txt
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: Portable App bauen
+        run: python build.py
+
+      - name: tar.gz packen
+        run: |
+          name="Notex-${GITHUB_REF_NAME//\//-}-linux-x86_64.tar.gz"
+          tar -czf "$name" -C dist Notex
+          echo "ASSET=$name" >> "$GITHUB_ENV"
+
+      - name: Artefakt ablegen (manueller Lauf)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: notex-linux
+          path: ${{ env.ASSET }}
+
+      - name: Release erstellen und tar.gz anhängen
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ASSET }}

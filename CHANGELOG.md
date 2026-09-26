@@ -13,6 +13,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Update-Check über die GitHub-Releases-API: höchstens einmal täglich, abschaltbar, nur ein Hinweis –
   kein Download; Hilfe › Nach Updates suchen mit Versionshinweisen, Release-Seite öffnen, Version überspringen;
   ignoriert Entwürfe, Vorabversionen und Tags, die keine Version sind
+- Linux: Build als `Notex-vX.Y.Z-linux-x86_64.tar.gz` (Ubuntu 22.04), Desktop-Integration auf Knopfdruck
+  (notex.desktop, MIME-Typ für .ntx mit Magic, Icon – nur in ~/.local/share, Standardprogramm wird nie gesetzt),
+  Rückfrage nach dem Verschieben des Ordners
+- CI: Tests auf Ubuntu und Windows; Build-Check beider Plattformen bei Änderungen am Build, ohne Release
 
 ### Behoben
 - Überblendung beim Tabwechsel deckte kurz die Tab-Leiste ab und ließ unten einen Streifen frei (falsche

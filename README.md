@@ -58,6 +58,28 @@ Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche ent
 - **Design**: matt schwarz/grau, das Blatt weiß und zentriert (Alt+P schaltet auf volle Breite),
   ein einziger dezenter Akzent, kurze Animationen (abschaltbar unter Ansicht)
 
+## Linux
+
+Seit 1.4 gibt es auch einen Linux-Build: `Notex-vX.Y.Z-linux-x86_64.tar.gz` aus den Releases, gebaut auf
+Ubuntu 22.04 (läuft auf Distributionen mit glibc ≥ 2.35, z. B. Ubuntu 22.04+, Debian 12, Fedora 36+).
+
+```bash
+tar -xzf Notex-v1.4.0-linux-x86_64.tar.gz -C ~/Apps
+~/Apps/Notex/Notex
+```
+
+- Portabel wie unter Windows: `data/`, `config.json`, `history/`, `templates/` liegen neben der Datei `Notex`.
+- Qt braucht auf manchen Systemen noch `libxcb-cursor0` (Ubuntu/Debian: `sudo apt install libxcb-cursor0`).
+- Rechtschreibung nutzt Enchant/Hunspell des Systems, falls installiert (`libenchant-2-2`), sonst das
+  eingebaute spylls mit den mitgelieferten Wörterbüchern.
+- **Einstellungen → System → „Im Anwendungsmenü registrieren“** legt `notex.desktop`, den MIME-Typ für
+  `.ntx` und das Icon in `~/.local/share` an – kein root, nichts systemweit. Danach steht Notex im Menü und
+  unter „Öffnen mit“. Standardprogramm wird es nur, wenn man es selbst festlegt
+  (`xdg-mime default notex.desktop text/plain`). Nach dem Verschieben des Ordners fragt Notex beim Start
+  nach und registriert neu.
+- Die Windows-Dateizuordnung, die dunkle Titelleiste und die Taskleisten-Gruppierung sind Windows-only und
+  werden unter Linux übersprungen.
+
 ## Dateien von außen und Dateizuordnung
 
 `Notex.exe "C:\pfad\datei.txt"` öffnet die Datei. Läuft Notex schon, übernimmt die laufende
@@ -536,10 +558,14 @@ Diesen Ordner kannst du komplett kopieren, z. B. auf einen USB-Stick.
 ## Release über GitHub Actions
 
 Ein annotiertes Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut
-die App auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
+die App auf `windows-latest` (ZIP) und `ubuntu-22.04` (tar.gz) und hängt beides an ein GitHub-Release.
 Die Version steht zentral in `notex/__init__.py` und muss zum Tag passen.
 
 ```bat
-git tag -a v1.1.0 -m "Notex 1.1.0"
-git push origin v1.1.0
+git tag -a v1.4.0 -m "Notex 1.4.0"
+git push origin v1.4.0
 ```
+
+Ändert ein Push auf einem Branch `build.py`, die requirements oder den Workflow selbst, laufen beide
+Builds ebenfalls – ohne Release, die Ergebnisse liegen als Artefakte am Workflow-Lauf. Die Tests laufen
+bei jedem Push auf Ubuntu und Windows.
