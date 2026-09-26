@@ -208,6 +208,7 @@ class MainWindow(QMainWindow):
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
         edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
         edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
+        edit_menu.addAction(self._action("Ersetzen in Dateien …", "Ctrl+Shift+H", self.open_replace_in_files))
         edit_menu.addSeparator()
         self.spell_action = self._action("Rechtschreibung prüfen", "F7", self.toggle_spellcheck, checkable=True)
         self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
@@ -760,6 +761,57 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    # ---- Ersetzen in Dateien -------------------------------------------------------------
+    def open_replace_in_files(self) -> None:
+        from notex.ui.replace_dialog import ReplaceInFilesDialog
+        dialog = getattr(self, "_replace_dialog", None)
+        if dialog is None:
+            dialog = ReplaceInFilesDialog(self, self.root, self.config)
+            dialog.apply_requested.connect(self._apply_replace_in_files)
+            self._replace_dialog = dialog
+        # offene, ungespeicherte Dateien: den Editor-Text nehmen, nicht die Platte
+        dialog.overrides = {e.path: e.toPlainText() for e in self.tabs.editors()
+                            if e.is_dirty and not self.tabs.is_external(e.path)}
+        query = self.sidebar.search_field.text() if self.sidebar.search_field.text().strip() else dialog.find_field.text()
+        dialog.prefill(query, self.sidebar.regex.isChecked(), self.sidebar.whole_word.isChecked())
+        dialog.show()
+        dialog.raise_()
+        dialog.refresh()
+
+    def _apply_replace_in_files(self, query, replacement: str, chosen: dict) -> None:
+        from notex.core.search import apply_replace
+        files = lines_total = 0
+        failed: list[str] = []
+        for path, line_numbers in chosen.items():
+            views = self.tabs.views_of(path)
+            editor = views[0] if views else None
+            try:
+                if editor is not None:
+                    new_text, count = apply_replace(editor.toPlainText(), query, replacement, line_numbers)
+                    if count:
+                        was_clean = not editor.is_dirty
+                        self.tabs.replace_text_keep_cursor(editor, new_text)
+                        if was_clean:
+                            self.tabs.group_of(editor).save_editor(editor)
+                else:
+                    text_file = _read_text_file(path)
+                    new_text, count = apply_replace(text_file.text, query, replacement, line_numbers)
+                    if count:
+                        save_text_file(path, new_text, text_file.encoding, text_file.eol)
+                        if not self.tabs.is_external(path):
+                            self.links.update_path(self.tabs.relative(path))
+            except (OSError, UnicodeDecodeError) as error:
+                failed.append(f"{path.name}: {error}")
+                continue
+            if count:
+                files += 1
+                lines_total += count
+        if failed:
+            dialogs.warn(self, "Ersetzen in Dateien", "Nicht alle Dateien konnten geschrieben werden:",
+                         informative="\n".join(failed[:10]))
+        self.toast.show_message(f"{lines_total} Zeilen in {files} Dateien ersetzt", "replace-all")
+        self.file_index.request_rescan()
 
     # ---- Geteilter Editor ----------------------------------------------------------------
     def toggle_split(self) -> None:

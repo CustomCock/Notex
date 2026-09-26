@@ -87,3 +87,82 @@ def test_cancel_stops_search(tree: Path) -> None:
     result = search(tree, "apfel", SearchOptions(by_name=True, full_text=True, **OPTS), cancel=cancel)
     assert result.cancelled is True
     assert result.names == [] and result.files == []
+
+
+# ---- v1.2: Abfragesprache, Regex, Ganzes Wort, Ersetzen ------------------------------------------
+from notex.core.search import (HAS_TIMEOUT, RegexTimeout, apply_replace, match_spans, parse_query, preview_replace,
+                               replace_query_ok)
+
+
+def test_parse_query_filters_and_phrases() -> None:
+    q = parse_query('apfel "grüne birne" ext:md,txt path:Projekte -path:archiv ext:log')
+    assert q.terms == ["apfel", "grüne birne"]
+    assert q.extensions == [".md", ".txt", ".log"]
+    assert q.path_includes == ["projekte"] and q.path_excludes == ["archiv"]
+    assert q.allows_path("Projekte/Notex/a.md") and not q.allows_path("Projekte/archiv/a.md") and not q.allows_path("x/a.md")
+    assert q.allows_extension(".MD") and not q.allows_extension(".py")
+    assert parse_query("   ").empty and not parse_query("ext:md").empty
+
+
+def test_and_semantics_and_spans() -> None:
+    q = parse_query("apfel kuchen")
+    assert match_spans(q, "Der Apfelkuchen") == [(4, 9), (9, 15)]
+    assert match_spans(q, "nur apfel") is None
+    q = parse_query('"apfel kuchen"')
+    assert match_spans(q, "apfel kuchen ja") == [(0, 12)] and match_spans(q, "apfelkuchen") is None
+
+
+def test_whole_word() -> None:
+    q = parse_query("apfel", whole_word=True)
+    assert match_spans(q, "ein apfel hier") == [(4, 9)]
+    assert match_spans(q, "apfelkuchen") is None and match_spans(q, "(apfel)") == [(1, 6)]
+
+
+def test_regex_mode_valid_invalid_and_case() -> None:
+    q = parse_query(r"ap+fel\d+ ext:txt", regex=True)
+    assert q.error is None and q.extensions == [".txt"] and q.terms == [r"ap+fel\d+"]
+    assert match_spans(q, "APFEL12 und apfel3") == [(0, 7), (12, 18)]
+    bad = parse_query("a(b", regex=True)
+    assert bad.error and "Ungültige Regex" in bad.error and not bad.needles
+    assert match_spans(parse_query("Apfel", case_sensitive=True), "apfel") is None
+    assert match_spans(parse_query(r"a.c", regex=True, whole_word=True), "xabcx abc") == [(6, 9)]
+
+
+def test_search_with_filters_regex_and_error(tree: Path) -> None:
+    result = search(tree, "apfel path:tief", SearchOptions(by_name=False, full_text=True, **OPTS))
+    assert [m.relative for m in result.files] == ["a/tief/log.log"]
+    result = search(tree, "apfel -path:tief ext:txt", SearchOptions(by_name=True, full_text=True, **OPTS))
+    assert [m.relative for m in result.files] == ["Bericht.txt"] and result.names == []
+    result = search(tree, r"^Erste\s+Z", SearchOptions(by_name=False, full_text=True, regex=True, **OPTS))
+    assert [m.relative for m in result.files] == ["Bericht.txt"]
+    result = search(tree, "a(b", SearchOptions(by_name=True, full_text=True, regex=True, **OPTS))
+    assert result.error and result.files == [] and result.names == []
+    # ext:-Filter erweitert auf Endungen, die nicht im Baum stehen
+    (tree / "roh.py").write_text("apfel = 1\n", encoding="utf-8")
+    result = search(tree, "apfel ext:py", SearchOptions(by_name=False, full_text=True, **OPTS))
+    assert [m.relative for m in result.files] == ["roh.py"]
+
+
+@pytest.mark.skipif(not HAS_TIMEOUT, reason="regex-Modul ohne Timeout nicht installiert")
+def test_catastrophic_regex_times_out(tmp_path: Path) -> None:
+    (tmp_path / "boom.txt").write_text("a" * 40 + "!\n", encoding="utf-8")
+    result = search(tmp_path, r"(a|a)+$", SearchOptions(by_name=False, full_text=True, regex=True, extensions=(".txt",)))
+    assert result.timed_out and result.error and "Timeout" in result.error
+    with pytest.raises(RegexTimeout):
+        match_spans(parse_query(r"(a|a)+$", regex=True), "a" * 40 + "!")
+
+
+def test_replace_preview_and_apply() -> None:
+    text = "Apfel eins\nkein treffer\napfel zwei apfel\n"
+    q = parse_query("apfel")
+    assert replace_query_ok(q) is None and replace_query_ok(parse_query("a b")) is not None
+    preview = preview_replace(text, q, "Birne")
+    assert [(p.line_no, p.after) for p in preview] == [(1, "Birne eins"), (3, "Birne zwei Birne")]
+    new_text, count = apply_replace(text, q, "Birne", only_lines={3})
+    assert new_text == "Apfel eins\nkein treffer\nBirne zwei Birne\n" and count == 1
+    assert apply_replace(text, q, "Birne")[1] == 2
+    # Klartext-Ersatz behandelt Backslashes wörtlich, Regex-Ersatz kennt Gruppen
+    assert apply_replace("a1", parse_query("a1"), r"\1x")[0] == r"\1x"
+    assert apply_replace("a1 a2", parse_query(r"a(\d)", regex=True), r"b\1")[0] == "b1 b2"
+    q_word = parse_query("apfel", whole_word=True)
+    assert apply_replace("apfelkuchen apfel", q_word, "birne")[0] == "apfelkuchen birne"

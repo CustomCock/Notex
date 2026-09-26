@@ -37,7 +37,8 @@ Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche ent
 
 - **Verzeichnisbaum** von `data/` links, Dateien per Klick im Editor öffnen, mehrere Tabs
 - **Suche** (Ctrl+Shift+F): rekursiv, case-insensitive, nach Dateiname und/oder Volltext,
-  läuft im Hintergrund-Thread, Klick auf einen Treffer springt in die Zeile
+  läuft im Hintergrund-Thread, Klick auf einen Treffer springt in die Zeile. Filter, Regex und
+  „Ganzes Wort“ siehe [Suche und Ersetzen in Dateien](#suche-und-ersetzen-in-dateien)
 - **Editor**: weißes Blatt auf dunklem Tisch, Zeilennummern, aktuelle Zeile hervorgehoben,
   Suchen/Ersetzen (Ctrl+F / Ctrl+H), Zoom (Ctrl+Mausrad, Ctrl+Plus/Minus)
 - **Bearbeitungsleiste** über dem Blatt (Ctrl+Shift+E): Verlauf, Suchen, Textschrift, Ansicht,
@@ -113,6 +114,31 @@ Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Tex
 „verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt Notex „X Links in Y
 Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
 offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
+
+## Suche und Ersetzen in Dateien
+
+Das Suchfeld links versteht eine kleine Abfragesprache:
+
+| Eingabe | Bedeutung |
+|---|---|
+| `apfel kuchen` | beide Wörter müssen in derselben Zeile stehen (bzw. im Dateinamen) |
+| `"grüne birne"` | genaue Phrase mit Leerzeichen |
+| `ext:md` oder `ext:md,txt` | nur diese Endungen (auch welche, die nicht im Baum stehen) |
+| `path:projekte` | nur Pfade, die „projekte“ enthalten |
+| `-path:archiv` | Pfade mit „archiv“ ausschließen |
+
+Die Chips unter dem Feld schalten **`.*`** (regulärer Ausdruck, Python-Syntax) und **Wort** (nur ganze
+Wörter) zu. Eine ungültige Regex bekommt einen roten Rahmen und die Fehlermeldung als Tooltip. Jeder
+Regex-Treffer hat ein Zeitlimit von 0,25 s pro Zeile, damit ein Muster wie `(a|a)+$` Notex nicht
+einfriert; die Suche bricht dann mit „Timeout“ ab.
+
+**Ctrl+Shift+H** öffnet „Ersetzen in Dateien“: gleicher Suchbegriff, Ersatztext (bei Regex mit `\1` für
+Gruppen), darunter jede betroffene Zeile als *vorher → nachher* mit Häkchen. Ersetzt wird nur, was
+angekreuzt ist. Offene Dateien mit ungespeicherten Änderungen werden im Editor ersetzt (rückgängig
+machbar, nicht gespeichert), offene gespeicherte Dateien werden danach gespeichert, alle anderen
+atomar mit ihrem Encoding und Zeilenende geschrieben.
+
+![Ersetzen in Dateien](docs/28-replace-in-files.png)
 
 ## Markdown-Vorschau
 
@@ -294,6 +320,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+B | Seitenleiste ein-/ausklappen |
 | Ctrl+Shift+F | Suche in Dateien (Esc leert sie) |
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
+| Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |

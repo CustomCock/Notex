@@ -309,7 +309,11 @@ def main() -> int:
         later(3400, lambda: (window.set_preview_mode("edit"), window.tabs.open_file(data / "Projekte/Python/notizen.md"),
                              window.tabs.split(), window.tabs.open_file(data / "Projekte/Python/snippets.py")))
         later(4000, lambda: save(window, "27-split-view"))
-        later(4100, lambda: (window.close(), app.quit()))
+        # v1.2: Ersetzen in Dateien
+        later(4100, lambda: (window.tabs.unsplit(), window.sidebar.search_field.setText("portabel"),
+                             window.open_replace_in_files(), window._replace_dialog.replace_field.setText("portable")))
+        later(5000, lambda: save(window._replace_dialog, "28-replace-in-files"))
+        later(5100, lambda: (window._replace_dialog.close(), window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)

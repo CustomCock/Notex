@@ -66,6 +66,8 @@ DEFAULTS: dict[str, Any] = {
     "search": {
         "by_name": True,
         "full_text": False,
+        "regex": False,       # Chip „.*“: regulärer Ausdruck
+        "whole_word": False,  # Chip „Wort“: nur ganze Wörter
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
                    ".xml", ".html", ".css", ".js", ".sql"],

@@ -14,6 +14,14 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Split View (Ctrl+\): zweite Tab-Gruppe nebeneinander oder untereinander (Ctrl+Alt+\), Tabs per Drag
   zwischen den Gruppen (Ablegen am rechten/unteren Rand teilt), dieselbe Datei in beiden Gruppen als ein
   Dokument mit gemeinsamem Undo, Zustand der Gruppen wird in config.json gesichert
+- Erweiterte Suche: mehrere Begriffe (AND), `"Phrase"`, Filter `ext:`, `path:`, `-path:`; Chips „.*“
+  (Regex, ungültig = roter Rahmen, 0,25 s Timeout pro Zeile gegen katastrophales Backtracking) und
+  „Wort“ (nur ganze Wörter); alle Treffer einer Zeile werden hervorgehoben
+- Ersetzen in Dateien (Ctrl+Shift+H): Vorschau vorher → nachher je Zeile mit Häkchen, Regex-Gruppen
+  im Ersatz, offene Dateien werden im Editor ersetzt (rückgängig machbar)
+
+### Abhängigkeiten
+- markdown-it-py (MIT) für die Vorschau, regex (Apache-2.0) für das Regex-Timeout; beide mit Lizenztext in `licenses/`
 
 ## [1.1.1] – 2026-09-26
 

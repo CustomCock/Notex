@@ -17,6 +17,7 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 | Pygments | 2.x | BSD 2-Clause | https://pygments.org | `licenses/LICENSE-Pygments.txt` |
 | markdown-it-py | 3.x/4.x | MIT | https://github.com/executablebooks/markdown-it-py | `licenses/LICENSE-markdown-it-py.txt` |
 | mdurl | 0.1.x | MIT | https://github.com/executablebooks/mdurl | `licenses/LICENSE-mdurl.txt` |
+| regex (mrab-regex) | 2024+ | Apache License 2.0 (Teile CNRI-Python) | https://github.com/mrabarnett/mrab-regex | `licenses/LICENSE-regex.txt` |
 | Inter (Schrift) | 4.1 | SIL Open Font License 1.1 | https://rsms.me/inter | `notex/assets/fonts/LICENSE-Inter.txt` |
 | JetBrains Mono (Schrift) | 2.304 | SIL Open Font License 1.1 | https://www.jetbrains.com/lp/mono | `notex/assets/fonts/LICENSE-JetBrainsMono.txt` |
 | Lucide Icons | 2026 | ISC | https://lucide.dev | `notex/assets/icons/LICENSE-Lucide.txt` |

@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout, QWidget
 
-from notex.core.search import SearchOptions, SearchResult
+from notex.core.search import SearchOptions, SearchResult, parse_query
 from notex.ui.file_tree import FileTree
 from notex.ui.open_files import OpenFilesSection
 from notex.ui.search_results import SearchResults
@@ -37,12 +37,18 @@ class Sidebar(QWidget):
         self.config = config
 
         self.search_field = SearchField("Suchen …")
-        self.search_field.setToolTip("Suche in Dateien  Ctrl+Shift+F")
+        self.search_field.setToolTip("Suche in Dateien  Ctrl+Shift+F\n\n"
+                                     "Mehrere Wörter: alle müssen in der Zeile vorkommen\n"
+                                     '"genaue Phrase"  ·  ext:md,txt  ·  path:ordner  ·  -path:archiv')
 
         self.by_name = Chip("Name", "Dateinamen durchsuchen")
         self.full_text = Chip("Volltext", "Inhalte durchsuchen")
+        self.regex = Chip(".*", "Regulärer Ausdruck (Python-Syntax, Groß/Klein egal)")
+        self.whole_word = Chip("Wort", "Nur ganze Wörter")
         self.by_name.setChecked(config["search"]["by_name"])
         self.full_text.setChecked(config["search"]["full_text"])
+        self.regex.setChecked(bool(config["search"].get("regex", False)))
+        self.whole_word.setChecked(bool(config["search"].get("whole_word", False)))
         self.results_info = QLabel()
         self.results_info.setObjectName("ResultsInfo")
         self.results_info.hide()
@@ -51,8 +57,9 @@ class Sidebar(QWidget):
         checks.setSpacing(SPACING.xs)
         checks.addWidget(self.by_name)
         checks.addWidget(self.full_text)
+        checks.addWidget(self.regex)
+        checks.addWidget(self.whole_word)
         checks.addStretch()
-        checks.addWidget(self.results_info)
 
         self.open_files = OpenFilesSection()
         self.tree = FileTree(root, config["extensions"])
@@ -75,6 +82,7 @@ class Sidebar(QWidget):
         layout.setSpacing(SPACING.sm)
         layout.addWidget(self.search_field)
         layout.addLayout(checks)
+        layout.addWidget(self.results_info)   # eigene Zeile: bei schmaler Seitenleiste bleiben die Chips lesbar
         layout.addWidget(self.open_files)
         layout.addWidget(self.stack, 1)
         layout.addLayout(footer)
@@ -92,8 +100,8 @@ class Sidebar(QWidget):
         self._workers: list[SearchWorker] = []   # laufende Threads am Leben halten, bis sie fertig sind
 
         self.search_field.textChanged.connect(self._on_text_changed)
-        self.by_name.toggled.connect(self._on_option_changed)
-        self.full_text.toggled.connect(self._on_option_changed)
+        for chip in (self.by_name, self.full_text, self.regex, self.whole_word):
+            chip.toggled.connect(self._on_option_changed)
         self.tree.file_activated.connect(lambda path: self.open_requested.emit(path, None))
         self.results.open_requested.connect(self.open_requested)
 
@@ -119,6 +127,7 @@ class Sidebar(QWidget):
 
     def clear_search(self) -> None:
         self.search_field.clear()   # löst textChanged aus -> Baum wieder sichtbar
+        self._set_invalid(False)
         self.tree.setFocus()
 
     def search_options(self) -> SearchOptions:
@@ -127,7 +136,17 @@ class Sidebar(QWidget):
             full_text=self.full_text.isChecked(),
             extensions=tuple(self.config["extensions"]),
             max_bytes=int(self.config["fulltext_max_mb"]) * 1024 * 1024,
+            regex=self.regex.isChecked(),
+            whole_word=self.whole_word.isChecked(),
         )
+
+    def _set_invalid(self, invalid: bool, reason: str = "") -> None:
+        """Roter Rahmen am Suchfeld bei ungültiger Regex oder Timeout."""
+        if self.search_field.property("invalid") != invalid:
+            self.search_field.setProperty("invalid", invalid)
+            self.search_field.style().unpolish(self.search_field)
+            self.search_field.style().polish(self.search_field)
+        self.search_field.input.setToolTip(reason)
 
     def stop_search(self) -> None:
         for worker in self._workers:
@@ -149,6 +168,8 @@ class Sidebar(QWidget):
     def _on_option_changed(self) -> None:
         self.config["search"]["by_name"] = self.by_name.isChecked()
         self.config["search"]["full_text"] = self.full_text.isChecked()
+        self.config["search"]["regex"] = self.regex.isChecked()
+        self.config["search"]["whole_word"] = self.whole_word.isChecked()
         if self.search_field.text().strip():
             self._debounce.start()
 
@@ -163,6 +184,17 @@ class Sidebar(QWidget):
         options = self.search_options()
         if not (options.by_name or options.full_text):
             self.results.show_message("Keine Suchart gewählt – Dateiname und/oder Volltext ankreuzen.")
+            return
+        parsed = parse_query(query, options.regex, options.whole_word)
+        if parsed.error:
+            self._set_invalid(True, parsed.error)
+            self.results.show_message(parsed.error)
+            self.results_info.setText("Ungültig")
+            return
+        self._set_invalid(False)
+        if not parsed.needles:
+            self.results.show_message("Nur Filter angegeben – dazu noch einen Suchbegriff eingeben.")
+            self.results_info.setText("")
             return
         self.results.show_message("Suche …")
         self.results_info.setText("Suche …")
@@ -199,6 +231,11 @@ class Sidebar(QWidget):
 
     def _on_search_done(self, generation: int, result: SearchResult) -> None:
         if not self._is_current(generation) or result.cancelled:
+            return
+        if result.error:
+            self._set_invalid(True, result.error)
+            self.results.show_message(result.error)
+            self.results_info.setText("Timeout" if result.timed_out else "Ungültig")
             return
         hits = len(result.names) + sum(len(f.lines) for f in result.files)
         files = len({m.path for m in result.names} | {f.path for f in result.files})

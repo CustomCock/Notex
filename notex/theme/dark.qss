@@ -55,6 +55,10 @@ QFrame#SearchField[focused="true"] {
     border: 1px solid @accent;
     background: @surface;
 }
+/* ungültige Regex / Timeout */
+QFrame#SearchField[invalid="true"], QLineEdit[invalid="true"] {
+    border: 1px solid @danger;
+}
 QLineEdit#SearchInput, QLineEdit#SearchInput:hover, QLineEdit#SearchInput:focus {
     background: transparent;
     border: none;

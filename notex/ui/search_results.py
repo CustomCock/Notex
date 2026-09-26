@@ -16,15 +16,20 @@ ROLE_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_LINE = Qt.ItemDataRole.UserRole + 2     # (line_no, column, length) oder None
 
 
-def _highlight(text: str, start: int, end: int) -> str:
-    """Escaped Text mit hervorgehobenem Bereich – als kleines HTML-Fragment."""
-    return (
-        html.escape(text[:start])
-        + f'<span style="background:{COLORS.accent_soft}; color:{COLORS.text}; font-weight:600">'
-        + html.escape(text[start:end])
-        + "</span>"
-        + html.escape(text[end:])
-    )
+def _highlight(text: str, start: int, end: int, spans: list[tuple[int, int]] | None = None) -> str:
+    """Escaped Text mit hervorgehobenen Bereichen (alle Treffer einer Zeile) – als kleines HTML-Fragment."""
+    ranges = sorted(spans) if spans else [(start, end)]
+    out: list[str] = []
+    pos = 0
+    for s, e in ranges:
+        if s < pos or e <= s:
+            continue
+        out.append(html.escape(text[pos:s]))
+        out.append(f'<span style="background:{COLORS.accent_soft}; color:{COLORS.text}; font-weight:600">'
+                   + html.escape(text[s:e]) + "</span>")
+        pos = e
+    out.append(html.escape(text[pos:]))
+    return "".join(out)
 
 
 def _muted(text: str) -> str:
@@ -104,7 +109,7 @@ class SearchResults(QTreeWidget):
         if with_headers and self._name_header is None:
             self._name_header = self._header("Dateinamen")
         folder = match.relative.rsplit("/", 1)[0] + "/" if "/" in match.relative else ""
-        item = QTreeWidgetItem([_highlight(match.path.name, match.start, match.end) + "  " + _muted(folder)])
+        item = QTreeWidgetItem([_highlight(match.path.name, match.start, match.end, match.spans) + "  " + _muted(folder)])
         item.setIcon(0, icon("file-text"))
         item.setData(0, ROLE_PATH, str(match.path))
         item.setData(0, ROLE_LINE, None)
@@ -119,7 +124,7 @@ class SearchResults(QTreeWidget):
         parent.setData(0, ROLE_PATH, str(match.path))
         parent.setData(0, ROLE_LINE, None)
         for line in match.lines:
-            child = QTreeWidgetItem([_muted(f"{line.line_no}:") + "  " + _highlight(line.snippet, line.start, line.end)])
+            child = QTreeWidgetItem([_muted(f"{line.line_no}:") + "  " + _highlight(line.snippet, line.start, line.end, line.spans)])
             child.setData(0, ROLE_PATH, str(match.path))
             child.setData(0, ROLE_LINE, (line.line_no, line.column, line.length))
             child.setToolTip(0, f"Zeile {line.line_no}")

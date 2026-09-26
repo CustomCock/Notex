@@ -4,3 +4,4 @@ spylls>=0.1.7
 send2trash>=1.8
 Pygments>=2.17,<3
 markdown-it-py>=3.0,<5   # Markdown-Vorschau (CommonMark + Tabellen), reines Python, MIT
+regex>=2024.5.15   # Suche: Timeout pro Regex-Match gegen katastrophales Backtracking (Apache-2.0)
