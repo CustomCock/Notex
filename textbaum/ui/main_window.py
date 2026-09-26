@@ -6,12 +6,13 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QToolButton
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QToolButton, QVBoxLayout, QWidget
 
 from textbaum import APP_NAME
 from textbaum.core.encoding import read_text_file
 from textbaum.ui.editor_tabs import EditorTabs
 from textbaum.ui.file_watcher import OpenFileWatcher
+from textbaum.ui.find_bar import FindBar
 from textbaum.ui.sidebar import Sidebar
 from textbaum.ui.status_bar import StatusBar
 from textbaum.ui.winapi import apply_dark_titlebar
@@ -27,6 +28,9 @@ class MainWindow(QMainWindow):
 
         self.sidebar = Sidebar(root, config)
         self.tabs = EditorTabs(root)
+        self.tabs.font_size = config["font_size"]
+        self.tabs.word_wrap = config["word_wrap"]
+        self.find_bar = FindBar(self.tabs.current_editor)
         self.status = StatusBar()
         self.setStatusBar(self.status)
         self.watcher = OpenFileWatcher()
@@ -40,9 +44,17 @@ class MainWindow(QMainWindow):
         self.sidebar_button.clicked.connect(self.toggle_sidebar)
         self.tabs.setCornerWidget(self.sidebar_button, Qt.Corner.TopLeftCorner)
 
+        # Rechte Seite: Tabs oben, darunter (ausblendbar) die Suchen/Ersetzen-Leiste
+        editor_area = QWidget()
+        editor_layout = QVBoxLayout(editor_area)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
+        editor_layout.addWidget(self.tabs, 1)
+        editor_layout.addWidget(self.find_bar)
+
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.sidebar)
-        self.splitter.addWidget(self.tabs)
+        self.splitter.addWidget(editor_area)
         self.splitter.setStretchFactor(0, 0)  # Seitenleiste behält ihre Breite
         self.splitter.setStretchFactor(1, 1)  # Editor bekommt den Rest
         self.splitter.setCollapsible(1, False)
@@ -59,6 +71,8 @@ class MainWindow(QMainWindow):
         tree.path_deleted.connect(self.tabs.close_paths_under)
 
         self.tabs.status_changed.connect(self._update_status)
+        self.tabs.currentChanged.connect(lambda _i: self.find_bar.refresh_highlight())
+        self.tabs.font_size_changed.connect(lambda size: self.config.__setitem__("font_size", size))
         self.tabs.file_opened.connect(self.watcher.watch)
         self.tabs.file_closed.connect(self.watcher.unwatch)
         self.tabs.file_saved.connect(self.watcher.mark_saved)
@@ -87,10 +101,30 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self._action("Beenden", "Ctrl+Q", self.close))
 
+        edit_menu = self.menuBar().addMenu("&Bearbeiten")
+        edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
+        edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
+
         view_menu = self.menuBar().addMenu("&Ansicht")
         self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
         view_menu.addAction(self.sidebar_action)
         view_menu.addAction(self._action("Suche in Dateien", "Ctrl+Shift+F", self.focus_search))
+        view_menu.addSeparator()
+        self.wrap_action = self._action("Zeilenumbruch", "Alt+Z", self.toggle_word_wrap, checkable=True)
+        self.wrap_action.setChecked(self.config["word_wrap"])
+        view_menu.addAction(self.wrap_action)
+        view_menu.addSeparator()
+        view_menu.addAction(self._action("Vergrößern", QKeySequence.StandardKey.ZoomIn, lambda: self.tabs.zoom(+1)))
+        view_menu.addAction(self._action("Verkleinern", QKeySequence.StandardKey.ZoomOut, lambda: self.tabs.zoom(-1)))
+        view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(11)))
+        # Ctrl+Plus liegt je nach Tastatur auf "Ctrl+=" – beides abdecken
+        self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
+
+    def toggle_word_wrap(self) -> None:
+        enabled = not self.tabs.word_wrap
+        self.tabs.set_word_wrap(enabled)
+        self.wrap_action.setChecked(enabled)
+        self.config["word_wrap"] = enabled
 
     def focus_search(self) -> None:
         if not self.sidebar.isVisible():

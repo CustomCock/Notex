@@ -47,7 +47,11 @@ QCheckBox::indicator {
     background: @surface;
 }
 QCheckBox::indicator:checked {
-    background: @accent;
+    background: @text;
+    border-color: @text;
+}
+QCheckBox:checked {
+    color: @text;
 }
 
 /* Baum und Ergebnisliste */
@@ -116,13 +120,19 @@ QTabBar::close-button {
     subcontrol-position: right;
 }
 
-/* Editorfläche = weißes Blatt. Der Rand außen ist der "Tisch". */
+/* Editorfläche = weißes Blatt. Der margin ist der dunkle "Tisch" drumherum. */
 QPlainTextEdit {
     background: @paper;
     color: @paper_text;
-    border: none;
+    border: 1px solid @border;
+    margin: 10px 12px 12px 12px;
     selection-background-color: @paper_selection;
     selection-color: @paper_text;
+}
+
+QWidget#FindBar {
+    background: @sidebar;
+    border-top: 1px solid @border;
 }
 
 /* ---------- Statusleiste, Menüs, Buttons ---------- */

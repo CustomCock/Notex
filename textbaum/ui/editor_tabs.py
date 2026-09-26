@@ -12,6 +12,7 @@ from textbaum.core.fileops import save_text_file
 from textbaum.ui.editor import Editor
 
 DIRTY_MARK = " ●"
+MIN_FONT_SIZE, MAX_FONT_SIZE = 6, 40
 
 
 class EditorTabs(QTabWidget):
@@ -20,6 +21,7 @@ class EditorTabs(QTabWidget):
     file_saved = Signal(Path)
     file_opened = Signal(Path)
     file_closed = Signal(Path)
+    font_size_changed = Signal(int)
 
     def __init__(self, root: Path) -> None:
         super().__init__()
@@ -67,6 +69,7 @@ class EditorTabs(QTabWidget):
             editor.document().modificationChanged.connect(lambda _m, e=editor: self._refresh_title(e))
             editor.cursorPositionChanged.connect(self.status_changed.emit)
             editor.textChanged.connect(self.status_changed.emit)
+            editor.zoom_requested.connect(self.zoom)
             index = self.addTab(editor, path.name)
             self.setTabToolTip(index, self.relative(path))
             self.file_opened.emit(path)
@@ -169,9 +172,13 @@ class EditorTabs(QTabWidget):
             self._refresh_title(editor)
 
     def set_font_size(self, size: int) -> None:
-        self.font_size = size
+        self.font_size = max(MIN_FONT_SIZE, min(MAX_FONT_SIZE, size))
         for editor in self.editors():
-            editor.set_font_size(size)
+            editor.set_font_size(self.font_size)
+        self.font_size_changed.emit(self.font_size)
+
+    def zoom(self, direction: int) -> None:
+        self.set_font_size(self.font_size + direction)
 
     def set_word_wrap(self, enabled: bool) -> None:
         self.word_wrap = enabled
