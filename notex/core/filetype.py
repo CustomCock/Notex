@@ -61,6 +61,10 @@ OGG = _t("ogg", "Ogg-Medien", [".ogg", ".oga", ".ogv", ".opus"], "media")
 FLAC = _t("flac", "FLAC-Audio", [".flac"], "media")
 WAV = _t("wav", "WAV-Audio", [".wav"], "media")
 MP4 = _t("mp4", "MP4/MOV-Video", [".mp4", ".m4a", ".m4v", ".mov"], "media")
+TAR = _t("tar", "TAR-Archiv", [".tar"], "archive")
+PCAP = _t("pcap", "Netzwerk-Mitschnitt (PCAP)", [".pcap", ".cap", ".dmp"], "capture")
+PCAPNG = _t("pcapng", "Netzwerk-Mitschnitt (PCAPNG)", [".pcapng", ".ntar"], "capture")
+EVTX = _t("evtx", "Windows-Ereignisprotokoll (EVTX)", [".evtx"], "log")
 TEXT = _t("text", "Text", [], "text")
 BINARY = _t("binary", "Binärdaten (unbekannt)", [], "binary")
 EMPTY = _t("empty", "Leere Datei", [], "text")
@@ -68,6 +72,11 @@ EMPTY = _t("empty", "Leere Datei", [], "text")
 # (Offset, Bytes, Typ) – die Reihenfolge zählt: spezifische Signaturen zuerst
 SIGNATURES: list[tuple[int, bytes, FileType]] = [
     (0, b"NOTEXENC", NTX),
+    (0, b"ElfFile\x00", EVTX),
+    (0, b"\xd4\xc3\xb2\xa1", PCAP), (0, b"\xa1\xb2\xc3\xd4", PCAP),      # Mikrosekunden, LE/BE
+    (0, b"\x4d\x3c\xb2\xa1", PCAP), (0, b"\xa1\xb2\x3c\x4d", PCAP),      # Nanosekunden, LE/BE
+    (0, b"\x0a\x0d\x0d\x0a", PCAPNG),
+    (257, b"ustar", TAR),
     (0, b"\x89PNG\r\n\x1a\n", PNG),
     (0, b"\xff\xd8\xff", JPEG),
     (0, b"GIF87a", GIF),

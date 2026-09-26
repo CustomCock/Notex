@@ -122,3 +122,16 @@ def test_hashing_ntx_only_sees_ciphertext(tmp_path: Path) -> None:
     raw = path.read_bytes()
     assert secret.encode() not in raw
     assert hashing.hash_file(path)["sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+def test_copy_formats_and_interpretation() -> None:
+    assert hexdata.to_base64(b"Notex") == "Tm90ZXg="
+    c = hexdata.to_c_array(bytes(range(14)), "blob")
+    assert c.startswith("unsigned char blob[14] = {\n    0x00, 0x01") and c.rstrip().endswith("0x0D\n};")
+    rows = hexdata.interpret(b"\x01\x02\x03\x04\x05")
+    assert rows[0] == ("u8", 1, 1)
+    assert rows[1] == ("u16", 0x0201, 0x0102)
+    assert rows[2] == ("u32", 0x04030201, 0x01020304)
+    assert rows[3] == ("u64", None, None)                      # nur 5 Bytes da
+    assert hexdata.selection_value(b"\x34\x12") == "u16 LE 4.660 · BE 13.330"
+    assert hexdata.selection_value(b"\xff") == "u8 255" and hexdata.selection_value(b"abc") == ""

@@ -1078,6 +1078,23 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             service.upsert(dialog.result_variable(), old_name=name)
 
+    def show_in_hex(self, path: Path, offset: int, length: int = 1) -> None:
+        """Sprung aus Strings/Eingebettete Dateien/Entropie an eine Stelle der Datei (Modul Hex & Dateianalyse)."""
+        if not self.modules.enabled("hex"):
+            self.toast.show_message("Für die Hex-Ansicht das Modul „Hex & Dateianalyse“ einschalten", "info")
+            return
+        viewer = self.tabs.open_viewer(Path(path), "hex")
+        if viewer is not None:
+            viewer.select_range(offset, length)
+
+    def _analysis_target(self, path: Path | None) -> Path | None:
+        """Datei für ein Analyse-Werkzeug: übergeben, sonst der aktuelle Tab, sonst die Auswahl im Baum."""
+        path = path or self._current_file() or self.sidebar.tree.selected_path()
+        if path is None or not Path(path).is_file():
+            self.toast.show_message("Erst eine Datei öffnen oder im Baum auswählen", "info")
+            return None
+        return Path(path)
+
     def open_as_hex(self, path: Path | None = None) -> None:
         """Beliebige Datei als Hex (nur lesen) – bei .ntx sieht man nur den Geheimtext von der Platte."""
         path = path or self._current_file()

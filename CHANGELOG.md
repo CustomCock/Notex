@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.8.0] – unveröffentlicht
+
+### Hinzugefügt
+- Hex-Ansicht: Auswahl kopieren als Hex, Text, Base64 oder C-Array (Rechtsklick); Werte-Zeile u8/u16/u32/u64 LE/BE
+  ab Cursor; Wert der Auswahl (1/2/4/8 Bytes) in der Statusleiste
+- Dateityp-Erkennung: TAR, PCAP (µs/ns, LE/BE), PCAPNG, EVTX
+
 ## [1.7.0] – 2026-09-26
 
 ### Hinzugefügt

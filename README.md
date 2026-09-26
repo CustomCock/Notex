@@ -371,12 +371,15 @@ Textdatei:
   nur lesend. Unbekannte Binärdateien öffnen automatisch so. Auswahl ist in beiden Spalten synchron (Klick, Ziehen,
   Shift+Pfeile), `Tab` wechselt die Spalte, `Ctrl+C` kopiert als Hex (in der ASCII-Spalte als Text).
 - **Gehe zu Offset** (`Ctrl+G`): dezimal (`1234`) oder hex (`0x4D2`, `4D2h`, `$4D2`).
+- **Rechtsklick** in der Hex-Ansicht: Auswahl kopieren als Hex, Text, Base64 oder C-Array. Unter der Ansicht stehen
+  die Werte ab dem Cursor als u8/u16/u32/u64 (Little und Big Endian); bei einer Auswahl von 1, 2, 4 oder 8 Bytes
+  zeigt die Statusleiste zusätzlich deren Wert.
 - **Suchen** (`Ctrl+F`, `F3` weiter, `Esc` bricht ab): Hex-Bytes (`DE AD BE EF`) oder Text, wahlweise ohne
   Groß/klein. Die Suche läuft im Hintergrund mit Fortschritt; auch über mehrere GB bleibt die Oberfläche bedienbar.
 - Gelesen wird seitenweise (64 KB, kleiner Cache), die Datei bleibt nicht geöffnet – mehrere GB öffnen sofort, und
   Umbenennen/Verschieben/Löschen funktioniert auch unter Windows, während der Tab offen ist.
 - **Dateityp** über Magic Bytes (eigene Tabelle: PNG, JPEG, GIF, PDF, ZIP inkl. docx/xlsx/jar/apk, RAR, 7z, GZIP,
-  ELF, PE/EXE, Mach-O, SQLite, .ntx u. a.) steht in der Statusleiste; passt die Endung nicht zum Inhalt (z. B. eine
+  ELF, PE/EXE, Mach-O, SQLite, TAR, PCAP, PCAPNG, EVTX, .ntx u. a.) steht in der Statusleiste; passt die Endung nicht zum Inhalt (z. B. eine
   „rechnung.pdf“, die ein Windows-Programm ist), erscheint rechts eine Warnung.
 - **Prüfsummen …** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+C`): MD5, SHA-1, SHA-256, SHA-512 in einem
   Lesedurchgang im Hintergrund, jede mit Kopierknopf. „Vergleichen mit …“ nimmt auch `SHA256: …`, Doppelpunkt-

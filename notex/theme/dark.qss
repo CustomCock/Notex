@@ -1056,3 +1056,11 @@ QTreeView#PdfOutline::item:selected, QTreeView#PdfOutline::item:hover {
     background: @selection;
     color: @text;
 }
+QLabel#HexInspector {
+    background: @surface;
+    color: @text_muted;
+    font-size: @fs_smallpx;
+    padding: @sp_xspx @sp_mdpx;
+    border-bottom-left-radius: @r_panelpx;
+    border-bottom-right-radius: @r_panelpx;
+}
