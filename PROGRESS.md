@@ -231,6 +231,13 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Vorab (Rückfrage des Besitzers „wie benutze ich die Tools?“): Binärdateien waren im Baum unsichtbar (nur
   eingestellte Endungen). `core/modules.show_all_files` – Baum zeigt alle Dateien per Schalter `tree_show_all` oder
   automatisch, solange ein Analyse-Modul an ist; MainWindow.apply_tree_filter bei Modulwechsel und aus den Einstellungen.
+- **Besitzer (26.09.2026): H, I, J und K ohne Zwischenstopp nacheinander bauen**, Zusammenfassung erst am Ende.
+- H4 IOC entschärfen: `core/ioc.py` – Spans in fester Reihenfolge (URL → E-Mail → IPv6 → IPv4 → Domain), keine
+  Überlappung; Domain nur mit TLD aus Liste bzw. zwei Buchstaben, mehrdeutige ccTLDs (md, py, sh, so, rs …) erst ab
+  drei Teilen, Dateiendungen (exe, txt, pdf, zip …) nie; IPv6/IPv4 per ipaddress geprüft; URL: nur Host entschärft,
+  Pfad bleibt; schon Entschärftes wird erkannt. refang per Ersetzungstabelle (auch [dot], (.), {.}, [at], h[xx]p).
+  UI: MainWindow._activate_ioc (Bearbeiten → Umwandeln, Kontextmenü-Gruppe, Palette), Einstellung
+  `ioc.skip_code`. Nur im Editor-Dokument → .ntx-Regel erfüllt (nichts auf Platte).
 
 ## Offen
 

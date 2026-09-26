@@ -590,6 +590,14 @@ class SettingsDialog(QDialog):
             info.setWordWrap(True)
             page.row(box, info)
             self.module_boxes[module.key] = box
+        page.section("IOCs entschärfen")
+        ioc_cfg = self.config.setdefault("ioc", {})
+        self.ioc_skip_code = QCheckBox("Code-Blöcke (``` und `inline`) nicht umwandeln")
+        self.ioc_skip_code.setChecked(bool(ioc_cfg.get("skip_code", True)))
+        self.ioc_skip_code.toggled.connect(lambda on: ioc_cfg.__setitem__("skip_code", on))
+        page.add(self.ioc_skip_code)
+        page.note("Ctrl+Alt+D entschärft die Auswahl bzw. die ganze Datei (hxxp://, [.], [@], [:]), Ctrl+Shift+Alt+D "
+                  "macht sie wieder scharf. Dateinamen wie setup.py oder readme.md bleiben unverändert.")
         return page
 
     def _build_variables(self) -> SettingsPage:
@@ -863,6 +871,8 @@ class SettingsDialog(QDialog):
         self.manager.apply(self._snapshot_theme)
         for key in ("paper_mode", "extensions", "font_by_extension"):
             self.config[key] = self._snapshot_config[key]
+        if "ioc" in self._snapshot_config:
+            self.config["ioc"] = self._snapshot_config["ioc"]
         self.window_.tabs.apply_text_fonts()
         self.window_.tabs.set_paper_mode(self.config["paper_mode"])
         self.window_.paper_action.setChecked(self.config["paper_mode"])

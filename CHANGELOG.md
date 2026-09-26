@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 
 ## [1.9.0] – unveröffentlicht
 
+### Hinzugefügt
+- Modul IOC entschärfen (Standard an): Rechtsklick → Umwandeln, `Ctrl+Alt+D` / `Ctrl+Shift+Alt+D` – URLs, Domains,
+  IPv4/IPv6 und E-Mails in Auswahl oder Datei entschärfen (hxxp, [.], [@], [:]) und wieder scharf machen; Dateinamen,
+  Versionen und schon Entschärftes bleiben unverändert, Code-Blöcke optional ausgenommen
+
 ### Verbessert
 - Baum zeigt alle Dateien, solange ein Analyse-Modul (Strings, Eingebettete Dateien, Entropie) an ist, oder per
   Schalter „Alle Dateien anzeigen“ – vorher waren .exe/.zip/.pcap im Baum unsichtbar und nicht per Rechtsklick

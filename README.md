@@ -403,6 +403,28 @@ Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **En
 ![Entropie](docs/53-entropy.png)
 
 
+## IOCs entschärfen
+
+Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
+Command Palette. Wirkt auf die Auswahl, ohne Auswahl auf die ganze Datei – ein Undo-Schritt.
+
+| Vorher | Entschärft (`Ctrl+Alt+D`) |
+|---|---|
+| `http://evil.example.com/a.php` | `hxxp://evil[.]example[.]com/a.php` (Punkte nur im Host) |
+| `evil.example.com`, `192.168.1.10:445` | `evil[.]example[.]com`, `192[.]168[.]1[.]10:445` |
+| `2001:db8::1` | `2001[:]db8[:][:]1` |
+| `admin@example.org` | `admin[@]example[.]org` |
+
+- `Ctrl+Shift+Alt+D` macht wieder scharf und versteht auch andere übliche Schreibweisen (`[dot]`, `(.)`, `{.}`,
+  `[at]`, `hxxps`, `h[xx]p`, `fxp`, `[://]`).
+- Erkannt werden URLs (http/https/ftp), Domains, IPv4, IPv6 (geprüft), E-Mails. Dateinamen wie `setup.py`,
+  `readme.md`, `evil.exe`, Versionsnummern und Uhrzeiten bleiben unverändert: Die Endung muss eine Top-Level-Domain
+  sein, mehrdeutige Endungen (`.md`, `.py`, `.sh` …) zählen erst ab drei Teilen (`cdn.evil.md`). Schon entschärfte
+  Werte werden nicht doppelt entschärft.
+- Code-Blöcke (``` und `inline`) bleiben standardmäßig unverändert (Einstellungen → Module).
+- Alles geschieht nur im Editor – bei verschlüsselten Notizen landet nichts im Klartext auf der Platte.
+
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -727,6 +749,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
 | Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
+| Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
 | Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |

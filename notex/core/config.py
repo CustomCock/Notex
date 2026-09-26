@@ -112,6 +112,9 @@ DEFAULTS: dict[str, Any] = {
         "min_len": 4,
         "encodings": ["ascii", "utf16le"],
     },
+    "ioc": {                  # Modul IOCs entschärfen (Umwandeln, Ctrl+Alt+D / Ctrl+Shift+Alt+D)
+        "skip_code": True,    # Code-Blöcke (``` und `inline`) unverändert lassen
+    },
     "variables": {            # Modul Variablen – Definitionen liegen in variables.json neben der App
         "prefix": "§",
         "copy": "values",     # Ctrl+C: "values" (Werte einsetzen) oder "tokens"

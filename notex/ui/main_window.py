@@ -905,6 +905,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("entropy", lambda: self._activate_analysis(
             "entropy", "Entropie anzeigen …", "Ctrl+Alt+E", "activity", self.show_entropy,
             "entropie verschlüsselt komprimiert zufall kurve"))
+        self.modules.contribute("ioc", self._activate_ioc)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -1093,6 +1094,72 @@ class MainWindow(QMainWindow):
         dialog = VariableEditDialog(self, variable, [v.name for v in service.variables], service.prefix)
         if dialog.exec():
             service.upsert(dialog.result_variable(), old_name=name)
+
+    # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
+    def _activate_ioc(self):
+        """Umwandeln: IOCs (URLs, Domains, IPs, E-Mails) in Auswahl oder Datei entschärfen bzw. scharf machen."""
+        submenu = self.edit_menu.addMenu("Umwandeln")
+        actions = [self._action("IOCs entschärfen", "Ctrl+Alt+D", lambda: self.convert_iocs(True)),
+                   self._action("IOCs wieder scharf machen", "Ctrl+Shift+Alt+D", lambda: self.convert_iocs(False))]
+        for action in actions:
+            submenu.addAction(action)
+        keywords = "ioc defang refang entschärfen hxxp url domain ip e-mail bericht ticket"
+        self.registry.add("ioc:defang", "IOCs entschärfen (Auswahl oder Datei)", lambda: self.convert_iocs(True),
+                          category="Umwandeln", shortcut="Ctrl+Alt+D", keywords=keywords)
+        self.registry.add("ioc:refang", "IOCs wieder scharf machen (Auswahl oder Datei)", lambda: self.convert_iocs(False),
+                          category="Umwandeln", shortcut="Ctrl+Shift+Alt+D", keywords=keywords)
+        self._editor_menu_providers.append(self._ioc_menu)
+
+        def undo() -> None:
+            for action in actions:
+                self.removeAction(action)
+                action.deleteLater()
+            self.edit_menu.removeAction(submenu.menuAction())
+            submenu.deleteLater()
+            self.registry.remove("ioc:defang")
+            self.registry.remove("ioc:refang")
+            if self._ioc_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._ioc_menu)
+        return undo
+
+    def _ioc_menu(self, editor, menu) -> None:
+        writable = not editor.isReadOnly() and not getattr(editor, "locked", False)
+        scope = "Auswahl" if editor.textCursor().hasSelection() else "Datei"
+        submenu = menu.addMenu(icon("shield"), "Umwandeln")
+        submenu.addAction(f"IOCs entschärfen ({scope})\tCtrl+Alt+D", lambda: self.convert_iocs(True, editor)).setEnabled(writable)
+        submenu.addAction(f"IOCs wieder scharf machen ({scope})\tCtrl+Shift+Alt+D",
+                          lambda: self.convert_iocs(False, editor)).setEnabled(writable)
+
+    def convert_iocs(self, defang: bool, editor=None) -> None:
+        """Auswahl (oder ganze Datei) umwandeln – ein Undo-Schritt, alles nur im Editor (auch bei .ntx nichts auf Platte)."""
+        from notex.core import ioc
+        editor = editor or self.tabs.current_editor()
+        if editor is None or self._in_data_view():
+            self.toast.show_message("Erst eine Textdatei öffnen", "info")
+            return
+        if editor.isReadOnly() or getattr(editor, "locked", False):
+            self.toast.show_message("Die Datei ist schreibgeschützt oder gesperrt", "lock")
+            return
+        skip_code = bool(self.config.get("ioc", {}).get("skip_code", True))
+        convert = ioc.defang if defang else ioc.refang
+        cursor = editor.textCursor()
+        if cursor.hasSelection():
+            start = cursor.selectionStart()
+            new, count = convert(cursor.selection().toPlainText(), skip_code=skip_code)
+            if count:
+                editor._grouped(lambda: cursor.insertText(new))
+                cursor.setPosition(start)
+                cursor.setPosition(start + len(new), QTextCursor.MoveMode.KeepAnchor)
+                editor.setTextCursor(cursor)
+        else:
+            new, count = convert(editor.toPlainText(), skip_code=skip_code)
+            if count:
+                self.tabs.replace_text_keep_cursor(editor, new)
+        if not count:
+            self.toast.show_message("Keine IOCs gefunden" if defang else "Nichts Entschärftes gefunden", "info")
+            return
+        what = "entschärft" if defang else "wieder scharf gemacht"
+        self.toast.show_message(f"{count} Stelle(n) {what} – Ctrl+Z macht es rückgängig", "shield")
 
     def _activate_analysis(self, key: str, title: str, shortcut: str, icon_name: str, opener, keywords: str):
         """Gemeinsamer Aktivator für Datei-Analysen: Menü Datei, Palette, Kürzel, Baum-Kontextmenü."""
