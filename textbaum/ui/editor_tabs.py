@@ -7,6 +7,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
 from textbaum.core.encoding import read_text_file
+from textbaum.core import fileops
 from textbaum.core.fileops import save_text_file
 from textbaum.ui.editor import Editor
 
@@ -91,6 +92,15 @@ class EditorTabs(QTabWidget):
     def close_current(self) -> None:
         if self.count():
             self.close_tab(self.currentIndex())
+
+    def close_paths_under(self, path: Path) -> None:
+        """Nach Löschen im Baum: Tabs der Datei bzw. aller Dateien im Ordner ohne Nachfrage schließen."""
+        for editor in self.editors():
+            if editor.path == path or fileops.is_within(editor.path, path):
+                self.removeTab(self.indexOf(editor))
+                self.file_closed.emit(editor.path)
+                editor.deleteLater()
+        self.status_changed.emit()
 
     def confirm_close_all(self) -> bool:
         """Vor dem Beenden: für jeden ungespeicherten Tab nachfragen. False = Abbruch."""

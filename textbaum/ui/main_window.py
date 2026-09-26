@@ -1,4 +1,4 @@
-"""Hauptfenster: Seitenleiste links, Editor-Tabs rechts, Menü und Shortcuts."""
+"""Hauptfenster: Seitenleiste links, Editor-Tabs rechts, Statusleiste, Menü und Shortcuts."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,11 +6,14 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QSplitter
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QToolButton
 
 from textbaum import APP_NAME
+from textbaum.core.encoding import read_text_file
 from textbaum.ui.editor_tabs import EditorTabs
+from textbaum.ui.file_watcher import OpenFileWatcher
 from textbaum.ui.sidebar import Sidebar
+from textbaum.ui.status_bar import StatusBar
 from textbaum.ui.winapi import apply_dark_titlebar
 
 
@@ -24,6 +27,18 @@ class MainWindow(QMainWindow):
 
         self.sidebar = Sidebar(root, config["extensions"])
         self.tabs = EditorTabs(root)
+        self.status = StatusBar()
+        self.setStatusBar(self.status)
+        self.watcher = OpenFileWatcher()
+
+        # Kleiner Button links neben den Tabs, der die Seitenleiste ein-/ausklappt.
+        # Er sitzt bewusst außerhalb der Seitenleiste, damit er auch sichtbar ist, wenn sie weg ist.
+        self.sidebar_button = QToolButton()
+        self.sidebar_button.setObjectName("FlatButton")
+        self.sidebar_button.setText("☰")
+        self.sidebar_button.setToolTip("Seitenleiste ein-/ausblenden (Ctrl+B)")
+        self.sidebar_button.clicked.connect(self.toggle_sidebar)
+        self.tabs.setCornerWidget(self.sidebar_button, Qt.Corner.TopLeftCorner)
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(self.sidebar)
@@ -33,36 +48,112 @@ class MainWindow(QMainWindow):
         self.splitter.setCollapsible(1, False)
         self.setCentralWidget(self.splitter)
 
-        self.sidebar.tree.file_activated.connect(self.tabs.open_file)
-        self.tabs.status_changed.connect(self._update_title)
-
+        self._connect_signals()
         self._build_menu()
         self._restore_window_state()
 
+    def _connect_signals(self) -> None:
+        tree = self.sidebar.tree
+        tree.file_activated.connect(self.tabs.open_file)
+        tree.path_renamed.connect(self._on_path_renamed)
+        tree.path_deleted.connect(self.tabs.close_paths_under)
+
+        self.tabs.status_changed.connect(self._update_status)
+        self.tabs.file_opened.connect(self.watcher.watch)
+        self.tabs.file_closed.connect(self.watcher.unwatch)
+        self.tabs.file_saved.connect(self.watcher.mark_saved)
+        self.watcher.file_changed_externally.connect(self._on_external_change)
+        self.watcher.file_removed_externally.connect(self._on_external_remove)
+
     # ---- Menü & Shortcuts ---------------------------------------------------
-    def _action(self, text: str, shortcut: str | QKeySequence.StandardKey | None, slot) -> QAction:
+    def _action(self, text: str, shortcut, slot, checkable: bool = False) -> QAction:
         action = QAction(text, self)
         if shortcut is not None:
             action.setShortcut(QKeySequence(shortcut))
+        action.setCheckable(checkable)
         action.triggered.connect(slot)
-        self.addAction(action)  # damit der Shortcut auch ohne sichtbares Menü greift
+        self.addAction(action)  # damit der Shortcut auch ohne offenes Menü greift
         return action
 
     def _build_menu(self) -> None:
+        tree = self.sidebar.tree
         file_menu = self.menuBar().addMenu("&Datei")
+        file_menu.addAction(self._action("Neue Datei", "Ctrl+N", lambda: tree.create_file(tree._folder_for(tree.selected_path()))))
+        file_menu.addAction(self._action("Neuer Ordner", "Ctrl+Shift+N", lambda: tree.create_folder(tree._folder_for(tree.selected_path()))))
+        file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))
         file_menu.addAction(self._action("Tab schließen", "Ctrl+W", self.tabs.close_current))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Beenden", "Ctrl+Q", self.close))
 
-    def _update_title(self) -> None:
+        view_menu = self.menuBar().addMenu("&Ansicht")
+        self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
+        view_menu.addAction(self.sidebar_action)
+
+    # ---- Seitenleiste ---------------------------------------------------------
+    def toggle_sidebar(self) -> None:
+        self.set_sidebar_visible(not self.sidebar.isVisible())
+
+    def set_sidebar_visible(self, visible: bool) -> None:
+        if not visible and self.sidebar.isVisible():
+            sizes = self.splitter.sizes()
+            if sizes and sizes[0] > 0:
+                self.config["sidebar"]["width"] = sizes[0]  # Breite merken, bevor sie auf 0 geht
+        self.sidebar.setVisible(visible)
+        if visible:
+            width = self.config["sidebar"]["width"]
+            self.splitter.setSizes([width, max(200, self.width() - width)])
+        self.sidebar_action.setChecked(visible)
+        self.config["sidebar"]["visible"] = visible
+
+    # ---- Reaktionen auf Baum / Watcher -----------------------------------------
+    def _on_path_renamed(self, old: Path, new: Path) -> None:
+        self.tabs.rename_open_file(old, new)
+        # Watcher auf die neuen Pfade umhängen
+        for editor in self.tabs.editors():
+            if editor.path == new or new in editor.path.parents:
+                self.watcher.watch(editor.path)
+        self.watcher.unwatch(old)
+        self._update_status()
+
+    def _on_external_change(self, path: Path) -> None:
+        editor = self.tabs.editor_for(path)
+        if editor is None:
+            return
+        hint = "\nAchtung: Du hast ungespeicherte Änderungen, die dabei verloren gehen." if editor.is_dirty else ""
+        answer = QMessageBox.question(
+            self, "Datei extern geändert",
+            f"„{self.tabs.relative(path)}“ wurde außerhalb von {APP_NAME} geändert.\nNeu laden?{hint}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            try:
+                editor.replace_content(read_text_file(path))
+            except OSError as error:
+                QMessageBox.warning(self, "Neu laden fehlgeschlagen", str(error))
+        else:
+            editor.document().setModified(True)  # Inhalt weicht jetzt von der Platte ab
+        self._update_status()
+
+    def _on_external_remove(self, path: Path) -> None:
+        editor = self.tabs.editor_for(path)
+        if editor is None:
+            return
+        editor.document().setModified(True)  # Speichern legt die Datei wieder an
+        self.status.showMessage(f"„{self.tabs.relative(path)}“ wurde extern gelöscht oder verschoben.", 8000)
+        self._update_status()
+
+    def _update_status(self) -> None:
         editor = self.tabs.current_editor()
         if editor is None:
+            self.status.update_for(None, "")
             self.setWindowTitle(APP_NAME)
             return
-        mark = "● " if editor.is_dirty else ""
-        self.setWindowTitle(f"{mark}{self.tabs.relative(editor.path)} – {APP_NAME}")
+        relative = self.tabs.relative(editor.path)
+        self.status.update_for(editor, relative)
+        self.setWindowTitle(f"{'● ' if editor.is_dirty else ''}{relative} – {APP_NAME}")
 
     # ---- Zustand ----------------------------------------------------------
     def _restore_window_state(self) -> None:
@@ -75,6 +166,8 @@ class MainWindow(QMainWindow):
 
         side = self.config["sidebar"]
         self.splitter.setSizes([side["width"], max(200, win["width"] - side["width"])])
+        self.set_sidebar_visible(side["visible"])
+        self.sidebar.tree.restore_expanded(self.config["expanded_folders"])
 
         for rel in self.config["open_tabs"]:
             path = self.root / rel
@@ -89,9 +182,12 @@ class MainWindow(QMainWindow):
         if not self.isMaximized():
             geo = self.normalGeometry()  # Größe/Position im nicht-maximierten Zustand
             win["x"], win["y"], win["width"], win["height"] = geo.x(), geo.y(), geo.width(), geo.height()
-        sizes = self.splitter.sizes()
-        if sizes and sizes[0] > 0:
-            self.config["sidebar"]["width"] = sizes[0]
+        if self.sidebar.isVisible():
+            sizes = self.splitter.sizes()
+            if sizes and sizes[0] > 0:
+                self.config["sidebar"]["width"] = sizes[0]
+        self.config["sidebar"]["visible"] = self.sidebar.isVisible()
+        self.config["expanded_folders"] = self.sidebar.tree.expanded_folders()
         self.config["open_tabs"] = self.tabs.open_paths()
         self.config["active_tab"] = max(0, self.tabs.currentIndex())
 
