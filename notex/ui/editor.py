@@ -11,11 +11,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QPainter, QTextBlockFormat, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QFrame, QMenu, QTextEdit, QWidget
 
 from notex.core.encoding import TextFile
+from notex.core.text_ops import hanging_prefix
 from notex.core.spell import SpellChecker, LANGUAGE_LABELS
 from notex.theme.icons import icon
 from notex.theme.theme import style_menu
@@ -58,9 +59,20 @@ class Editor(QTextEdit):
         self.setObjectName("Editor")
         self.setFrameStyle(QFrame.Shape.NoFrame)
         self.setAcceptRichText(False)          # eingefügter Text bleibt reiner Text
-        self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        # Text ist immer vollständig sichtbar: Umbruch an der Blattbreite, notfalls mitten im Wort
+        # (lange URLs, Hashes, Pfade), und keine horizontale Scrollbar
+        self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.document().setDocumentMargin(SPACING.xs)
         self.setCursorWidth(2)
+        self._padding = LAYOUT.paper_padding   # aktueller Innenabstand (schrumpft bei schmalem Blatt)
+        self._indent_pending: set[int] = set()
+        self._indent_timer = QTimer(self)
+        self._indent_timer.setSingleShot(True)
+        self._indent_timer.setInterval(0)
+        self._indent_timer.timeout.connect(self._apply_pending_indents)
+        self.document().contentsChange.connect(self._on_block_changed)
 
         self.line_numbers = LineNumberArea(self)
         self.verticalScrollBar().valueChanged.connect(self.line_numbers.update)
@@ -75,6 +87,7 @@ class Editor(QTextEdit):
         self.encoding, self.eol = text_file.encoding, text_file.eol
         self.setPlainText(text_file.text)
         self._apply_line_height()
+        self._apply_hanging_indents()
         self.document().clearUndoRedoStacks()
         self.document().setModified(False)
         self._update_margins()
@@ -139,12 +152,74 @@ class Editor(QTextEdit):
         """Zeilennummern in der UI-Schrift mit tabellarischen Ziffern, etwas kleiner als der Text."""
         return ui_font(max(9, self._font_size - 2), tabular=True)
 
-    def set_word_wrap(self, enabled: bool) -> None:
-        self.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth if enabled else QTextEdit.LineWrapMode.NoWrap)
-        self.setWordWrapMode(QTextOption.WrapMode.WordWrap if enabled else QTextOption.WrapMode.NoWrap)
+    def char_width(self) -> float:
+        """Mittlere Zeichenbreite – bei proportionalen Schriften über einen typischen Satz gemessen."""
+        sample = "Franz jagt im komplett verwahrlosten Taxi quer durch Bayern. 0123456789"
+        return self.fontMetrics().horizontalAdvance(sample) / len(sample)
 
-    def char_width(self) -> int:
-        return self.fontMetrics().horizontalAdvance("M")
+    def set_padding(self, padding: int) -> None:
+        """Innenabstand des Blatts; schrumpft, wenn das Blatt schmal wird (Minimum 16 px)."""
+        padding = max(SPACING.lg, padding)
+        if padding != self._padding:
+            self._padding = padding
+            self._update_margins()
+
+    # ---- Hängende Einrückung ----------------------------------------------------
+    def _indent_for(self, text: str) -> int:
+        """Breite des Präfixes (Einrückung + Listenmarker) in Pixeln, Tabs als 4 Leerzeichen."""
+        prefix = hanging_prefix(text).replace("\t", "    ")
+        return self.fontMetrics().horizontalAdvance(prefix) if prefix else 0
+
+    def _set_hanging_indent(self, block, indent: int) -> None:
+        fmt = block.blockFormat()
+        if round(fmt.leftMargin()) == indent:
+            return
+        fmt.setLeftMargin(indent)
+        fmt.setTextIndent(-indent)
+        cursor = QTextCursor(block)
+        cursor.setBlockFormat(fmt)
+
+    def _apply_hanging_indents(self) -> None:
+        """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen)."""
+        block = self.document().firstBlock()
+        while block.isValid():
+            self._set_hanging_indent(block, self._indent_for(block.text()))
+            block = block.next()
+
+    def _on_block_changed(self, position: int, removed: int, added: int) -> None:
+        block = self.document().findBlock(position)
+        end = self.document().findBlock(position + max(added, 1))
+        while block.isValid():
+            self._indent_pending.add(block.blockNumber())
+            if block == end or block.blockNumber() >= end.blockNumber():
+                break
+            block = block.next()
+        self._indent_timer.start()
+
+    def _apply_pending_indents(self) -> None:
+        """Einrückung der geänderten Blöcke nachziehen."""
+        pending, self._indent_pending = self._indent_pending, set()
+        for number in pending:
+            block = self.document().findBlockByNumber(number)
+            if block.isValid():
+                self._set_hanging_indent(block, self._indent_for(block.text()))
+
+    def _grouped(self, action) -> None:
+        """Führt `action` und die daraus folgende Einrückungs-Korrektur als EINEN Undo-Schritt aus."""
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        try:
+            action()
+            self._indent_timer.stop()
+            self._apply_pending_indents()
+        finally:
+            cursor.endEditBlock()
+
+    def keyPressEvent(self, event) -> None:
+        self._grouped(lambda: super(Editor, self).keyPressEvent(event))
+
+    def insertFromMimeData(self, source) -> None:
+        self._grouped(lambda: super(Editor, self).insertFromMimeData(source))
 
     def cursor_line_col(self) -> tuple[int, int]:
         cursor = self.textCursor()
@@ -256,17 +331,30 @@ class Editor(QTextEdit):
     def gutter_width(self) -> int:
         digits = max(2, len(str(max(1, self.document().blockCount()))))
         from PySide6.QtGui import QFontMetrics
-        return LAYOUT.paper_padding + QFontMetrics(self._number_font()).horizontalAdvance("9") * digits + GUTTER_GAP
+        return self._padding + QFontMetrics(self._number_font()).horizontalAdvance("9") * digits + GUTTER_GAP
 
     def _update_margins(self) -> None:
         # links: Zeilennummern + Innenabstand, oben/unten/rechts: Innenabstand des Blatts
-        self.setViewportMargins(self.gutter_width(), LAYOUT.paper_padding_top, SPACING.xl, LAYOUT.paper_padding_top)
+        top = max(SPACING.md, round(self._padding * 0.85))
+        self.setViewportMargins(self.gutter_width(), top, max(SPACING.lg, self._padding // 2), top)
         rect = self.contentsRect()
         self.line_numbers.setGeometry(QRect(rect.left(), rect.top(), self.gutter_width(), rect.height()))
 
     def resizeEvent(self, event) -> None:
+        # Lese-Position halten: der Block am oberen Rand bleibt nach dem Reflow oben
+        top_block = self.cursorForPosition(QPoint(0, 0)).block()
+        old_offset = 0
+        if top_block.isValid():
+            old_offset = self.verticalScrollBar().value() - int(self.document().documentLayout().blockBoundingRect(top_block).top())
         super().resizeEvent(event)
         self._update_margins()
+        if top_block.isValid() and event.oldSize().width() != event.size().width():
+            QTimer.singleShot(0, lambda b=top_block, o=old_offset: self._restore_top(b, o))
+
+    def _restore_top(self, block, old_offset: int) -> None:
+        if block.isValid():
+            top = int(self.document().documentLayout().blockBoundingRect(block).top())
+            self.verticalScrollBar().setValue(max(0, top + old_offset))
 
     def changeEvent(self, event) -> None:
         super().changeEvent(event)

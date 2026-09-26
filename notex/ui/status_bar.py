@@ -93,5 +93,6 @@ class StatusBar(QStatusBar):
         self.path_label.setText(relative_path)
         self.position_label.setText(f"Z {line}, S {col}")
         self.encoding_label.setText(f"{ENCODING_LABELS.get(editor.encoding, editor.encoding)} · {eol}")
-        self.chars_label.setText(f"{len(editor.toPlainText())} Zeichen")
+        # characterCount statt toPlainText: bei 5 MB kostet das Kopieren des Texts sonst 12 ms pro Tastendruck
+        self.chars_label.setText(f"{max(0, editor.document().characterCount() - 1)} Zeichen")
         self.dirty_label.setText("Ungespeichert" if editor.is_dirty else "Gespeichert")

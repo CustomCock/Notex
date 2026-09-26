@@ -326,9 +326,8 @@ class SettingsDialog(QDialog):
     def _build_editor(self) -> SettingsPage:
         page = SettingsPage()
         page.section("Text")
-        self.wrap_box = QCheckBox("Zeilenumbruch  (Alt+Z)")
-        self.wrap_box.toggled.connect(self._wrap_toggled)
-        page.row("", self.wrap_box)
+        page.note("Zeilen werden immer an der Blattbreite umgebrochen, auch lange URLs oder Hashes. "
+                  "Horizontal scrollen gibt es nicht – der Text ist immer vollständig sichtbar.")
         page.section("Baum")
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setToolTip("Dateiendungen, die im Baum erscheinen, mit Leerzeichen getrennt")
@@ -386,7 +385,6 @@ class SettingsDialog(QDialog):
             self._select_font(box, cfg.get("font_by_extension", {}).get(ext, ""))
         self.editor_size_spin.setValue(theme["font"]["editor_size"])
         self.line_height_spin.setValue(theme["font"]["line_height"])
-        self.wrap_box.setChecked(cfg["word_wrap"])
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self._refresh_theme_list()
         self._loading = False
@@ -444,10 +442,6 @@ class SettingsDialog(QDialog):
     def _paper_mode_toggled(self, on: bool) -> None:
         if not self._loading and on != self.window_.tabs.paper_mode:
             self.window_.toggle_paper_mode()
-
-    def _wrap_toggled(self, on: bool) -> None:
-        if not self._loading and on != self.window_.tabs.word_wrap:
-            self.window_.toggle_word_wrap()
 
     def _extensions_changed(self) -> None:
         if self._loading:
@@ -547,13 +541,11 @@ class SettingsDialog(QDialog):
         """Abbrechen: Theme und Config-Werte von vor dem Öffnen wiederherstellen."""
         self._preview_timer.stop()
         self.manager.apply(self._snapshot_theme)
-        for key in ("paper_mode", "word_wrap", "extensions", "font_by_extension"):
+        for key in ("paper_mode", "extensions", "font_by_extension"):
             self.config[key] = self._snapshot_config[key]
         self.window_.tabs.apply_text_fonts()
         self.window_.tabs.set_paper_mode(self.config["paper_mode"])
         self.window_.paper_action.setChecked(self.config["paper_mode"])
-        self.window_.tabs.set_word_wrap(self.config["word_wrap"])
-        self.window_.wrap_action.setChecked(self.config["word_wrap"])
         self.window_.sidebar.tree.set_extensions(self.config["extensions"])
         self.window_.tabs.set_font_size(self._snapshot_config["font_size"])
         super().reject()

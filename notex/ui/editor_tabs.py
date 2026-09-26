@@ -76,7 +76,6 @@ class EditorTabs(QTabWidget):
         if self.config.get("grammar", {}).get("enabled"):
             self.grammar.restart()
         self.font_size = FONT_SIZE.editor
-        self.word_wrap = False
         self.paper_mode = True
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)
@@ -136,7 +135,6 @@ class EditorTabs(QTabWidget):
                 return None
             editor = Editor(path, text_file, self.font_size, checker=self.checker)
             editor.set_text_font(self.font_family_for(path))
-            editor.set_word_wrap(self.word_wrap)
             self.grammar.attach(editor)
             self._apply_spell_to(editor)
             editor.document().modificationChanged.connect(lambda _m, e=editor: self._refresh_title(e))
@@ -284,11 +282,6 @@ class EditorTabs(QTabWidget):
         if theme["font"]["editor_family"] != family:
             theme["font"]["editor_family"] = family
             self.config["theme"] = theme_manager().apply(theme)
-
-    def set_word_wrap(self, enabled: bool) -> None:
-        self.word_wrap = enabled
-        for editor in self.editors():
-            editor.set_word_wrap(enabled)
 
     def set_paper_mode(self, enabled: bool) -> None:
         self.paper_mode = enabled

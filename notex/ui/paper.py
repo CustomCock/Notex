@@ -79,8 +79,9 @@ class EditorPage(QWidget):
     def set_paper_mode(self, enabled: bool) -> None:
         self.paper_mode = enabled
         if enabled:
-            # Textbreite in Zeichen + Zeilennummern + rechter Rand + Scrollbar
-            text_width = LAYOUT.paper_max_columns * self.editor.char_width()
+            # Maximale Textbreite in Zeichen + Zeilennummern + rechter Rand + Scrollbar.
+            # Das ist ein Maximum: wird das Fenster schmaler, schrumpft das Blatt mit.
+            text_width = int(LAYOUT.paper_max_columns * self.editor.char_width())
             self.frame.setMaximumWidth(text_width + self.editor.gutter_width() + SPACING.xl + LAYOUT.scrollbar + SPACING.sm)
         else:
             self.frame.setMaximumWidth(QWIDGETSIZE_MAX)
@@ -92,8 +93,7 @@ class EditorPage(QWidget):
         self.update()
 
     def retheme(self) -> None:
-        margin = LAYOUT.paper_margin
-        self._layout.setContentsMargins(margin, margin - SHADOW_OFFSET_Y // 2, margin, margin)
+        self._fit_padding()
         self._shadow = None
         self.editor.retheme()
         self.refresh_width()
@@ -102,6 +102,20 @@ class EditorPage(QWidget):
     def refresh_width(self) -> None:
         """Nach Zoom: die maximale Breite hängt von der Zeichenbreite ab."""
         self.set_paper_mode(self.paper_mode)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit_padding()
+
+    def _fit_padding(self) -> None:
+        """Bei wenig Platz Innenabstand und Rand herunterskalieren (Minimum 16 px innen, 8 px außen)."""
+        width = self.width()
+        full, tight = 760, 420      # ab `full` Pixeln volle Abstände, bei `tight` die Minima
+        t = min(1.0, max(0.0, (width - tight) / (full - tight)))
+        margin = round(SPACING.sm + (LAYOUT.paper_margin - SPACING.sm) * t)
+        padding = round(SPACING.lg + (LAYOUT.paper_padding - SPACING.lg) * t)
+        self._layout.setContentsMargins(margin, max(SPACING.sm, margin - SHADOW_OFFSET_Y // 2), margin, margin)
+        self.editor.set_padding(padding)
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)

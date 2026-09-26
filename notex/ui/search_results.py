@@ -4,8 +4,8 @@ from __future__ import annotations
 import html
 from pathlib import Path
 
-from PySide6.QtCore import QModelIndex, QSize, Qt, Signal
-from PySide6.QtGui import QAbstractTextDocumentLayout, QPalette, QTextDocument
+from PySide6.QtCore import QModelIndex, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QAbstractTextDocumentLayout, QColor, QPalette, QTextDocument
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTreeWidget, QTreeWidgetItem
 
 from notex.core.search import FileMatch, NameMatch
@@ -54,6 +54,12 @@ class HtmlDelegate(QStyledItemDelegate):
         context.palette.setColor(QPalette.ColorRole.Text, opt.palette.color(QPalette.ColorRole.Text))
         doc.documentLayout().draw(painter, context)
         painter.restore()
+        if doc.idealWidth() > text_rect.width():
+            # Zu lang: rechts mit „…“ abschließen statt hart abzuschneiden (kein seitliches Scrollen)
+            fade = QRect(text_rect.right() - 22, text_rect.top(), 23, text_rect.height())
+            painter.fillRect(fade, QColor(COLORS.sidebar))
+            painter.setPen(QColor(COLORS.text_muted))
+            painter.drawText(fade, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, "…")
 
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         opt = QStyleOptionViewItem(option)
@@ -76,6 +82,8 @@ class SearchResults(QTreeWidget):
         self.setIconSize(QSize(16, 16))
         self.setItemDelegate(HtmlDelegate(self))
         self.setRootIsDecorated(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.itemClicked.connect(self._on_item_clicked)
         self.itemActivated.connect(self._on_item_clicked)
         self._name_header: QTreeWidgetItem | None = None

@@ -43,7 +43,6 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar(root, config)
         self.tabs = EditorTabs(root, config)
         self.tabs.font_size = config["font_size"]
-        self.tabs.word_wrap = config["word_wrap"]
         self.tabs.paper_mode = config["paper_mode"]
         self.find_bar = FindBar(self.tabs.current_editor)
         self.empty_state = EmptyState()
@@ -144,9 +143,6 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.sidebar_action)
         view_menu.addAction(self._action("Suche in Dateien", "Ctrl+Shift+F", self.focus_search))
         view_menu.addSeparator()
-        self.wrap_action = self._action("Zeilenumbruch", "Alt+Z", self.toggle_word_wrap, checkable=True)
-        self.wrap_action.setChecked(self.config["word_wrap"])
-        view_menu.addAction(self.wrap_action)
         self.paper_action = self._action("Blatt zentrieren", "Alt+P", self.toggle_paper_mode, checkable=True)
         self.paper_action.setChecked(self.config["paper_mode"])
         view_menu.addAction(self.paper_action)
@@ -284,11 +280,6 @@ class MainWindow(QMainWindow):
         self.paper_action.setChecked(enabled)
         self.config["paper_mode"] = enabled
 
-    def toggle_word_wrap(self) -> None:
-        enabled = not self.tabs.word_wrap
-        self.tabs.set_word_wrap(enabled)
-        self.wrap_action.setChecked(enabled)
-        self.config["word_wrap"] = enabled
 
     def focus_search(self) -> None:
         if not self.sidebar.isVisible():

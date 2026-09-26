@@ -19,7 +19,6 @@ def test_wrong_types_fall_back_per_key(tmp_path: Path) -> None:
     path.write_text(json.dumps({
         "window": {"width": "breit", "height": 500, "x": True},
         "font_size": "gross",
-        "word_wrap": "ja",
         "open_tabs": "nur ein String",
         "extensions": [".txt"],
         "unbekannt": 123,
@@ -29,7 +28,6 @@ def test_wrong_types_fall_back_per_key(tmp_path: Path) -> None:
     assert cfg["window"]["height"] == 500                           # richtiger Typ -> übernommen
     assert cfg["window"]["x"] is None                               # bool ist kein int
     assert cfg["font_size"] == DEFAULTS["font_size"]
-    assert cfg["word_wrap"] is False
     assert cfg["open_tabs"] == []
     assert cfg["extensions"] == [".txt"]
     assert "unbekannt" not in cfg

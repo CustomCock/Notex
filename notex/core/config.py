@@ -34,7 +34,6 @@ DEFAULTS: dict[str, Any] = {
     "open_tabs": [],          # relative Pfade der offenen Dateien
     "active_tab": 0,
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
-    "word_wrap": False,
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
     "theme": default_theme(), # das aktive Theme, komplett (Presets/Dateien sind nur Vorlagen)
     "spellcheck": {
