@@ -42,7 +42,12 @@ def editor_font(point_size: int) -> QFont:
     return font
 
 
+ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+
+
 def load_stylesheet() -> str:
     qss = (Path(__file__).parent / "dark.qss").read_text(encoding="utf-8")
-    # `@name` -> Farbwert. Unbekannte Namen bleiben stehen, damit man den Tippfehler sieht.
+    # `@assets` -> Ordner mit Bildern (QSS braucht dafür absolute Pfade mit "/"),
+    # `@name`   -> Farbwert. Unbekannte Namen bleiben stehen, damit man den Tippfehler sieht.
+    qss = qss.replace("@assets", ASSETS_DIR.as_posix())
     return re.sub(r"@([a-z_]+)", lambda m: COLORS.get(m.group(1), m.group(0)), qss)

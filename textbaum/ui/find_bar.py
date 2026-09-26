@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QCheckBox, QGridLayout, QLabel, QLineEdit, QPushButton, QWidget
 
 from textbaum.ui.editor import Editor
@@ -55,7 +55,18 @@ class FindBar(QWidget):
         self.replace_button.clicked.connect(self.replace_one)
         self.replace_all_button.clicked.connect(self.replace_all)
         self.close_button.clicked.connect(self.close_bar)
+        # Shift+Enter im Suchfeld = rückwärts. QLineEdit schluckt Enter selbst,
+        # deshalb fangen wir das Ereignis vorher per Event-Filter ab.
+        self.find_field.installEventFilter(self)
         self.hide()
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self.find_field and event.type() == QEvent.Type.KeyPress \
+                and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) \
+                and event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            self.find_previous()
+            return True
+        return super().eventFilter(watched, event)
 
     # ---- Anzeigen / Verstecken ----------------------------------------------
     def open(self, with_replace: bool) -> None:

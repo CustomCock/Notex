@@ -1,0 +1,43 @@
+name: Release
+
+# Bei einem Tag wie v1.0.0: Tests laufen lassen, portable App auf Windows bauen,
+# als ZIP an ein GitHub-Release hängen.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # nötig, um das Release anzulegen und Dateien anzuhängen
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements-dev.txt
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: Portable App bauen
+        run: python build.py
+
+      - name: ZIP packen
+        shell: pwsh
+        run: |
+          $name = "Textbaum-${{ github.ref_name }}-windows-portable.zip"
+          Compress-Archive -Path dist/Textbaum -DestinationPath $name
+          "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Release erstellen und ZIP anhängen
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+          generate_release_notes: true

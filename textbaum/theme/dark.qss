@@ -116,8 +116,11 @@ QTabBar::tab:hover:!selected {
     background: @surface;
 }
 QTabBar::close-button {
-    image: none;
+    image: url(@assets/close.png);
     subcontrol-position: right;
+}
+QTabBar::close-button:hover {
+    image: url(@assets/close-hover.png);
 }
 
 /* Editorfläche = weißes Blatt. Der margin ist der dunkle "Tisch" drumherum. */

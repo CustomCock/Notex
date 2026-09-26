@@ -92,8 +92,8 @@ class MainWindow(QMainWindow):
     def _build_menu(self) -> None:
         tree = self.sidebar.tree
         file_menu = self.menuBar().addMenu("&Datei")
-        file_menu.addAction(self._action("Neue Datei", "Ctrl+N", lambda: tree.create_file(tree._folder_for(tree.selected_path()))))
-        file_menu.addAction(self._action("Neuer Ordner", "Ctrl+Shift+N", lambda: tree.create_folder(tree._folder_for(tree.selected_path()))))
+        file_menu.addAction(self._action("Neue Datei", "Ctrl+N", lambda: tree.create_file(tree.folder_for(tree.selected_path()))))
+        file_menu.addAction(self._action("Neuer Ordner", "Ctrl+Shift+N", lambda: tree.create_folder(tree.folder_for(tree.selected_path()))))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))

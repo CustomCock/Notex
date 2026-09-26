@@ -8,7 +8,7 @@ from PySide6.QtCore import QModelIndex, QSize, Qt, Signal
 from PySide6.QtGui import QAbstractTextDocumentLayout, QPalette, QTextDocument
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTreeWidget, QTreeWidgetItem
 
-from textbaum.core.search import FileMatch, LineMatch, NameMatch
+from textbaum.core.search import FileMatch, NameMatch
 from textbaum.theme.icons import file_icon
 from textbaum.theme.theme import COLORS
 

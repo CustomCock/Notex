@@ -1,0 +1,18 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Die Tests decken nur core/ ab und brauchen kein Qt
+      - run: pip install pytest send2trash
+      - run: python -m pytest -q

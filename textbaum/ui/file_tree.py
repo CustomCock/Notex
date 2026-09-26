@@ -82,7 +82,7 @@ class FileTree(QTreeView):
         except ValueError:
             return ""
 
-    def _folder_for(self, path: Path | None) -> Path:
+    def folder_for(self, path: Path | None) -> Path:
         """Zielordner für 'Neu…': der gewählte Ordner, sonst der Ordner der gewählten Datei, sonst root."""
         if path is None:
             return self.root
@@ -160,7 +160,9 @@ class FileTree(QTreeView):
                         shutil.copy2(source, destination)
             except (OSError, shutil.Error) as error:
                 QMessageBox.warning(self, "Verschieben fehlgeschlagen", str(error))
-        event.setDropAction(Qt.DropAction.IgnoreAction)  # wir haben es selbst erledigt
+        # Wir haben verschoben. Als Ergebnis "Copy" melden, sonst würde Qt nach einem
+        # "Move" die Quell-Einträge zusätzlich über das Modell löschen lassen.
+        event.setDropAction(Qt.DropAction.CopyAction)
         event.accept()
 
     # ---- Kontextmenü ---------------------------------------------------------
@@ -174,8 +176,8 @@ class FileTree(QTreeView):
             self.setCurrentIndex(QModelIndex())
 
         menu = QMenu(self)
-        menu.addAction("Neue Datei", lambda: self.create_file(self._folder_for(path)))
-        menu.addAction("Neuer Ordner", lambda: self.create_folder(self._folder_for(path)))
+        menu.addAction("Neue Datei", lambda: self.create_file(self.folder_for(path)))
+        menu.addAction("Neuer Ordner", lambda: self.create_folder(self.folder_for(path)))
         if path is not None:
             menu.addSeparator()
             menu.addAction("Umbenennen\tF2", self.rename_selected)
