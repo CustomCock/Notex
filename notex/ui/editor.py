@@ -592,16 +592,69 @@ class Editor(QTextEdit):
             return []
         return self.highlighter.issues_at(cursor.block(), cursor.positionInBlock())
 
+    context_menu_hook = None   # (editor, menu, term) -> None; setzt das Hauptfenster (Text + Nachschlagen)
+
+    def lookup_term(self) -> str:
+        """Suchbegriff: Markierung, sonst das Wort am Cursor – getrimmt, einzeilig, max. 200 Zeichen."""
+        from notex.core.lookup import prepare_term
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        return prepare_term(cursor.selectedText())
+
+    def term_rect(self) -> QRect:
+        """Bildschirm-Rechteck der Markierung bzw. des Worts am Cursor – Anker für die Nachschlage-Karte."""
+        cursor = QTextCursor(self.textCursor())
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        start, end = QTextCursor(cursor), QTextCursor(cursor)
+        start.setPosition(cursor.selectionStart())
+        end.setPosition(cursor.selectionEnd())
+        a, b = self.cursorRect(start), self.cursorRect(end)
+        if a.top() != b.top():                       # mehrzeilig: ganze Breite der Zeilen
+            rect = QRect(self.viewport().rect().left(), a.top(), self.viewport().width(), b.bottom() - a.top())
+        else:
+            rect = a.united(b)
+        clipped = rect.intersected(self.viewport().rect())
+        rect = clipped if not clipped.isEmpty() else rect
+        return QRect(self.viewport().mapToGlobal(rect.topLeft()), rect.size())
+
     def build_context_menu(self, pos) -> QMenu:
-        """Standardmenü, davor Vorschläge für ein markiertes Wort bzw. die Grammatik-Regel."""
-        cursor = self.cursorForPosition(pos)
-        issues = self.issues_at_cursor(cursor)
-        menu = style_menu(self.createStandardContextMenu(pos))
+        """Vorschläge (Rechtschreibung/Grammatik) oben, dann Bearbeiten, Text und Nachschlagen.
+        Rechtsklick außerhalb der Markierung setzt den Cursor dorthin – dann gilt das Wort unter dem Mauszeiger."""
+        from PySide6.QtGui import QKeySequence
+        click = self.cursorForPosition(pos)
+        current = self.textCursor()
+        inside = current.hasSelection() and current.selectionStart() <= click.position() <= current.selectionEnd()
+        if not inside:
+            self.setTextCursor(click)
+        issues = self.issues_at_cursor(click)
+        menu = style_menu(QMenu(self))
+        for issue in issues:
+            self._add_issue_actions(menu, None, click, issue)
         if issues:
-            first = menu.actions()[0] if menu.actions() else None
-            for issue in issues:
-                self._add_issue_actions(menu, first, cursor, issue)
-            menu.insertSeparator(first)
+            menu.addSeparator()
+
+        has_selection = self.textCursor().hasSelection()
+        writable = not self.isReadOnly()
+
+        def add(icon_name: str, text: str, shortcut, slot, enabled: bool) -> None:
+            action = QAction(icon(icon_name), text, menu)
+            if shortcut is not None:
+                action.setShortcut(QKeySequence(shortcut))
+                action.setShortcutVisibleInContextMenu(True)
+            action.setEnabled(enabled)
+            action.triggered.connect(slot)
+            menu.addAction(action)
+
+        add("scissors", "Ausschneiden", QKeySequence.StandardKey.Cut, self.cut, has_selection and writable)
+        add("copy", "Kopieren", QKeySequence.StandardKey.Copy, self.copy, has_selection)
+        add("clipboard-paste", "Einfügen", QKeySequence.StandardKey.Paste, self.paste, writable and self.canPaste())
+        add("trash", "Löschen", QKeySequence.StandardKey.Delete, lambda: self._grouped(lambda: self.textCursor().removeSelectedText()),
+            has_selection and writable)
+        add("scan-text", "Alles markieren", QKeySequence.StandardKey.SelectAll, self.selectAll, not self.document().isEmpty())
+        if self.context_menu_hook is not None:
+            self.context_menu_hook(self, menu, self.lookup_term())
         return menu
 
     def contextMenuEvent(self, event) -> None:

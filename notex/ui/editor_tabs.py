@@ -93,6 +93,7 @@ class EditorTabs(QTabWidget):
             self.open_font_settings = shared.open_font_settings
             self.toolbar_visible = shared.toolbar_visible
             self.line_numbers = shared.line_numbers
+            self.context_menu_hook = shared.context_menu_hook
         else:
             self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
             self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
@@ -107,6 +108,7 @@ class EditorTabs(QTabWidget):
             self.open_font_settings = lambda: None  # setzt das Hauptfenster
             self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
             self.line_numbers = bool(self.config.get("line_numbers", True))
+            self.context_menu_hook = None          # setzt das Hauptfenster (Text + Nachschlagen im Kontextmenü)
         self.setAcceptDrops(True)
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)
@@ -207,6 +209,7 @@ class EditorTabs(QTabWidget):
             editor.files_dropped.connect(self.files_dropped)
             editor.link_activated.connect(lambda span, e=editor: self.link_activated.emit(e, span))
             editor.completion_requested.connect(lambda kind, text, e=editor: self.completion_requested.emit(e, kind, text))
+            editor.context_menu_hook = self.context_menu_hook
             if editor.highlighter is not None:
                 editor.highlighter.resolve_link = self.resolve_link
                 editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))

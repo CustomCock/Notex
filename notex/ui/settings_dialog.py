@@ -80,8 +80,9 @@ class SettingsPage(QWidget):
 
 
 class SettingsDialog(QDialog):
-    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "System", "Tastenkürzel"]
-    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "sliders-horizontal", "keyboard"]
+    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "System", "Tastenkürzel"]
+    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "book-open", "sliders-horizontal",
+                      "keyboard"]
 
     def __init__(self, window, store: ThemeStore) -> None:
         super().__init__(window)
@@ -111,7 +112,7 @@ class SettingsDialog(QDialog):
             self.categories.addItem(QListWidgetItem(icon(icon_name), name))
         self.pages = QStackedWidget()
         for builder in (self._build_appearance, self._build_paper, self._build_font, self._build_editor,
-                        self._build_spelling, self._build_system, self._build_shortcuts):
+                        self._build_spelling, self._build_lookup, self._build_system, self._build_shortcuts):
             page = builder()
             page.finish()
             scroll = QScrollArea()
@@ -484,6 +485,47 @@ class SettingsDialog(QDialog):
         else:
             page.section("Rechtschreibung")
             page.note("Noch nicht verfügbar.")
+        return page
+
+    def _build_lookup(self) -> SettingsPage:
+        page = SettingsPage()
+        cfg = self.config.setdefault("lookup", {})
+        page.section("Nachschlagen")
+        online = QCheckBox("Wikipedia und Wiktionary online abfragen")
+        online.setChecked(bool(cfg.get("online", True)))
+        online.toggled.connect(lambda on: cfg.__setitem__("online", on))
+        page.row("", online)
+        language = QComboBox()
+        for label, value in (("Automatisch (Sprache des Tabs)", "auto"), ("Deutsch", "de"), ("Englisch", "en")):
+            language.addItem(label, value)
+        language.setCurrentIndex(max(0, language.findData(cfg.get("language", "auto"))))
+        language.currentIndexChanged.connect(lambda i: cfg.__setitem__("language", language.itemData(i)))
+        page.row("Sprache", language)
+        thumbs = QCheckBox("Vorschaubilder in der Karte anzeigen (lädt ein Bild von upload.wikimedia.org)")
+        thumbs.setChecked(bool(cfg.get("thumbnails", False)))
+        thumbs.toggled.connect(lambda on: cfg.__setitem__("thumbnails", on))
+        page.row("", thumbs)
+        page.note("Rechtsklick auf ein Wort oder eine Markierung → Wikipedia (Ctrl+Alt+W) oder Wiktionary (Ctrl+Alt+T) "
+                  "zeigt eine kleine Karte, ein Klick darauf öffnet den Artikel im Browser. Notex fragt nur bei dieser "
+                  "Aktion, nie beim bloßen Markieren; wird nichts gefunden, versucht es die andere Sprache.")
+
+        page.section("Websuche")
+        engine = QComboBox()
+        for label, value in (("Google", "google"), ("DuckDuckGo", "duckduckgo"), ("Startpage", "startpage"),
+                             ("Eigene URL", "custom")):
+            engine.addItem(label, value)
+        engine.setCurrentIndex(max(0, engine.findData(cfg.get("engine", "google"))))
+        custom = QLineEdit(str(cfg.get("custom_url", "")))
+        custom.setPlaceholderText("https://suche.example.org/?q={q}")
+        custom.setToolTip("{q} wird durch den Suchbegriff ersetzt; ohne {q} wird ?q=Begriff angehängt")
+        custom.setEnabled(engine.currentData() == "custom")
+        engine.currentIndexChanged.connect(lambda i: (cfg.__setitem__("engine", engine.itemData(i)),
+                                                      custom.setEnabled(engine.itemData(i) == "custom")))
+        custom.editingFinished.connect(lambda: cfg.__setitem__("custom_url", custom.text().strip()))
+        page.row("Suchmaschine", engine)
+        page.row("Eigene URL", custom)
+        page.note("Ctrl+Alt+G öffnet nur den Browser mit der Suche – Notex selbst ruft dabei nichts ab. "
+                  "Aus verschlüsselten Notizen (.ntx) fragt Notex vor jedem Senden nach.")
         return page
 
     def _build_system(self) -> SettingsPage:

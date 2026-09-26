@@ -201,6 +201,41 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 
 ![Neue Woche](docs/31-new-week.png)
 
+## Nachschlagen
+
+Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
+Kontextmenü mit Rechtschreib-/Grammatikvorschlägen (falls vorhanden), Bearbeiten (Ausschneiden, Kopieren,
+Einfügen, Löschen, Alles markieren), Text (GROSS, klein, Wortanfänge groß, bei `.md` zusätzlich Fett,
+Kursiv, Code, Link – dieselben Aktionen wie in der Bearbeitungsleiste) und Nachschlagen:
+
+- **Wikipedia: „Begriff“** (Ctrl+Alt+W) und **Wiktionary: „Begriff“** (Ctrl+Alt+T) zeigen eine kleine
+  Karte direkt unter (bei Platzmangel über) der Markierung: Quelle, Titel, Kurzbeschreibung und Auszug bzw.
+  Wortart, Bedeutungen, Aussprache (IPA) und Herkunft. Ein Klick irgendwo auf die Karte öffnet den Artikel im
+  Browser; unten wechselt „Wiktionary“/„Wikipedia“ die Quelle in derselben Karte. Unscharfe Begriffe laufen
+  über die Suche, Begriffsklärungen erscheinen als anklickbare Liste. Esc, Klick daneben oder × schließt.
+- **Bei Google suchen: „Begriff“** (Ctrl+Alt+G) öffnet nur den Browser – Notex ruft dabei nichts ab. Statt
+  Google lassen sich DuckDuckGo, Startpage oder eine eigene URL mit `{q}` einstellen.
+
+Nachgeschlagen wird nur bei dieser ausdrücklichen Aktion, nie beim bloßen Markieren, über die offiziellen
+Wikimedia-APIs (keine KI, kein Scraping) mit eigenem User-Agent, eine Anfrage nach der anderen, 5 s Timeout,
+Ergebnisse pro Sitzung zwischengespeichert. Sprache ist die Rechtschreib-Sprache des Tabs; findet sich nichts,
+versucht Notex die andere (Deutsch/Englisch). Offline, „nicht gefunden“ oder zu viele Anfragen zeigt die
+Karte selbst an, jeweils mit „Bei Google suchen ↗“ als Ausweg. Aus verschlüsselten Notizen (`.ntx`) fragt
+Notex vor jedem Senden nach („In dieser Sitzung nicht mehr fragen“ möglich). Einstellungen → Nachschlagen:
+online an/aus, Sprache (Automatisch/Deutsch/Englisch), Vorschaubilder (Standard aus), Suchmaschine.
+
+| Kontextmenü | Wikipedia | Wiktionary |
+|---|---|---|
+| ![Kontextmenü](docs/33-context-menu.png) | ![Wikipedia-Karte](docs/34-lookup-wikipedia.png) | ![Wiktionary-Karte](docs/35-lookup-wiktionary.png) |
+
+| Begriffsklärung | Fehler |
+|---|---|
+| ![Begriffsklärung](docs/36-lookup-disambiguation.png) | ![Fehlerzustand](docs/37-lookup-error.png) |
+
+**Warum Wiktionary über die Action-API?** Die REST-Definition-API gibt es nur auf en.wiktionary und sie
+liefert weder Herkunft noch Aussprache. `action=parse&prop=wikitext` gibt es auf beiden Wikis gleich; Notex
+liest daraus Wortarten, Bedeutungen, IPA und Herkunft und wandelt das Wiki-Markup in lesbaren Text um.
+
 ## Updates
 
 Notex sieht höchstens einmal am Tag in der öffentlichen Release-Liste auf GitHub nach, ob es eine neuere
@@ -419,6 +454,9 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
 | Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
+| Ctrl+Alt+W | Wikipedia zur Markierung (Karte) |
+| Ctrl+Alt+T | Wiktionary zur Markierung (Karte) |
+| Ctrl+Alt+G | Websuche zur Markierung (nur Browser) |
 | Hilfe › Nach Updates suchen | Update-Check sofort (kein Kürzel, auch in der Command Palette) |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
@@ -481,6 +519,8 @@ für die Volltextsuche (Default 5 MB).
 - Der Linux-Build ist auf Ubuntu 22.04 gebaut und in CI getestet; Wayland/X11-Eigenheiten einzelner
   Desktops (Fensterposition, Einzelinstanz-Fokus) können abweichen. macOS wird nicht unterstützt.
 - Der Update-Check fragt api.github.com; ohne Netz oder bei GitHub-Rate-Limit bleibt er still.
+- Nachschlagen: Das Wiktionary-Format ist Wikitext mit vielen Vorlagen; seltene Vorlagen werden weggelassen
+  statt übersetzt, einzelne Bedeutungen können dadurch knapper ausfallen als auf der Webseite.
 
 ## Entwicklung
 
@@ -534,7 +574,7 @@ notex/
   core/                 Qt-frei: config, encoding, fileops, search, theme_model, theme_store,
                         spell, spell_rules, grammar, text_ops, fuzzy, actions, file_index,
                         wikilinks, syntax, markdown, split_state, history, crypto_notes,
-                        recent, ipc, winreg_assoc
+                        templates, update_check, linux_desktop, lookup, recent, ipc, winreg_assoc
   ui/                   Fenster und Widgets (Baum, Tabs, Editorgruppen, Blatt, Vorschau, Suche,
                         Ersetzen in Dateien, Versionsverlauf, Sperrbildschirm, Palette,
                         Backlinks, Statusleiste, Toast,

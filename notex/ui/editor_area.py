@@ -24,7 +24,8 @@ from notex.ui.editor import Editor
 from notex.ui.editor_tabs import EditorTabs
 from notex.ui.paper import EditorPage
 
-SHARED_ATTRS = {"font_size", "paper_mode", "resolve_link", "open_font_settings", "toolbar_visible", "line_numbers"}
+SHARED_ATTRS = {"font_size", "paper_mode", "resolve_link", "open_font_settings", "toolbar_visible", "line_numbers",
+                "context_menu_hook"}
 FORWARDED_SIGNALS = ("status_changed", "file_saved", "file_opened", "font_size_changed", "text_font_changed",
                      "files_dropped", "link_activated", "completion_requested", "preview_link", "view_mode_changed")
 

@@ -120,6 +120,10 @@ class MainWindow(QMainWindow):
         self._snapshots_since_limit = 0
         QTimer.singleShot(5000, self._enforce_history_limit)
         self._update_worker = None
+        from notex.core.lookup import LookupService, SendGuard
+        self.lookup_service = LookupService()
+        self.send_guard = SendGuard()
+        self._card = None
         self._available_release = None
         QTimer.singleShot(8000, self.check_updates)   # nach dem Start, nie blockierend
         # Verschlüsselte Notizen nach Inaktivität sperren
@@ -239,6 +243,12 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
         edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
         edit_menu.addAction(self._action("Ersetzen in Dateien …", "Ctrl+Shift+H", self.open_replace_in_files))
+        lookup_menu = edit_menu.addMenu("Nachschlagen")
+        self.lookup_wikipedia_action = self._action("Wikipedia nachschlagen", "Ctrl+Alt+W", lambda: self.lookup_current("wikipedia"))
+        self.lookup_wiktionary_action = self._action("Wiktionary nachschlagen", "Ctrl+Alt+T", lambda: self.lookup_current("wiktionary"))
+        self.lookup_web_action = self._action("Im Web suchen (Browser)", "Ctrl+Alt+G", lambda: self.lookup_current("web"))
+        for action in (self.lookup_wikipedia_action, self.lookup_wiktionary_action, self.lookup_web_action):
+            lookup_menu.addAction(action)
         edit_menu.addSeparator()
         self.spell_action = self._action("Rechtschreibung prüfen", "F7", self.toggle_spellcheck, checkable=True)
         self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
@@ -861,6 +871,7 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+        self.tabs.context_menu_hook = self._extend_context_menu
 
     # ---- Linux-Desktop-Integration ----------------------------------------------------------
     def _linux_integration(self):
@@ -934,6 +945,114 @@ class MainWindow(QMainWindow):
         register.clicked.connect(do_register)
         remove.clicked.connect(do_remove)
         refresh()
+
+    # ---- Nachschlagen ------------------------------------------------------------------------
+    def _lookup_cfg(self) -> dict:
+        return self.config.setdefault("lookup", {})
+
+    def _lookup_langs(self, editor) -> list[str]:
+        from notex.core.lookup import languages_for
+        tab = editor.language or self.config.get("spellcheck", {}).get("language", "de")
+        return languages_for(str(self._lookup_cfg().get("language", "auto")), tab)
+
+    def _extend_context_menu(self, editor, menu, term: str) -> None:
+        """Kontextmenü des Editors: Text-Aktionen (die der Bearbeitungsleiste) und Nachschlagen."""
+        from notex.core import lookup as lk
+        from notex.theme.icons import icon as _icon
+        from PySide6.QtGui import QAction
+        actions = self.tabs.editor_actions
+        writable = not editor.isReadOnly()
+        menu.addSeparator()
+        keys = ["upper", "lower", "title"] + (["md_bold", "md_italic", "md_code", "md_link"]
+                                              if editor.path.suffix.lower() in (".md", ".markdown") else [])
+        for key in keys:
+            action = actions.get(key)
+            if action is not None:
+                action.setEnabled(writable)
+                action.setShortcutVisibleInContextMenu(True)
+                menu.addAction(action)
+        menu.addSeparator()
+        cfg = self._lookup_cfg()
+        online = bool(cfg.get("online", True))
+        label = lk.menu_label(term) if term else "–"
+
+        def add(icon_name: str, text: str, shortcut: str, source: str, enabled: bool, tooltip: str = "") -> None:
+            from PySide6.QtGui import QKeySequence
+            native = QKeySequence(shortcut).toString(QKeySequence.SequenceFormat.NativeText)   # „Strg+Alt+W“ wie die anderen
+            action = QAction(_icon(icon_name), f"{text}\t{native}", menu)
+            action.setEnabled(enabled)
+            if tooltip:
+                action.setToolTip(tooltip)
+            action.triggered.connect(lambda _c=False, e=editor, t=term, s=source: self.lookup_term(s, e, t))
+            menu.addAction(action)
+
+        off = "" if online else " (in den Einstellungen aus)"
+        add("book-open", f"Wikipedia: {label}{off}", "Ctrl+Alt+W", "wikipedia", bool(term) and online)
+        add("book-a", f"Wiktionary: {label}{off}", "Ctrl+Alt+T", "wiktionary", bool(term) and online)
+        text = lk.search_menu_text(term, cfg.get("engine", "google"), cfg.get("custom_url", "")) if term else "Im Web suchen"
+        add("globe", text, "Ctrl+Alt+G", "web", bool(term))
+        menu.setToolTipsVisible(True)
+
+    def lookup_current(self, source: str) -> None:
+        editor = self.tabs.current_editor()
+        if editor is None or editor.locked:
+            self.toast.show_message("Erst eine Datei öffnen und etwas markieren", "info")
+            return
+        term = editor.lookup_term()
+        if not term:
+            self.toast.show_message("Nichts markiert – Wort markieren oder den Cursor in ein Wort setzen", "info")
+            return
+        self.lookup_term(source, editor, term)
+
+    def _confirm_send(self, editor, service: str) -> bool:
+        """Bei .ntx vor jedem Senden fragen (bis „In dieser Sitzung nicht mehr fragen“)."""
+        from notex.core.lookup import confirmation_text
+        if not self.send_guard.needs_confirmation(bool(getattr(editor, "encrypted", False))):
+            return True
+        from PySide6.QtWidgets import QCheckBox, QMessageBox
+        box = QMessageBox(self)
+        box.setWindowTitle("Aus verschlüsselter Notiz senden?")
+        box.setText(confirmation_text(service))
+        box.setInformativeText("Die Notiz ist verschlüsselt – der markierte Begriff verlässt Notex dabei unverschlüsselt.")
+        box.setIcon(QMessageBox.Icon.Warning)
+        remember = QCheckBox("In dieser Sitzung nicht mehr fragen")
+        box.setCheckBox(remember)
+        yes = box.addButton("Fortfahren", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is not yes:
+            return False
+        if remember.isChecked():
+            self.send_guard.remember()
+        return True
+
+    def lookup_term(self, source: str, editor, term: str) -> None:
+        """Wikipedia/Wiktionary in der Karte, Websuche nur im Browser. Netz nur bei dieser ausdrücklichen Aktion."""
+        from notex.core import lookup as lk
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        term = lk.prepare_term(term)
+        if not term:
+            return
+        cfg = self._lookup_cfg()
+        if source == "web":
+            engine, custom = cfg.get("engine", "google"), cfg.get("custom_url", "")
+            if self._confirm_send(editor, lk.search_engine_name(engine, custom)):
+                QDesktopServices.openUrl(QUrl(lk.search_url(term, engine, custom)))
+            return
+        if not cfg.get("online", True):
+            self.toast.show_message("Nachschlagen online ist ausgeschaltet (Einstellungen › Nachschlagen)", "info")
+            return
+        if not self._confirm_send(editor, "Wikipedia" if source == "wikipedia" else "Wiktionary"):
+            return
+        card = self._lookup_card()
+        card.open(source, term, self._lookup_langs(editor), editor.term_rect())
+
+    def _lookup_card(self):
+        from notex.ui.lookup_card import LookupCard
+        if getattr(self, "_card", None) is None:
+            self._card = LookupCard(self, self.lookup_service, self.config)
+        return self._card
 
     # ---- Update-Check ------------------------------------------------------------------------
     def check_updates(self, manual: bool = False) -> None:
@@ -1745,5 +1864,7 @@ class MainWindow(QMainWindow):
         self.file_index.shutdown()
         self.links.shutdown()
         self.tabs.shutdown()
+        if self._card is not None:
+            self._card.shutdown()
         self.save_state()
         event.accept()

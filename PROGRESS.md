@@ -22,6 +22,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), kein Release (Besitzer) |
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
+| 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -93,6 +94,22 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   Windows-Zuordnung, Rückfrage nach Ordnerwechsel. CI: Tests-Matrix Ubuntu + Windows; release.yml baut Windows-ZIP und
   Linux-tar.gz (ubuntu-22.04), bei Branch-Pushes mit Build-Änderungen als Build-Check ohne Release.
 
+### 1.5.0 – Block E
+- Kontextmenü (`Editor.build_context_menu` + `context_menu_hook` des Hauptfensters): Vorschläge, Bearbeiten, Text mit
+  den QActions der Bearbeitungsleiste (keine doppelte Logik), Nachschlagen; Rechtsklick außerhalb der Markierung setzt
+  den Cursor → Wort unter dem Mauszeiger.
+- `core/lookup.py`: Begriffsaufbereitung, URL-Bau (Titel-Encoding, Suchseiten, Suchmaschinen inkl. eigener URL mit/ohne
+  {q}), `fetch_json` mit Fehlerarten (404/429/Timeout/Offline/kaputtes JSON), WikipediaClient (REST summary, opensearch,
+  Begriffsklärung über Wikitext-Bullets), WiktionaryClient (Action-API parse/wikitext, Parser für de/en, Schreibvarianten,
+  opensearch), `clean_wikitext`, `with_fallback`, `LookupService` (Sitzungs-Cache, eine Anfrage nach der anderen),
+  `SendGuard`, `place_card`. 31 Tests mit Fake-Server.
+- `ui/lookup_card.py`: Popup-Karte (Skeleton, Worker-Thread, ganze Karte klickbar, Links für Quelle/Web/Begriffsklärung/
+  „mehr“, Fehlerzustände, Fade-In, optionales Vorschaubild). Einstellungen-Kategorie „Nachschlagen“. Ctrl+Alt+W/T/G
+  (vorher geprüft: frei; auf deutscher Windows-Tastatur erzeugt AltGr+W/T/G kein Zeichen).
+- Live-Abgleich mit den Wikimedia-APIs war in der Arbeitsumgebung nicht möglich (Netzrichtlinie sperrt wikipedia.org/
+  wiktionary.org); Parser auf die dokumentierten Wikitext-Formate gebaut und mit realistischen Auszügen getestet.
+- Screenshot-Skript: virtueller Full-HD-Bildschirm (offscreen war 800×600 und kürzte Menüs).
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -134,6 +151,9 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | Update-Check | `/releases?per_page=20`, höchste gültige Version, Standard an, 1×/Tag, kein Download | `/releases/latest` würde das versehentliche Release „main“ liefern; Datenschutz: nur die Anfrage selbst |
 | Linux-Integration | nur `~/.local/share`, nie Default setzen, Build auf ubuntu-22.04 | Symmetrie zu Windows (HKCU, kein UserChoice); älteres glibc = breitere Lauffähigkeit |
 | Vorlagen | eigene Platzhalter-Engine statt Jinja; `{{date+N}}` als Erweiterung | keine Abhängigkeit, Wochenpläne brauchen Tagesversatz |
+| Wiktionary-Quelle | Action-API `action=parse&prop=wikitext` für de und en, eigener Parser je Sprache | REST-Definition-API nur für en und ohne Herkunft/IPA; Action-API ist MediaWiki-Kern und auf beiden Wikis gleich |
+| Wikipedia-Quelle | REST `page/summary` (+ `redirect=true`), bei 404 `opensearch` → bester Treffer, Begriffsklärung über Wikitext-Bullets | summary liefert Beschreibung/Auszug/Bild kompakt; die Optionen einer Begriffsklärung stehen nur im Seiteninhalt |
+| Websuche | nur `QDesktopServices.openUrl`, nie ein Abruf durch Notex | Vorgabe: keine Scraping-/Such-API |
 
 ## Nächster Schritt
 

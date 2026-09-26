@@ -843,3 +843,44 @@ QLabel#LockTitle {
 QLabel#LockError {
     color: @danger;
 }
+
+/* ---------- Nachschlage-Karte ---------- */
+QFrame#LookupCard {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_panelpx;
+}
+QFrame#LookupCard:hover {
+    background: @hover;
+    border: 1px solid @accent;
+}
+QFrame#LookupCard QWidget, QFrame#LookupCard QScrollArea, QScrollArea#LookupScroll > QWidget > QWidget {
+    background: transparent;
+}
+QLabel#LookupSource {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+QLabel#LookupTitle {
+    color: @text;
+    font-size: @fs_editorpx;
+    font-weight: 600;
+}
+QLabel#LookupDescription {
+    color: @text_muted;
+    font-style: italic;
+}
+QLabel#LookupBody {
+    color: @text;
+    font-size: @fs_uipx;
+}
+QLabel#LookupLinks, QLabel#LookupOpen {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+}
+QFrame#LookupSkeleton {
+    background: @selection;
+    border-radius: 4px;
+}

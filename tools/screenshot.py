@@ -16,7 +16,14 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+if os.environ.get("QT_QPA_PLATFORM", "offscreen") == "offscreen":
+    # Virtueller Full-HD-Bildschirm: sonst ist er 800×600 und Qt kürzt lange Menüs auf diese Höhe
+    import json as _json
+    import tempfile as _tempfile
+    _screens = Path(_tempfile.gettempdir()) / "notex-offscreen-screens.json"
+    _screens.write_text(_json.dumps({"screens": [{"name": "shot", "x": 0, "y": 0, "width": 1920, "height": 1080,
+                                                   "logicalDpi": 96, "dpr": 1}]}), encoding="utf-8")
+    os.environ["QT_QPA_PLATFORM"] = f"offscreen:configfile={_screens}"
 if os.environ.get("NOTEX_SCALE"):
     os.environ["QT_SCALE_FACTOR"] = os.environ["NOTEX_SCALE"]
 
@@ -109,6 +116,9 @@ PREVIEW_SAMPLE = (
 )
 
 SAMPLE = {
+    "Projekte/Notex/nachschlagen.md": (
+        "# Wörter zum Nachschlagen\n\nSerendipität ist ein schönes Wort für glückliche Zufallsfunde.\n\n"
+        "Ein Haus am Fluss, eine Bank im Park.\n"),
     "Projekte/Notex/vorschau.md": PREVIEW_SAMPLE,
     "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
     "Projekte/Python/snippets.py": CODE_SAMPLE,
@@ -153,6 +163,12 @@ def save(widget, name: str) -> None:
 
 def compose(window, popup, name: str, offset: QPoint) -> None:
     """Fenster + Popup (Menü) in ein Bild zeichnen, weil offscreen kein Screen-Grab geht."""
+    from notex.ui.editor_tabs import FadeOverlay
+    for fade in window.findChildren(FadeOverlay):
+        fade.hide()
+    # Popup ganz ins Bild holen (exec() würde es am Bildschirmrand ebenso verschieben)
+    size = popup.size().expandedTo(popup.sizeHint())
+    offset = QPoint(min(offset.x(), window.width() - size.width() - 8), min(offset.y(), window.height() - size.height() - 8))
     base = window.grab().toImage()
     top = popup.grab().toImage()
     painter = QPainter(base)
@@ -357,7 +373,57 @@ def main() -> int:
             window._shot_update.show()
         later(7100, open_update)
         later(7500, lambda: save(window._shot_update, "32-update"))
-        later(7600, lambda: (window._shot_update.close(), window.close(), app.quit()))
+        # v1.5: Kontextmenü und Nachschlage-Karte (vorbereitete Ergebnisse, kein Netz)
+        def lookup_shots():
+            from notex.core import lookup as lk
+            window._shot_update.close()
+            editor = window.tabs.open_file(data / "Projekte/Notex/nachschlagen.md")
+            QApplication.processEvents()
+            found = editor.document().find("Serendipität")
+            editor.setTextCursor(found)
+            menu = editor.build_context_menu(editor.cursorRect(found).center())
+            menu.show()
+            origin = editor.viewport().mapTo(window, editor.cursorRect(found).bottomRight())
+            compose(window, menu, "33-context-menu", origin + QPoint(4, 4))
+            menu.close()
+            card = window._lookup_card()
+            window._shot_card = card
+            anchor = editor.term_rect()
+            summary = lk.Summary("wikipedia", "de", "Serendipität", "glücklicher Zufallsfund",
+                                 "Serendipität bezeichnet eine zufällige Beobachtung von etwas ursprünglich nicht "
+                                 "Gesuchtem, das sich als neue und überraschende Entdeckung erweist. Der Begriff geht "
+                                 "auf das persische Märchen „Die drei Prinzen von Serendip“ zurück, das Horace Walpole "
+                                 "1754 in einem Brief erwähnte. In der Wissenschaftsgeschichte gelten die Entdeckung des "
+                                 "Penicillins und der Röntgenstrahlung als bekannte Beispiele.",
+                                 "https://de.wikipedia.org/wiki/Serendipit%C3%A4t")
+            card.show_result("wikipedia", "Serendipität", summary, anchor, ["de", "en"])
+            later_rel(300, lambda: compose_card(card, "34-lookup-wikipedia"))
+            definition = lk.Definition("wiktionary", "de", "Haus", "Deutsch", [lk.PartOfSpeech("Substantiv", [
+                "Gebäude, das Menschen zum Wohnen dient", "(übertragen): alle Bewohner eines Hauses",
+                "(Astrologie): einer der zwölf Abschnitte des Tierkreises", "Dynastie, Adelsgeschlecht",
+                "(Theater): Spielstätte", "Firma, Unternehmen", "Parlament, Kammer"])],
+                "haʊ̯s, Plural ˈhɔɪ̯zɐ", "mittelhochdeutsch hūs, althochdeutsch hūs", "https://de.wiktionary.org/wiki/Haus")
+            later_rel(500, lambda: card.show_result("wiktionary", "Haus", definition, anchor, ["de", "en"]))
+            later_rel(800, lambda: compose_card(card, "35-lookup-wiktionary"))
+            disamb = lk.Disambiguation("wikipedia", "de", "Bank", [
+                ("Bank (Möbel)", "eine Sitzgelegenheit für mehrere Personen"),
+                ("Bank (Kreditinstitut)", "ein Unternehmen, das Geldgeschäfte betreibt"),
+                ("Sandbank", "eine Erhebung im Meer"), ("Werkbank", "ein Arbeitstisch"),
+                ("Bank (Einheit)", "eine Speichereinheit")], "https://de.wikipedia.org/wiki/Bank")
+            later_rel(1000, lambda: card.show_result("wikipedia", "Bank", disamb, anchor, ["de", "en"]))
+            later_rel(1300, lambda: compose_card(card, "36-lookup-disambiguation"))
+            later_rel(1500, lambda: card.show_error("wikipedia", "Serendipität", "offline", anchor))
+            later_rel(1800, lambda: compose_card(card, "37-lookup-error"))
+            later_rel(2000, lambda: (card.close(), window.close(), app.quit()))
+
+        def compose_card(card, name):
+            origin = window.mapFromGlobal(card.geometry().topLeft())
+            compose(window, card, name, origin)
+
+        def later_rel(ms, fn):
+            QTimer.singleShot(ms, fn)
+
+        later(7600, lookup_shots)
 
     later(500, s_empty)
     later(60000, app.quit)

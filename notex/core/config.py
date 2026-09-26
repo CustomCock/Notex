@@ -63,6 +63,13 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "lookup": {               # Nachschlagen (Kontextmenü, Ctrl+Alt+W/T/G)
+        "online": True,           # Wikipedia/Wiktionary per API abfragen erlaubt
+        "language": "auto",       # "auto" (Sprache des Tabs) | "de" | "en"
+        "thumbnails": False,      # Vorschaubilder in der Karte
+        "engine": "google",       # "google" | "duckduckgo" | "startpage" | "custom"
+        "custom_url": "",         # eigene Such-URL, {q} = Begriff
+    },
     "update_check": {         # höchstens einmal täglich GitHub-Releases prüfen, nie etwas herunterladen
         "enabled": True,
         "last_check": 0.0,    # Unix-Zeit der letzten Prüfung

@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.5.0] – 2026-09-26
+
+### Hinzugefügt
+- Kontextmenü im Editor neu: Vorschläge, Bearbeiten (Ausschneiden, Kopieren, Einfügen, Löschen, Alles markieren),
+  Text (GROSS, klein, Wortanfänge groß, bei .md Fett/Kursiv/Code/Link – die Aktionen der Bearbeitungsleiste) und
+  Nachschlagen; ohne Markierung gilt das Wort unter dem Mauszeiger
+- Nachschlage-Karte für Wikipedia (Ctrl+Alt+W) und Wiktionary (Ctrl+Alt+T): Popover neben der Markierung, ganze
+  Karte öffnet den Browser, Quelle umschaltbar, Begriffsklärung als Liste, unscharfe Suche, Sprach-Fallback
+  Deutsch/Englisch, Skeleton beim Laden, Fehler in der Karte mit Websuche als Ausweg, Sitzungs-Cache,
+  Vorschaubilder optional; Abruf nur auf ausdrückliche Aktion, im Hintergrund, 5 s Timeout, eigener User-Agent
+- Websuche (Ctrl+Alt+G) nur als Browser-Link: Google, DuckDuckGo, Startpage oder eigene URL mit {q}
+- Einstellungen → Nachschlagen (online an/aus, Sprache, Vorschaubilder, Suchmaschine); aus .ntx-Notizen
+  Rückfrage vor jedem Senden
+
 ## [1.4.0] – 2026-09-26
 
 ### Hinzugefügt
