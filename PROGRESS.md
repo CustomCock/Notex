@@ -29,7 +29,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
-| 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | umgesetzt, CI grün, lokal getaggt – Umgang offen (Entscheidung Besitzer) |
+| 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün, lokal getaggt, bleibt (Besitzer) |
+| 1.7.0 | Neuer Block F: Modul-System, Variablen | in Arbeit |
 
 ## Erledigt
 
@@ -217,14 +218,10 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 
 ## Nächster Schritt
 
-**Wartet auf Entscheidung des Besitzers** zum bereits umgesetzten alten Block F, bevor der neue Plan F–K startet:
-1. Behalten oder zurücknehmen (per Revert, nichts löschen) – ganz oder einzeln (Bilder, CSV, JSON/YAML, Hex/Typ/
-   Hashes, Live-Logs, PDF).
-2. Behaltene Features als eigene Module in F1 aufnehmen (mit Schalter)?
-3. Versionen: Das lokale Tag `v1.6.0` gehört zum alten Block F. Neuer Block F = 1.7.0 (Nummern verschieben sich um
-   eins bis K = 1.12.0) oder altes Tag umbenennen und neuer Block F = 1.6.0.
-4. Überschneidung: Neuer G1 (Hex, Dateityp, Prüfsummen) ist zu großen Teilen schon da (alter F4); dann nur die
-   Lücken ergänzen (Kopieren als Base64/C-Array, u8–u64 LE/BE in der Statusleiste, TAR/PCAP/PCAPNG/EVTX-Signaturen).
+**Entscheidung des Besitzers (26.09.2026):** Alter Block F bleibt vollständig im Code (normale Funktionen, keine
+eigenen Module). Hex/Dateityp/Prüfsummen ist die Basis für das neue G1 (nur Lücken ergänzen) und gehört zum Modul
+„Hex & Dateianalyse“. Versionen zählen weiter: alter Block F = 1.6.0 (Tag bleibt), neuer F = 1.7.0, G = 1.8.0,
+H = 1.9.0, I = 1.10.0, J = 1.11.0, K = 1.12.0.
 
 Neuer Plan danach: F (Module, Variablen) → G (Hex/Strings/Eingebettet/Entropie) → H (Metadaten, YARA, Zeitleiste,
 IOC) → I (Ports, IP-Konflikte, RDAP/ASN) → J (Scanner) → K (Logs, PCAP); nach jedem Block anhalten.
