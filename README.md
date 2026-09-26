@@ -14,6 +14,7 @@ keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich
 | ![Kontextmenü](docs/06-context-menu.png) | ![Suchen und Ersetzen](docs/07-find-replace.png) | ![Toast](docs/08-toast.png) |
 
 Die Screenshots erzeugt `python tools/screenshot.py` automatisch (offscreen, mit Testdaten).
+Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche entsprechend anders aus.
 
 ## Was es kann
 
@@ -21,7 +22,11 @@ Die Screenshots erzeugt `python tools/screenshot.py` automatisch (offscreen, mit
 - **Suche** (Ctrl+Shift+F): rekursiv, case-insensitive, nach Dateiname und/oder Volltext,
   läuft im Hintergrund-Thread, Klick auf einen Treffer springt in die Zeile
 - **Editor**: weißes Blatt auf dunklem Tisch, Zeilennummern, aktuelle Zeile hervorgehoben,
-  Suchen/Ersetzen (Ctrl+F / Ctrl+H), Zoom (Ctrl+Mausrad, Ctrl+Plus/Minus), Zeilenumbruch (Alt+Z)
+  Suchen/Ersetzen (Ctrl+F / Ctrl+H), Zoom (Ctrl+Mausrad, Ctrl+Plus/Minus)
+- **Bearbeitungsleiste** über dem Blatt (Ctrl+Shift+E): Verlauf, Suchen, Textschrift, Ansicht,
+  Zeilen- und Textwerkzeuge, Markdown-Toggles bei .md, Prüfung, Encoding/Zeilenende
+- **Kein horizontales Scrollen**: Zeilen brechen immer an der Blattbreite um, auch lange URLs,
+  Hashes und Pfade; Listen behalten beim Umbruch ihre Einrückung
 - **Dateien**: Encoding (UTF-8, UTF-8-BOM, cp1252) und Zeilenenden (CRLF/LF) bleiben beim
   Speichern erhalten; atomares Speichern, damit bei einem Absturz nie eine halbe Datei liegt
 - **Baum-Kontextmenü**: Neue Datei, Neuer Ordner, Umbenennen (F2), Papierkorb (Entf),
@@ -29,9 +34,60 @@ Die Screenshots erzeugt `python tools/screenshot.py` automatisch (offscreen, mit
 - **Watcher**: extern hinzugefügte Dateien tauchen im Baum auf; wird eine offene Datei
   extern geändert, fragt die App, ob sie neu laden soll
 - **Zustand** in `config.json`: Fenster, Seitenleiste, aufgeklappte Ordner, offene Tabs,
-  Zoom, Umbruch, Blatt-Modus, Such-Chips, Animationen
+  Zoom, Blatt-Modus, Bearbeitungsleiste, Zeilennummern, Such-Chips, Theme
 - **Design**: matt schwarz/grau, das Blatt weiß und zentriert (Alt+P schaltet auf volle Breite),
   ein einziger dezenter Akzent, kurze Animationen (abschaltbar unter Ansicht)
+
+## Bearbeitungsleiste
+
+Direkt über dem Blatt sitzt eine schmale Leiste in Blattbreite. Der kleine Chevron darunter
+(oder **Ctrl+Shift+E**) klappt sie ein und aus, der Zustand bleibt gespeichert. Die Gruppen:
+
+| Gruppe | Werkzeuge |
+|---|---|
+| Verlauf | Rückgängig, Wiederholen |
+| Suchen | Suchen (Ctrl+F), Ersetzen (Ctrl+H) |
+| Textschrift | Schriftart-Dropdown, Größe −/Feld/+ |
+| Ansicht | Zoom zurücksetzen (Ctrl+0), Blatt-Modus/volle Breite (Alt+P), Zeilennummern (Ctrl+Alt+N) |
+| Zeilen | Duplizieren (Ctrl+D), hoch/runter (Alt+↑/↓), sortieren (F9), Duplikate entfernen (Ctrl+Shift+D), Leerzeichen am Zeilenende entfernen |
+| Text | GROSS (Ctrl+Shift+U), klein (Ctrl+U), Wortanfänge groß (Ctrl+Alt+U), Datum/Uhrzeit (F5) |
+| Markdown (nur .md) | Fett (Ctrl+Alt+B), Kursiv (Ctrl+Alt+I), Überschrift (Ctrl+Alt+H), Liste (Ctrl+Alt+L), Checkbox (Ctrl+Alt+X), Code (Ctrl+Alt+C), Link (Ctrl+K) – jeweils als Toggle |
+| Prüfung | Rechtschreibung (F7), Grammatik (Shift+F7) |
+| Datei | Encoding (UTF-8 / UTF-8 BOM / cp1252) und Zeilenende (LF / CRLF) anzeigen und umstellen |
+
+Passt nicht alles nebeneinander, wandern die hinteren Gruppen in das „…“-Menü rechts. Die
+Tastenkürzel gelten auch bei eingeklappter Leiste. Wichtig: Textdateien haben keine
+Formatierung. Schriftart und Größe sind Ansichts-Einstellungen für alle Dateien und ändern
+nichts am Inhalt.
+
+| Leiste mit Markdown-Gruppe | Eingeklappt | Schmales Fenster mit „…“ |
+|---|---|---|
+| ![Toolbar](docs/16-toolbar-markdown.png) | ![Eingeklappt](docs/17-toolbar-collapsed.png) | ![Überlauf](docs/18-toolbar-overflow.png) |
+
+## Schriften
+
+Die Oberfläche benutzt eine feste Schrift, die nicht einstellbar ist. Reihenfolge:
+**SF Pro Text / SF Pro Display** (falls vorhanden) → **Inter** (gebündelt, OFL) → Segoe UI
+Variable → Segoe UI. SF Pro wird aus Lizenzgründen nie mitgeliefert. Willst du sie (oder andere
+Schriften) nutzen, lege die Dateien nach `fonts/user/` neben die App: Sie werden beim Start
+automatisch geladen und erscheinen im Schrift-Dropdown. Der Ordner steht in `.gitignore` und
+wird vom Build nicht mitkopiert.
+
+Einstellbar ist nur die Schrift des Textinhalts im Blatt (Einstellungen → Schrift oder
+Toolbar), standardmäßig dieselbe proportionale Schrift wie die Oberfläche. Für Code-artige
+Endungen (.py, .json, .csv, .log, .ini) ist JetBrains Mono voreingestellt; das lässt sich je
+Endung ändern.
+
+## Umbruch
+
+Zeilen brechen immer an der Blattbreite um, notfalls mitten im Wort (URLs, Hashes, Pfade,
+Base64). Es gibt keine horizontale Scrollbar. Die maximale Textbreite im Blatt-Modus ist ein
+Maximum: Wird das Fenster schmaler oder die Seitenleiste geöffnet, schrumpft das Blatt mit,
+die Innenabstände gehen bis auf 16 px zurück, und die Lese-Position bleibt beim Reflow erhalten.
+Umgebrochene Folgezeilen eingerückter Zeilen und Listenpunkte übernehmen die Einrückung,
+Zeilennummern stehen nur an der ersten Zeile.
+
+![Lange Zeilen](docs/19-wrap-long-lines.png)
 
 ## Themes anpassen
 
@@ -45,7 +101,8 @@ Alles wirkt sofort als Vorschau; **Abbrechen** stellt den Zustand von vorher wie
   Hintergrund unter 4.5:1 (WCAG) fällt.
 - **Blatt**: Varianten Weiß, Papier, Sepia, Dunkel; Blatt-, Text-, Zeilennummern- und
   Auswahlfarbe, Schatten und Stärke, Innenabstand, Blatt-Modus und maximale Textbreite.
-- **Schrift**: UI- und Editor-Schrift (gebündelte plus installierte), Größen, Zeilenhöhe.
+- **Schrift**: Textschrift des Blatts (Standard, gebündelte, eigene und installierte), Größen,
+  Zeilenhöhe, Schrift je Dateiendung.
 
 Eigene Themes speicherst du mit **Speichern als …**; sie liegen als JSON in `themes/` neben
 der App und wandern mit dem Ordner mit. Duplizieren, Umbenennen, Löschen, Import und Export
@@ -121,7 +178,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+F | Suche in Dateien (Esc leert sie) |
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
-| Alt+Z | Zeilenumbruch |
+| Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
+| Ctrl+Alt+N | Zeilennummern |
 | Alt+P | Blatt zentrieren / volle Breite |
 | Ctrl+, | Einstellungen |
 | F7 / Shift+F7 | Rechtschreibung / Grammatik umschalten |
