@@ -6,10 +6,11 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QSplitter, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QMainWindow, QSplitter, QToolButton, QVBoxLayout, QWidget
 
 from notex import APP_NAME
 from notex.core.encoding import read_text_file
+from notex.ui import dialogs
 from notex.ui.editor_tabs import EditorTabs
 from notex.ui.file_watcher import OpenFileWatcher
 from notex.ui.find_bar import FindBar
@@ -181,18 +182,17 @@ class MainWindow(QMainWindow):
         editor = self.tabs.editor_for(path)
         if editor is None:
             return
-        hint = "\nAchtung: Du hast ungespeicherte Änderungen, die dabei verloren gehen." if editor.is_dirty else ""
-        answer = QMessageBox.question(
+        hint = "Achtung: Deine ungespeicherten Änderungen gehen dabei verloren." if editor.is_dirty else ""
+        reload = dialogs.confirm(
             self, "Datei extern geändert",
-            f"„{self.tabs.relative(path)}“ wurde außerhalb von {APP_NAME} geändert.\nNeu laden?{hint}",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
+            f"„{self.tabs.relative(path)}“ wurde außerhalb von {APP_NAME} geändert. Neu laden?",
+            yes="Neu laden", no="Behalten", informative=hint, danger=editor.is_dirty,
         )
-        if answer == QMessageBox.StandardButton.Yes:
+        if reload:
             try:
                 editor.replace_content(read_text_file(path))
             except OSError as error:
-                QMessageBox.warning(self, "Neu laden fehlgeschlagen", str(error))
+                dialogs.warn(self, "Neu laden fehlgeschlagen", str(error))
         else:
             editor.document().setModified(True)  # Inhalt weicht jetzt von der Platte ab
         self._update_status()

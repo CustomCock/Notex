@@ -43,8 +43,36 @@ QLineEdit:focus {
     border: 1px solid @accent;
     background: @surface;
 }
-QLineEdit#SearchField {
-    padding-left: @sp_xspx;   /* das Lupen-Icon sitzt als Action im Feld */
+QFrame#SearchField {
+    background: @surface;
+    border: 1px solid transparent;
+    border-radius: @r_controlpx;
+}
+QFrame#SearchField:hover {
+    background: @hover;
+}
+QFrame#SearchField[focused="true"] {
+    border: 1px solid @accent;
+    background: @surface;
+}
+QLineEdit#SearchInput, QLineEdit#SearchInput:hover, QLineEdit#SearchInput:focus {
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+}
+QLabel#SearchIcon {
+    background: transparent;
+}
+QToolButton#SearchClear {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    min-height: 0;
+    border-radius: 4px;
+}
+QToolButton#SearchClear:hover {
+    background: @selection;
 }
 
 /* Toggle-Chips (Name / Volltext) */
@@ -245,6 +273,9 @@ QPushButton:default {
 QPushButton#Danger {
     color: @danger;
 }
+QPushButton#Danger:focus, QPushButton#Danger:default {
+    border-color: @danger;
+}
 QToolButton#IconButton {
     background: transparent;
     border: 1px solid transparent;
@@ -362,4 +393,21 @@ QFrame#Toast {
 QFrame#Toast QLabel {
     background: transparent;
     color: @text;
+}
+
+/* ---------- Seitenleiste: Hinweise ---------- */
+QLabel#TreeHint {
+    color: @text_faint;
+    background: transparent;
+    font-size: @fs_smallpx;
+}
+QLabel#ResultsInfo {
+    color: @text_muted;
+    background: transparent;
+    font-size: @fs_smallpx;
+    padding-right: @sp_xspx;
+}
+QLabel#StatusDot {
+    color: @text_faint;
+    padding: 0;
 }

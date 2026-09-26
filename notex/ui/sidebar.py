@@ -12,12 +12,14 @@ from typing import Any
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLineEdit, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout, QWidget
 
 from notex.core.search import SearchOptions, SearchResult
 from notex.ui.file_tree import FileTree
 from notex.ui.search_results import SearchResults
 from notex.ui.search_worker import SearchWorker
+from notex.ui.widgets import Chip, SearchField
+from notex.theme.tokens import SPACING
 
 DEBOUNCE_MS = 250
 
@@ -31,19 +33,23 @@ class Sidebar(QWidget):
         self.root = root
         self.config = config
 
-        self.search_field = QLineEdit()
-        self.search_field.setPlaceholderText("Suchen …  (Ctrl+Shift+F)")
-        self.search_field.setClearButtonEnabled(True)
+        self.search_field = SearchField("Suchen …")
+        self.search_field.setToolTip("Suche in Dateien  Ctrl+Shift+F")
 
-        self.by_name = QCheckBox("Dateiname")
-        self.full_text = QCheckBox("Volltext")
+        self.by_name = Chip("Name", "Dateinamen durchsuchen")
+        self.full_text = Chip("Volltext", "Inhalte durchsuchen")
         self.by_name.setChecked(config["search"]["by_name"])
         self.full_text.setChecked(config["search"]["full_text"])
+        self.results_info = QLabel()
+        self.results_info.setObjectName("ResultsInfo")
+        self.results_info.hide()
         checks = QHBoxLayout()
-        checks.setContentsMargins(2, 0, 0, 0)
+        checks.setContentsMargins(0, 0, 0, 0)
+        checks.setSpacing(SPACING.xs)
         checks.addWidget(self.by_name)
         checks.addWidget(self.full_text)
         checks.addStretch()
+        checks.addWidget(self.results_info)
 
         self.tree = FileTree(root, config["extensions"])
         self.results = SearchResults()
@@ -52,8 +58,8 @@ class Sidebar(QWidget):
         self.stack.addWidget(self.results)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 4, 0)
-        layout.setSpacing(6)
+        layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, 0)
+        layout.setSpacing(SPACING.sm)
         layout.addWidget(self.search_field)
         layout.addLayout(checks)
         layout.addWidget(self.stack, 1)
@@ -75,7 +81,7 @@ class Sidebar(QWidget):
         self.results.open_requested.connect(self.open_requested)
 
         # Esc leert die Suche – egal ob Feld oder Trefferliste den Fokus hat
-        for widget in (self.search_field, self.results):
+        for widget in (self.search_field.input, self.results):
             shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), widget)
             shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
             shortcut.activated.connect(self.clear_search)
@@ -105,11 +111,13 @@ class Sidebar(QWidget):
     def _on_text_changed(self, text: str) -> None:
         if text.strip():
             self.stack.setCurrentWidget(self.results)
+            self.results_info.show()
             self._debounce.start()
         else:
             self._debounce.stop()
             self.stop_search()
             self.results.clear_results()
+            self.results_info.hide()
             self.stack.setCurrentWidget(self.tree)
 
     def _on_option_changed(self) -> None:
@@ -131,6 +139,7 @@ class Sidebar(QWidget):
             self.results.show_message("Keine Suchart gewählt – Dateiname und/oder Volltext ankreuzen.")
             return
         self.results.show_message("Suche …")
+        self.results_info.setText("Suche …")
         self._placeholder_shown = True
 
         worker = SearchWorker(self._generation, self.root, query, options)
@@ -165,6 +174,9 @@ class Sidebar(QWidget):
     def _on_search_done(self, generation: int, result: SearchResult) -> None:
         if not self._is_current(generation) or result.cancelled:
             return
-        if not result.names and not result.files:
+        hits = len(result.names) + sum(len(f.lines) for f in result.files)
+        files = len({m.path for m in result.names} | {f.path for f in result.files})
+        self.results_info.setText(f"{hits} Treffer in {files} Dateien" if hits else "Keine Treffer")
+        if not hits:
             note = f" ({result.skipped_large} große Dateien übersprungen)" if result.skipped_large else ""
             self.results.show_message("Keine Treffer" + note)

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem,
 
 from notex.core.search import FileMatch, NameMatch
 from notex.theme.icons import icon
-from notex.theme.tokens import COLORS
+from notex.theme.tokens import COLORS, LAYOUT
 
 ROLE_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_LINE = Qt.ItemDataRole.UserRole + 2     # (line_no, column, length) oder None
@@ -20,7 +20,7 @@ def _highlight(text: str, start: int, end: int) -> str:
     """Escaped Text mit hervorgehobenem Bereich – als kleines HTML-Fragment."""
     return (
         html.escape(text[:start])
-        + f'<span style="background:{COLORS.selection}; color:{COLORS.text}; font-weight:bold">'
+        + f'<span style="background:{COLORS.accent_soft}; color:{COLORS.text}; font-weight:600">'
         + html.escape(text[start:end])
         + "</span>"
         + html.escape(text[end:])
@@ -62,7 +62,7 @@ class HtmlDelegate(QStyledItemDelegate):
         doc.setDefaultFont(opt.font)
         doc.setDocumentMargin(2)
         doc.setHtml(opt.text)
-        return QSize(int(doc.idealWidth()), int(doc.size().height()))
+        return QSize(int(doc.idealWidth()), max(LAYOUT.tree_row_height - 2, int(doc.size().height())))
 
 
 class SearchResults(QTreeWidget):
@@ -71,7 +71,9 @@ class SearchResults(QTreeWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setHeaderHidden(True)
-        self.setIndentation(12)
+        self.setIndentation(LAYOUT.tree_indent)
+        self.setFrameShape(QTreeWidget.Shape.NoFrame)
+        self.setIconSize(QSize(16, 16))
         self.setItemDelegate(HtmlDelegate(self))
         self.setRootIsDecorated(True)
         self.itemClicked.connect(self._on_item_clicked)

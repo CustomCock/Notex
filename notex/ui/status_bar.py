@@ -1,4 +1,4 @@
-"""Statusleiste: Pfad relativ zu data/, Zeile/Spalte, Encoding, Zeichen, Gespeichert-Status."""
+"""Statusleiste: niedrig, klein, gedämpft. Elemente rechts durch Punkte getrennt."""
 from __future__ import annotations
 
 from PySide6.QtWidgets import QLabel, QStatusBar
@@ -17,21 +17,32 @@ class StatusBar(QStatusBar):
         self.encoding_label = QLabel()
         self.chars_label = QLabel()
         self.dirty_label = QLabel()
+        self._separators: list[QLabel] = []
         self.addWidget(self.path_label, 1)  # stretch=1: nimmt den freien Platz links
-        for label in (self.position_label, self.encoding_label, self.chars_label, self.dirty_label):
+        for i, label in enumerate((self.position_label, self.encoding_label, self.chars_label, self.dirty_label)):
+            if i:
+                dot = QLabel("·")
+                dot.setObjectName("StatusDot")
+                self._separators.append(dot)
+                self.addPermanentWidget(dot)
             self.addPermanentWidget(label)
         self.update_for(None, "")
 
     def update_for(self, editor: Editor | None, relative_path: str) -> None:
+        labels = (self.position_label, self.encoding_label, self.chars_label, self.dirty_label)
         if editor is None:
             self.path_label.setText("")
-            for label in (self.position_label, self.encoding_label, self.chars_label, self.dirty_label):
+            for label in labels:
                 label.setText("")
+            for dot in self._separators:
+                dot.setVisible(False)
             return
+        for dot in self._separators:
+            dot.setVisible(True)
         line, col = editor.cursor_line_col()
         eol = "CRLF" if editor.eol == "\r\n" else "LF"
         self.path_label.setText(relative_path)
         self.position_label.setText(f"Z {line}, S {col}")
-        self.encoding_label.setText(f"{ENCODING_LABELS.get(editor.encoding, editor.encoding)}  {eol}")
+        self.encoding_label.setText(f"{ENCODING_LABELS.get(editor.encoding, editor.encoding)} · {eol}")
         self.chars_label.setText(f"{len(editor.toPlainText())} Zeichen")
         self.dirty_label.setText("Ungespeichert" if editor.is_dirty else "Gespeichert")

@@ -15,6 +15,7 @@ from notex.core.fileops import save_text_file
 from notex.theme.tokens import FONT_SIZE
 from notex.ui.editor import Editor
 from notex.ui.paper import EditorPage
+from notex.ui.widgets import EditorTabBar
 
 DIRTY_MARK = " ●"
 MIN_FONT_SIZE, MAX_FONT_SIZE = 8, 40
@@ -35,10 +36,12 @@ class EditorTabs(QTabWidget):
         self.font_size = FONT_SIZE.editor
         self.word_wrap = False
         self.paper_mode = True
-        self.setTabsClosable(True)
+        self.tab_bar = EditorTabBar()
+        self.setTabBar(self.tab_bar)
+        self.tab_bar.close_requested.connect(self.close_tab)
         self.setMovable(True)
         self.setDocumentMode(True)
-        self.tabCloseRequested.connect(self.close_tab)
+        self.dirty_changed.connect(self.tab_bar.set_dirty)
         self.currentChanged.connect(lambda _index: self.status_changed.emit())
 
     # ---- Zugriff ----------------------------------------------------------

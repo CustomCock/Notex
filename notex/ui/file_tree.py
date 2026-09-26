@@ -4,19 +4,45 @@ QFileSystemModel bringt vieles fertig mit: lazy Laden, Namensfilter, Umbenennen
 und einen eigenen Watcher, der den Baum aktuell hält, wenn extern Dateien
 dazukommen. Drag & Drop machen wir selbst (dropEvent), damit offene Tabs vom
 Verschieben erfahren.
+
+Aussehen: Zeilen 28 px hoch, Auswahl/Hover als abgerundete Fläche über die
+ganze Zeile (drawRow), Chevrons als Lucide-Icons (drawBranches), Ordner-Icon
+wechselt beim Aufklappen.
 """
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
 
-from PySide6.QtCore import QDir, QModelIndex, QPoint, Qt, Signal
-from PySide6.QtGui import QDropEvent
-from PySide6.QtWidgets import QAbstractItemView, QFileSystemModel, QInputDialog, QMenu, QMessageBox, QTreeView
+from PySide6.QtCore import QDir, QModelIndex, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QDropEvent, QPainter
+from PySide6.QtWidgets import (QAbstractItemView, QFileSystemModel, QLabel, QMenu, QStyledItemDelegate,
+                               QStyleOptionViewItem, QTreeView)
 
 from notex.core import fileops
-from notex.theme.icons import LucideIconProvider, icon
+from notex.theme.icons import LucideIconProvider, icon, pixmap
 from notex.theme.theme import style_menu
+from notex.theme.tokens import COLORS, LAYOUT, RADIUS, SPACING
+from notex.ui import dialogs
+
+CHEVRON_SIZE = 14
+
+
+class TreeDelegate(QStyledItemDelegate):
+    """Zeilenhöhe aus den Tokens, Ordner-Icon je nach Zustand."""
+
+    def __init__(self, view: "FileTree") -> None:
+        super().__init__(view)
+        self.view = view
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+        size = super().sizeHint(option, index)
+        return QSize(size.width(), LAYOUT.tree_row_height)
+
+    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        super().initStyleOption(option, index)
+        if self.view.model_.isDir(index):
+            option.icon = icon("folder-open" if self.view.isExpanded(index) else "folder")
 
 
 class FileTree(QTreeView):
@@ -28,6 +54,7 @@ class FileTree(QTreeView):
         super().__init__()
         self.root = Path(root)
         self._expanded: set[str] = set()
+        self._hover_row = QModelIndex()
 
         self.model_ = QFileSystemModel(self)
         self.model_.setIconProvider(LucideIconProvider())
@@ -42,14 +69,18 @@ class FileTree(QTreeView):
         self.setRootIndex(self.model_.index(str(self.root)))
         for column in range(1, self.model_.columnCount()):  # nur Namen zeigen
             self.hideColumn(column)
+        self.setItemDelegate(TreeDelegate(self))
         self.setHeaderHidden(True)
         self.setSortingEnabled(True)
         self.sortByColumn(0, Qt.SortOrder.AscendingOrder)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)  # Umbenennen nur per F2/Menü
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setUniformRowHeights(True)
-        self.setAnimated(False)
-        self.setIndentation(14)
+        self.setIndentation(LAYOUT.tree_indent)
+        self.setIconSize(QSize(16, 16))
+        self.setMouseTracking(True)
+        self.setFrameShape(QTreeView.Shape.NoFrame)
+        self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
         # Drag & Drop: Dateien/Ordner innerhalb von data/ verschieben, von außen hineinkopieren
         self.setDragEnabled(True)
@@ -61,9 +92,21 @@ class FileTree(QTreeView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
+        # Hinweis, wenn data/ leer ist
+        self.hint = QLabel(
+            "Noch keine Dateien.\n\nLege Ordner mit Textdateien in data/ ab\n"
+            "oder erstelle per Rechtsklick eine neue Datei.", self.viewport())
+        self.hint.setObjectName("TreeHint")
+        self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hint.setWordWrap(True)
+        self.hint.hide()
+        self.model_.directoryLoaded.connect(lambda _p: self._update_hint())
+        self.model_.rowsInserted.connect(lambda *_: self._update_hint())
+        self.model_.rowsRemoved.connect(lambda *_: self._update_hint())
+
         self.clicked.connect(self._on_clicked)
-        self.expanded.connect(lambda index: self._expanded.add(self._relative(self.path_at(index))))
-        self.collapsed.connect(lambda index: self._expanded.discard(self._relative(self.path_at(index))))
+        self.expanded.connect(self._on_expanded)
+        self.collapsed.connect(self._on_collapsed)
 
     # ---- Hilfen ------------------------------------------------------------
     def path_at(self, index: QModelIndex) -> Path | None:
@@ -95,7 +138,19 @@ class FileTree(QTreeView):
             self.setCurrentIndex(index)
             self.scrollTo(index)
 
+    def _update_hint(self) -> None:
+        empty = self.model_.rowCount(self.rootIndex()) == 0
+        self.hint.setVisible(empty)
+        if empty:
+            self.hint.setGeometry(self.viewport().rect().adjusted(SPACING.lg, SPACING.xxl, -SPACING.lg, -SPACING.xxl))
+
     # ---- Auf-/Zuklappzustand ------------------------------------------------
+    def _on_expanded(self, index: QModelIndex) -> None:
+        self._expanded.add(self._relative(self.path_at(index)))
+
+    def _on_collapsed(self, index: QModelIndex) -> None:
+        self._expanded.discard(self._relative(self.path_at(index)))
+
     def expanded_folders(self) -> list[str]:
         return sorted(self._expanded)
 
@@ -107,11 +162,65 @@ class FileTree(QTreeView):
             if path.is_dir():
                 self.expand(self.index_for(path))
 
+    # ---- Zeichnen ------------------------------------------------------------
+    def chevron_angle(self, index: QModelIndex) -> float:
+        """0 = zu (Pfeil nach rechts), 90 = offen. Wird in der Animations-Stufe weich."""
+        return 90.0 if self.isExpanded(index) else 0.0
+
+    def drawBranches(self, painter: QPainter, rect: QRect, index: QModelIndex) -> None:
+        if not self.model_.hasChildren(index):
+            return
+        cell = QRect(rect.right() - self.indentation() + 1, rect.top(), self.indentation(), rect.height())
+        pm = pixmap("chevron-right", CHEVRON_SIZE, COLORS.text_muted, self.devicePixelRatioF())
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.translate(cell.center())
+        painter.rotate(self.chevron_angle(index))
+        painter.drawPixmap(-CHEVRON_SIZE // 2, -CHEVRON_SIZE // 2, pm)
+        painter.restore()
+
+    def row_background(self, index: QModelIndex) -> QColor | None:
+        if index in self.selectedIndexes() or index == self.currentIndex():
+            return QColor(COLORS.selection)
+        if index == self._hover_row:
+            return QColor(COLORS.hover)
+        return None
+
+    def drawRow(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+        color = self.row_background(index)
+        if color is not None:
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(color)
+            painter.drawRoundedRect(option.rect.adjusted(0, 1, 0, -1), RADIUS.control, RADIUS.control)
+            painter.restore()
+        super().drawRow(painter, option, index)
+
+    def mouseMoveEvent(self, event) -> None:
+        self._set_hover(self.indexAt(event.position().toPoint()))
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self._set_hover(QModelIndex())
+        super().leaveEvent(event)
+
+    def _set_hover(self, index: QModelIndex) -> None:
+        if index != self._hover_row:
+            self._hover_row = index
+            self.viewport().update()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_hint()
+
     # ---- Events -------------------------------------------------------------
     def _on_clicked(self, index: QModelIndex) -> None:
         path = self.path_at(index)
         if path is not None and path.is_file():
             self.file_activated.emit(path)
+        elif path is not None and path.is_dir():
+            self.setExpanded(index, not self.isExpanded(index))
 
     def keyPressEvent(self, event) -> None:
         key = event.key()
@@ -144,7 +253,7 @@ class FileTree(QTreeView):
             if not source.exists() or source.parent == target or source == target:
                 continue
             if fileops.is_within(target, source):
-                QMessageBox.warning(self, "Verschieben", f"„{source.name}“ kann nicht in sich selbst verschoben werden.")
+                dialogs.warn(self, "Verschieben", f"„{source.name}“ kann nicht in sich selbst verschoben werden.")
                 continue
             try:
                 if fileops.is_within(source, self.root):
@@ -160,7 +269,7 @@ class FileTree(QTreeView):
                     else:
                         shutil.copy2(source, destination)
             except (OSError, shutil.Error) as error:
-                QMessageBox.warning(self, "Verschieben fehlgeschlagen", str(error))
+                dialogs.warn(self, "Verschieben fehlgeschlagen", str(error))
         # Wir haben verschoben. Als Ergebnis "Copy" melden, sonst würde Qt nach einem
         # "Move" die Quell-Einträge zusätzlich über das Modell löschen lassen.
         event.setDropAction(Qt.DropAction.CopyAction)
@@ -175,7 +284,6 @@ class FileTree(QTreeView):
         else:
             self.clearSelection()
             self.setCurrentIndex(QModelIndex())
-
         menu = self.build_context_menu(path)
         menu.exec(self.viewport().mapToGlobal(pos))
 
@@ -192,28 +300,26 @@ class FileTree(QTreeView):
         return menu
 
     def create_file(self, folder: Path) -> None:
-        suggestion = fileops.unique_path(folder, "Neu", ".txt").name
-        name, ok = QInputDialog.getText(self, "Neue Datei", "Dateiname:", text=suggestion)
-        if not ok or not name.strip():
+        name = dialogs.ask_text(self, "Neue Datei", "Dateiname:", fileops.unique_path(folder, "Neu", ".txt").name)
+        if not name:
             return
         try:
-            path = fileops.create_file(folder, name.strip())
+            path = fileops.create_file(folder, name)
         except OSError as error:
-            QMessageBox.warning(self, "Neue Datei", str(error))
+            dialogs.warn(self, "Neue Datei", str(error))
             return
         self.expand(self.index_for(folder))
         self.select_path(path)
         self.file_activated.emit(path)
 
     def create_folder(self, folder: Path) -> None:
-        suggestion = fileops.unique_path(folder, "Neuer Ordner").name
-        name, ok = QInputDialog.getText(self, "Neuer Ordner", "Ordnername:", text=suggestion)
-        if not ok or not name.strip():
+        name = dialogs.ask_text(self, "Neuer Ordner", "Ordnername:", fileops.unique_path(folder, "Neuer Ordner").name)
+        if not name:
             return
         try:
-            path = fileops.create_folder(folder, name.strip())
+            path = fileops.create_folder(folder, name)
         except OSError as error:
-            QMessageBox.warning(self, "Neuer Ordner", str(error))
+            dialogs.warn(self, "Neuer Ordner", str(error))
             return
         self.expand(self.index_for(folder))
         self.select_path(path)
@@ -231,17 +337,12 @@ class FileTree(QTreeView):
         if path is None:
             return
         kind = "Ordner" if path.is_dir() else "Datei"
-        answer = QMessageBox.question(
-            self, "In den Papierkorb",
-            f"{kind} „{path.name}“ in den Papierkorb verschieben?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
+        if not dialogs.confirm(self, "In den Papierkorb", f"{kind} „{path.name}“ in den Papierkorb verschieben?",
+                               yes="In den Papierkorb", danger=True):
             return
         try:
             fileops.move_to_trash(path)
         except Exception as error:  # noqa: BLE001 – send2trash wirft eigene Exception-Typen
-            QMessageBox.warning(self, "Löschen fehlgeschlagen", str(error))
+            dialogs.warn(self, "Löschen fehlgeschlagen", str(error))
             return
         self.path_deleted.emit(path)
