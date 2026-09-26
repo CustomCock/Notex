@@ -391,6 +391,16 @@ class SettingsDialog(QDialog):
         page.note("Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt. Die Vorschau lädt nie von selbst aus dem "
                   "Internet: externe Bilder erscheinen als „Bild laden“, externe Links öffnen den Browser erst auf Klick.")
 
+        page.section("Geteilter Editor")
+        self.split_box = QComboBox()
+        self.split_box.addItem("Nebeneinander", "horizontal")
+        self.split_box.addItem("Untereinander", "vertical")
+        self.split_box.currentIndexChanged.connect(
+            lambda i: self.window_.tabs.set_orientation(self.split_box.itemData(i)) if not self._loading else None)
+        page.row("Gruppen anordnen", self.split_box)
+        page.note("Ctrl+\\ teilt den Editor in zwei Tab-Gruppen; Tabs lassen sich per Drag zwischen den Gruppen "
+                  "ziehen, dieselbe Datei kann in beiden offen sein (ein Dokument, zwei Ansichten).")
+
         page.section("Wiki-Links")
         self.wiki_box = QCheckBox("[[Links]] hervorheben und auflösen (Ctrl+Klick öffnet)")
         self.wiki_box.toggled.connect(lambda on: (self.config.__setitem__("wiki_links", on), self.window_.tabs.relink_all()) if not self._loading else None)
@@ -468,6 +478,7 @@ class SettingsDialog(QDialog):
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
         self.markdown_view_box.setCurrentIndex(max(0, self.markdown_view_box.findData(cfg.get("markdown_view", "edit"))))
+        self.split_box.setCurrentIndex(max(0, self.split_box.findData(cfg.get("split", {}).get("orientation", "horizontal"))))
         self.sync_scroll_box.setChecked(bool(cfg.get("preview_sync_scroll", True)))
         self.syntax_box.setChecked(bool(cfg.get("syntax_highlighting", True)))
         for ext, chip in self.syntax_chips.items():

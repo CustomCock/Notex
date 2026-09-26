@@ -47,7 +47,10 @@ class Editor(QTextEdit):
     link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
     completion_requested = Signal(str, str)   # ("file", Präfix) oder ("heading", Ziel) nach "[[" bzw. "#"
 
-    def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None) -> None:
+    def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None,
+                 share_with: "Editor | None" = None) -> None:
+        """`share_with`: zweite Ansicht desselben Dokuments (geteilter Editor) – gleicher Text, gleiches Undo,
+        gleicher Highlighter; nur Cursor, Scrollposition und Auswahl sind eigen."""
         super().__init__()
         self.path = path
         self.encoding = text_file.encoding
@@ -57,8 +60,14 @@ class Editor(QTextEdit):
         self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
         self.read_only = False
+        self.shared = share_with is not None
         self.highlighter: SpellHighlighter | None = None
-        if checker is not None:
+        if share_with is not None:
+            self.setDocument(share_with.document())
+            self.highlighter = share_with.highlighter
+            if self.highlighter is not None:
+                self.highlighter.add_view(self)
+        elif checker is not None:
             self.highlighter = SpellHighlighter(self.document(), self, checker, markdown=path.suffix.lower() == ".md")
 
         self.setObjectName("Editor")
@@ -85,12 +94,20 @@ class Editor(QTextEdit):
         self.document().contentsChanged.connect(self._on_contents_changed)
         self.cursorPositionChanged.connect(self._refresh_extra_selections)
 
+        self._loaded_once = False
         self.set_font_size(font_size)
         self.load(text_file)
 
     # ---- Inhalt ---------------------------------------------------------------
     def load(self, text_file: TextFile) -> None:
         self.encoding, self.eol = text_file.encoding, text_file.eol
+        if self.shared and not self._loaded_once:
+            # zweite Ansicht: das Dokument hat schon Inhalt, Formate und Undo-Stack
+            self._loaded_once = True
+            self._update_margins()
+            self._refresh_extra_selections()
+            return
+        self._loaded_once = True
         self.setPlainText(text_file.text)
         self._apply_line_height()
         self._apply_hanging_indents()

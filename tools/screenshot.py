@@ -306,7 +306,10 @@ def main() -> int:
         # v1.2: Markdown-Vorschau geteilt
         later(2700, lambda: (window.tabs.open_file(data / "Projekte/Notex/vorschau.md"), window.set_preview_mode("split")))
         later(3300, lambda: save(window, "26-markdown-preview"))
-        later(3400, lambda: (window.close(), app.quit()))
+        later(3400, lambda: (window.set_preview_mode("edit"), window.tabs.open_file(data / "Projekte/Python/notizen.md"),
+                             window.tabs.split(), window.tabs.open_file(data / "Projekte/Python/snippets.py")))
+        later(4000, lambda: save(window, "27-split-view"))
+        later(4100, lambda: (window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)

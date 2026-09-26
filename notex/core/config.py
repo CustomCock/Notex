@@ -39,6 +39,13 @@ DEFAULTS: dict[str, Any] = {
     "backlinks_visible": False,
     "backlinks_position": "bottom",   # "bottom" | "right"
     "active_tab": 0,
+    "split": {                # geteilter Editor: zweite Tab-Gruppe
+        "enabled": False,
+        "open_tabs": [],
+        "active_tab": 0,
+        "active_group": 0,
+        "orientation": "horizontal",   # nebeneinander | "vertical" = untereinander
+    },
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
     "toolbar_visible": True,  # Bearbeitungsleiste über dem Blatt ausgeklappt

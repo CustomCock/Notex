@@ -11,7 +11,8 @@ from PySide6.QtWidgets import QMainWindow, QSplitter, QStackedWidget, QVBoxLayou
 from notex import APP_NAME
 from notex.core.encoding import read_text_file
 from notex.ui import dialogs
-from notex.ui.editor_tabs import EditorTabs
+from notex.ui.editor_area import EditorArea
+from notex.core import split_state
 from notex.ui.empty_state import EmptyState
 from notex.ui.toast import Toast
 from notex.ui.file_watcher import OpenFileWatcher
@@ -60,7 +61,7 @@ class MainWindow(QMainWindow):
         config["recent_files"] = prune_recent(config["recent_files"])
 
         self.sidebar = Sidebar(root, config)
-        self.tabs = EditorTabs(root, config)
+        self.tabs = EditorArea(root, config)   # eine oder zwei Tab-Gruppen, spricht wie ein EditorTabs
         self.tabs.font_size = config["font_size"]
         self.tabs.paper_mode = config["paper_mode"]
         self.links = LinkIndexService(root)
@@ -83,7 +84,7 @@ class MainWindow(QMainWindow):
         self.sidebar_button = IconButton("panel-left", "Seitenleiste ein-/ausblenden  Ctrl+B")
         self.sidebar_button.clicked.connect(self.toggle_sidebar)
         self._sidebar_anim = None
-        self.tabs.setCornerWidget(self.sidebar_button, Qt.Corner.TopLeftCorner)
+        self.tabs.set_corner_widget(self.sidebar_button)
 
         # Rechte Seite: Tabs oben, darunter (ausblendbar) die Suchen/Ersetzen-Leiste
         editor_area = QWidget()
@@ -223,6 +224,12 @@ class MainWindow(QMainWindow):
         self.backlinks_action.setChecked(bool(self.config.get("backlinks_visible", False)))
         view_menu.addAction(self.backlinks_action)
         view_menu.addSeparator()
+        self.split_action = self._action("Editor teilen", "Ctrl+\\", self.toggle_split, checkable=True)
+        view_menu.addAction(self.split_action)
+        view_menu.addAction(self._action("Teilung: nebeneinander / untereinander", "Ctrl+Alt+\\", self.toggle_split_orientation))
+        view_menu.addAction(self._action("Tab in andere Gruppe verschieben", "Ctrl+Alt+Right", self.tabs.move_current_to_other_group))
+        view_menu.addAction(self._action("Datei auch in anderer Gruppe öffnen", "Ctrl+Alt+Shift+Right", self.tabs.open_in_other_group))
+        view_menu.addSeparator()
         self.paper_action = self._action("Blatt zentrieren", "Alt+P", self.toggle_paper_mode, checkable=True)
         self.paper_action.setChecked(self.config["paper_mode"])
         view_menu.addAction(self.paper_action)
@@ -298,10 +305,8 @@ class MainWindow(QMainWindow):
         except OSError as error:
             dialogs.warn(self, "Nach data/ übernehmen", str(error))
             return
-        index = self.tabs.indexOf(self.tabs.page_for(self.tabs.editor_for(new_path))) if self.tabs.editor_for(new_path) else -1
-        if index >= 0:
-            from PySide6.QtGui import QIcon
-            self.tabs.setTabIcon(index, QIcon())
+        for editor in self.tabs.views_of(new_path):
+            self.tabs.refresh_tab_icon(editor)
         self._refresh_open_files()
         self.toast.show_message(f"{'Verschoben' if move else 'Kopiert'} nach data/ · {new_path.name}", "check")
         self.sidebar.tree.select_path(new_path)
@@ -721,6 +726,9 @@ class MainWindow(QMainWindow):
         a("zoom_reset", "rotate-ccw", "Zoom zurücksetzen", None, lambda: self.tabs.set_font_size(FONT_SIZE.editor)).setToolTip("Zoom zurücksetzen  Ctrl+0")
         self.paper_toolbar_action = a("paper_mode", "minimize-2", "Blatt-Modus / volle Breite", None, self.toggle_paper_mode, checkable=True)
         self.paper_toolbar_action.setToolTip("Blatt zentrieren / volle Breite  Alt+P")
+        self.split_toolbar_action = a("split", "square-split-horizontal", "Editor teilen / Teilung aufheben", None,
+                                      self.toggle_split, checkable=True)
+        self.split_toolbar_action.setToolTip("Editor teilen  Ctrl+\\")
         self.line_numbers_action = a("line_numbers", "hash", "Zeilennummern", "Ctrl+Alt+N",
                                      lambda: self.tabs.set_line_numbers(not self.tabs.line_numbers), checkable=True)
         a("dup_line", "copy-plus", "Zeile duplizieren", "Ctrl+D", lambda: ed(lambda e: e.apply_line_op(ops.duplicate_lines)))
@@ -752,6 +760,22 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    # ---- Geteilter Editor ----------------------------------------------------------------
+    def toggle_split(self) -> None:
+        if self.tabs.current_editor() is None and not self.tabs.is_split:
+            self.toast.show_message("Erst eine Datei öffnen, dann teilen", "info")
+            self.split_action.setChecked(False)
+            return
+        split = self.tabs.toggle_split()
+        self.split_action.setChecked(split)
+        self.toast.show_message("Editor geteilt – Tabs lassen sich zwischen den Gruppen ziehen" if split else "Teilung aufgehoben",
+                                "square-split-horizontal")
+
+    def toggle_split_orientation(self) -> None:
+        orientation = self.tabs.toggle_orientation()
+        self.toast.show_message("Gruppen untereinander" if orientation == "vertical" else "Gruppen nebeneinander",
+                                "square-split-vertical" if orientation == "vertical" else "square-split-horizontal")
 
     # ---- Markdown-Vorschau -------------------------------------------------------------
     def cycle_preview(self) -> None:
@@ -1063,6 +1087,8 @@ class MainWindow(QMainWindow):
         """Checkbare Toolbar-Aktionen an den aktuellen Zustand angleichen."""
         editor = self.tabs.current_editor()
         self.paper_toolbar_action.setChecked(self.tabs.paper_mode)
+        self.split_toolbar_action.setChecked(self.tabs.is_split)
+        self.split_action.setChecked(self.tabs.is_split)
         self.line_numbers_action.setChecked(self.tabs.line_numbers)
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         if editor is not None:
@@ -1103,13 +1129,9 @@ class MainWindow(QMainWindow):
         self.apply_backlinks_position()
         self.sidebar.tree.restore_expanded(self.config["expanded_folders"])
 
-        for entry in self.config["open_tabs"]:
-            path = self.tabs.resolve_saved(entry)
-            if path.is_file():
-                self.tabs.open_file(path)
+        state = split_state.from_config(self.config, exists=lambda entry: self.tabs.resolve_saved(entry).is_file())
+        self.tabs.restore_state(state)
         self.empty_state.set_recent(self.config["recent_files"])
-        if 0 <= self.config["active_tab"] < self.tabs.count():
-            self.tabs.setCurrentIndex(self.config["active_tab"])
 
     def _collect_window_state(self) -> None:
         win = self.config["window"]
@@ -1123,8 +1145,7 @@ class MainWindow(QMainWindow):
                 self.config["sidebar"]["width"] = sizes[0]
         self.config["sidebar"]["visible"] = self.sidebar.isVisible()
         self.config["expanded_folders"] = self.sidebar.tree.expanded_folders()
-        self.config["open_tabs"] = self.tabs.open_paths()
-        self.config["active_tab"] = max(0, self.tabs.currentIndex())
+        self.config.update(self.tabs.state().to_config())
 
     def save_state(self) -> None:
         self._collect_window_state()

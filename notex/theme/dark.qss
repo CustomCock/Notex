@@ -158,6 +158,20 @@ QTabBar::tab:selected {
 QTabBar::close-button {
     image: none;
 }
+/* Geteilter Editor: die Gruppe ohne Fokus zeigt ihren aktiven Tab gedämpft */
+QTabBar[inactive="true"]::tab:selected {
+    color: @text_muted;
+    border-bottom: 2px solid @text_faint;
+}
+QSplitter#EditorGroups::handle {
+    background: @border;
+}
+QSplitter#EditorGroups::handle:horizontal {
+    width: 1px;
+}
+QSplitter#EditorGroups::handle:vertical {
+    height: 1px;
+}
 
 /* Das Blatt: Hintergrund transparent – die weiße Fläche mit runden Ecken malt PaperFrame */
 QTextEdit#Editor {

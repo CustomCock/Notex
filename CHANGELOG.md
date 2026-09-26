@@ -11,6 +11,9 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   Klick auf „Bild laden“, externe Links öffnen den Browser nur auf Klick. Aufgaben-Checkboxen sind in der
   Vorschau klickbar, [[Wiki-Links]] und relative .md-Links öffnen die Zieldatei, Codeblöcke in den
   Syntax-Farben des Themes, Scrollen in der geteilten Ansicht synchron (abschaltbar)
+- Split View (Ctrl+\): zweite Tab-Gruppe nebeneinander oder untereinander (Ctrl+Alt+\), Tabs per Drag
+  zwischen den Gruppen (Ablegen am rechten/unteren Rand teilt), dieselbe Datei in beiden Gruppen als ein
+  Dokument mit gemeinsamem Undo, Zustand der Gruppen wird in config.json gesichert
 
 ## [1.1.1] – 2026-09-26
 

@@ -1,7 +1,7 @@
 """Kleine, wiederverwendbare Bausteine: Chips, Tab-Buttons, Suchfeld."""
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QPointF, QEvent, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QTabBar, QToolButton, QWidget
 
@@ -279,9 +279,39 @@ class EditorTabBar(QTabBar):
         painter.end()
         super().paintEvent(event)
 
+    TAB_MIME = "application/x-notex-tab"
+    DETACH_DISTANCE = 28   # so weit muss der Tab senkrecht aus der Leiste gezogen werden, bevor ein Drag beginnt
+
+    def mousePressEvent(self, event) -> None:
+        self._press_pos = event.position().toPoint() if event.button() == Qt.MouseButton.LeftButton else None
+        super().mousePressEvent(event)
+
     def mouseMoveEvent(self, event) -> None:
-        self._set_hovered(self.tabAt(event.position().toPoint()))
+        pos = event.position().toPoint()
+        self._set_hovered(self.tabAt(pos))
+        press = getattr(self, "_press_pos", None)
+        if press is not None and event.buttons() & Qt.MouseButton.LeftButton \
+                and abs(pos.y() - press.y()) > self.DETACH_DISTANCE and self.tabAt(press) >= 0:
+            self._start_tab_drag(self.tabAt(press))
+            return
         super().mouseMoveEvent(event)
+
+    def _start_tab_drag(self, index: int) -> None:
+        """Tab senkrecht aus der Leiste gezogen: als Drag anbieten (Ziel: andere Editorgruppe)."""
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QDrag, QMouseEvent
+        from PySide6.QtWidgets import QApplication
+        self._press_pos = None
+        # QTabBar hält noch seinen internen „Tab wird verschoben“-Zustand – mit einem Release-Ereignis beenden
+        release = QMouseEvent(QEvent.Type.MouseButtonRelease, QPointF(self.tabRect(index).center()),
+                              Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(self, release)
+        mime = QMimeData()
+        mime.setData(self.TAB_MIME, f"{getattr(self, 'group_key', 0)}:{index}".encode())
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        drag.setPixmap(self.grab(self.tabRect(index)))
+        drag.exec(Qt.DropAction.MoveAction)
 
     def leaveEvent(self, event) -> None:
         self._set_hovered(-1)

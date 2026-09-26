@@ -72,24 +72,40 @@ class EditorTabs(QTabWidget):
     view_mode_changed = Signal(str)             # "edit" | "preview" | "split" des aktuellen Tabs
     completion_requested = Signal(object, str, str)   # Editor, Art, Text
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
+    tabs_emptied = Signal()             # letzter Tab dieser Gruppe geschlossen
+    tab_drop = Signal(int, int, object, bool)   # Quellgruppe, Index, Zielgruppe, „neue Gruppe gewünscht“
 
-    def __init__(self, root: Path, config: dict | None = None) -> None:
+    def __init__(self, root: Path, config: dict | None = None, shared: "EditorTabs | None" = None) -> None:
+        """`shared`: zweite Gruppe des geteilten Editors – teilt Checker, Grammatikdienst und Ansichtszustand."""
         super().__init__()
         self.root = root
         self.config = config if config is not None else {}
-        self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
-        self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
-        self.grammar = GrammarService(self.config)
-        self.grammar.state_changed.connect(lambda _n: self.status_changed.emit())
-        if self.config.get("grammar", {}).get("enabled"):
-            self.grammar.restart()
-        self.font_size = FONT_SIZE.editor
-        self.paper_mode = True
-        self.editor_actions: dict = {}          # QActions aus dem Hauptfenster für die Bearbeitungsleiste
-        self.resolve_link = lambda target: None  # setzt das Hauptfenster (Link-Index)
-        self.open_font_settings = lambda: None  # setzt das Hauptfenster
-        self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
-        self.line_numbers = bool(self.config.get("line_numbers", True))
+        self.area = None                         # EditorArea, wenn es mehrere Gruppen geben kann
+        if shared is not None:
+            self.checker = shared.checker
+            self.grammar = shared.grammar
+            self.font_size = shared.font_size
+            self.paper_mode = shared.paper_mode
+            self.editor_actions = shared.editor_actions
+            self.resolve_link = shared.resolve_link
+            self.open_font_settings = shared.open_font_settings
+            self.toolbar_visible = shared.toolbar_visible
+            self.line_numbers = shared.line_numbers
+        else:
+            self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
+            self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
+            self.grammar = GrammarService(self.config)
+            self.grammar.state_changed.connect(lambda _n: self.status_changed.emit())
+            if self.config.get("grammar", {}).get("enabled"):
+                self.grammar.restart()
+            self.font_size = FONT_SIZE.editor
+            self.paper_mode = True
+            self.editor_actions: dict = {}          # QActions aus dem Hauptfenster für die Bearbeitungsleiste
+            self.resolve_link = lambda target: None  # setzt das Hauptfenster (Link-Index)
+            self.open_font_settings = lambda: None  # setzt das Hauptfenster
+            self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
+            self.line_numbers = bool(self.config.get("line_numbers", True))
+        self.setAcceptDrops(True)
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)
         self.tab_bar.close_requested.connect(self.close_tab)
@@ -152,16 +168,23 @@ class EditorTabs(QTabWidget):
         return path.exists() and not os.access(path, os.W_OK)
 
     # ---- Öffnen / Schließen ------------------------------------------------
-    def open_file(self, path: Path, line: int | None = None, column: int = 0, length: int = 0) -> Editor | None:
+    def open_file(self, path: Path, line: int | None = None, column: int = 0, length: int = 0,
+                  share_from: Editor | None = None) -> Editor | None:
+        """`share_from`: zweite Ansicht eines schon offenen Editors (gleiches Dokument, geteilter Editor)."""
         path = Path(path)
         editor = self.editor_for(path)
         if editor is None:
-            try:
-                text_file = read_text_file(path)
-            except OSError as error:
-                QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
-                return None
-            editor = Editor(path, text_file, self.font_size, checker=self.checker)
+            if share_from is not None and share_from.path == path:
+                from notex.core.encoding import TextFile
+                text_file = TextFile("", share_from.encoding, share_from.eol)
+                editor = Editor(path, text_file, self.font_size, checker=self.checker, share_with=share_from)
+            else:
+                try:
+                    text_file = read_text_file(path)
+                except OSError as error:
+                    QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
+                    return None
+                editor = Editor(path, text_file, self.font_size, checker=self.checker)
             editor.set_text_font(self.font_family_for(path))
             self.grammar.attach(editor)
             self._apply_spell_to(editor)
@@ -201,24 +224,39 @@ class EditorTabs(QTabWidget):
         self.status_changed.emit()
         return editor
 
+    def _other_views(self, editor: Editor) -> list[Editor]:
+        """Weitere Ansichten desselben Dokuments in anderen Gruppen (geteilter Editor)."""
+        if self.area is None:
+            return []
+        return [e for e in self.area.views_of(editor.path) if e is not editor]
+
     def _remove(self, editor: Editor) -> None:
         self.grammar.detach(editor)
+        if editor.highlighter is not None and self._other_views(editor):
+            editor.highlighter.remove_view(editor)
         page = self.page_for(editor)
         if page is not None:
             self.removeTab(self.indexOf(page))
+            if page.preview is not None:
+                page.preview.shutdown()
             page.deleteLater()
         self.file_closed.emit(editor.path)
+        if self.count() == 0:
+            self.tabs_emptied.emit()
+
+    def remove_page(self, page: EditorPage, ask: bool = True) -> bool:
+        editor = page.editor
+        if ask and editor.is_dirty and not self._other_views(editor) and not self._ask_save(editor):
+            return False
+        self._remove(editor)
+        self.status_changed.emit()
+        return True
 
     def close_tab(self, index: int) -> bool:
         page = self.widget(index)
         if not isinstance(page, EditorPage):
             return False
-        editor = page.editor
-        if editor.is_dirty and not self._ask_save(editor):
-            return False
-        self._remove(editor)
-        self.status_changed.emit()
-        return True
+        return self.remove_page(page, ask=True)
 
     def close_current(self) -> None:
         if self.count():
@@ -233,8 +271,10 @@ class EditorTabs(QTabWidget):
 
     def confirm_close_all(self) -> bool:
         """Vor dem Beenden: für jeden ungespeicherten Tab nachfragen. False = Abbruch."""
+        asked: set[int] = set()
         for editor in self.editors():
-            if editor.is_dirty:
+            if editor.is_dirty and id(editor.document()) not in asked:
+                asked.add(id(editor.document()))
                 self.setCurrentWidget(self.page_for(editor))
                 if not self._ask_save(editor):
                     return False
@@ -323,6 +363,11 @@ class EditorTabs(QTabWidget):
     # ---- Darstellung -------------------------------------------------------
     def _refresh_title(self, editor: Editor) -> None:
         page = self.page_for(editor)
+        if page is None and self.area is not None:
+            owner = self.area.group_of(editor)
+            if owner is not None and owner is not self:
+                owner._refresh_title(editor)
+                return
         index = self.indexOf(page) if page else -1
         if index >= 0:
             self.setTabText(index, editor.path.name)
@@ -349,7 +394,42 @@ class EditorTabs(QTabWidget):
         self.font_size_changed.emit(self.font_size)
 
     def zoom(self, direction: int) -> None:
-        self.set_font_size(self.font_size + direction)
+        if self.area is not None:
+            self.area.zoom(direction)
+        else:
+            self.set_font_size(self.font_size + direction)
+
+    def refresh_icon(self, editor: Editor) -> None:
+        page = self.page_for(editor)
+        if page is not None:
+            self.setTabIcon(self.indexOf(page), icon("external-link") if self.is_external(editor.path) else QIcon())
+
+    # ---- Tabs per Drag zwischen Gruppen -------------------------------------------------------
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasFormat(EditorTabBar.TAB_MIME):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event) -> None:
+        if event.mimeData().hasFormat(EditorTabBar.TAB_MIME):
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event) -> None:
+        if not event.mimeData().hasFormat(EditorTabBar.TAB_MIME):
+            super().dropEvent(event)
+            return
+        try:
+            group_key, index = (int(x) for x in bytes(event.mimeData().data(EditorTabBar.TAB_MIME)).decode().split(":"))
+        except ValueError:
+            return
+        # Ohne Teilung: Ablegen im rechten/unteren Viertel legt eine neue Gruppe an
+        pos = event.position().toPoint()
+        wants_split = pos.x() > self.width() * 0.75 or pos.y() > self.height() * 0.75
+        event.acceptProposedAction()
+        self.tab_drop.emit(group_key, index, self, wants_split)
 
     # ---- Textschrift (Ansichts-Einstellung, gilt für alle Dateien) --------------
     def font_family_for(self, path: Path) -> str:

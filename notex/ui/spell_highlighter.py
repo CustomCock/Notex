@@ -87,8 +87,21 @@ class SpellHighlighter(QSyntaxHighlighter):
         self._scroll_timer.setSingleShot(True)
         self._scroll_timer.setInterval(SCROLL_CHECK_MS)
         self._scroll_timer.timeout.connect(self.check_visible)
+        self.views = [editor]                      # alle Editoren, die dieses Dokument zeigen (geteilter Editor)
         editor.verticalScrollBar().valueChanged.connect(lambda _v: self._scroll_timer.start())
         document.contentsChange.connect(self._on_contents_change)
+
+    def add_view(self, editor) -> None:
+        if editor not in self.views:
+            self.views.append(editor)
+            editor.verticalScrollBar().valueChanged.connect(lambda _v: self._scroll_timer.start())
+            self._scroll_timer.start()
+
+    def remove_view(self, editor) -> None:
+        if editor in self.views and len(self.views) > 1:
+            self.views.remove(editor)
+            if self.editor is editor:
+                self.editor = self.views[0]
 
     # ---- Steuerung -----------------------------------------------------------------
     def set_enabled(self, spelling: bool, grammar: bool) -> None:
@@ -155,25 +168,33 @@ class SpellHighlighter(QSyntaxHighlighter):
 
     # ---- Sichtbarer Bereich ----------------------------------------------------------
     def visible_block_range(self) -> tuple[int, int]:
-        viewport = self.editor.viewport()
-        first = self.editor.cursorForPosition(viewport.rect().topLeft()).blockNumber()
-        last = self.editor.cursorForPosition(viewport.rect().bottomLeft()).blockNumber()
+        return self._range_of(self.editor)
+
+    @staticmethod
+    def _range_of(editor) -> tuple[int, int]:
+        viewport = editor.viewport()
+        first = editor.cursorForPosition(viewport.rect().topLeft()).blockNumber()
+        last = editor.cursorForPosition(viewport.rect().bottomLeft()).blockNumber()
         return max(0, first - VISIBLE_BUFFER), last + VISIBLE_BUFFER
+
+    def visible_ranges(self) -> list[tuple[int, int]]:
+        """Sichtbare Bereiche aller Ansichten (geteilter Editor zeigt dasselbe Dokument zweimal)."""
+        return [self._range_of(view) for view in self.views if view.isVisible()] or [self._range_of(self.editor)]
 
     def check_visible(self) -> None:
         if not (self.spelling_enabled or self.grammar_enabled):
             return
-        first, last = self.visible_block_range()
-        block = self.document().findBlockByNumber(first)
-        while block.isValid() and block.blockNumber() <= last:
-            data = block.userData()
-            if not (isinstance(data, BlockIssues) and data.checked):
-                self.rehighlightBlock(block)
-            block = block.next()
+        for first, last in self.visible_ranges():
+            block = self.document().findBlockByNumber(first)
+            while block.isValid() and block.blockNumber() <= last:
+                data = block.userData()
+                if not (isinstance(data, BlockIssues) and data.checked):
+                    self.rehighlightBlock(block)
+                block = block.next()
 
     def _in_visible_range(self, block: QTextBlock) -> bool:
-        first, last = self.visible_block_range()
-        return first <= block.blockNumber() <= last
+        number = block.blockNumber()
+        return any(first <= number <= last for first, last in self.visible_ranges())
 
     # ---- Tippen -----------------------------------------------------------------------
     def _on_contents_change(self, position: int, removed: int, added: int) -> None:

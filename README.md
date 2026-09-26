@@ -130,6 +130,16 @@ Vorschau mitscrollt.
 
 ![Markdown-Vorschau](docs/26-markdown-preview.png)
 
+## Split View
+
+`Ctrl+\` teilt den Editor in zwei Tab-Gruppen, die aktuelle Datei erscheint in beiden (ein Dokument, zwei
+Ansichten, gemeinsames Undo). Tabs lassen sich per Drag zwischen den Gruppen ziehen; wird ein Tab am
+rechten oder unteren Rand abgelegt, entsteht die zweite Gruppe. `Ctrl+Alt+\` stellt die Gruppen
+untereinander statt nebeneinander, `Ctrl+Alt+→` verschiebt den Tab in die andere Gruppe. Schließt der
+letzte Tab einer Gruppe, verschwindet sie. Die Aufteilung überlebt einen Neustart.
+
+![Split View](docs/27-split-view.png)
+
 ## Syntax-Highlighting
 
 Code und Logs werden über [Pygments](https://pygments.org) farbig hervorgehoben: `.py`, `.json`,
@@ -292,6 +302,10 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+Shift+K | Backlinks-Panel |
 | Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt |
+| Ctrl+\ | Editor teilen / Teilung aufheben |
+| Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |
+| Ctrl+Alt+→ | Tab in andere Gruppe verschieben |
+| Ctrl+Alt+Shift+→ | Datei auch in anderer Gruppe öffnen |
 | Ctrl+Klick | Wiki-Link öffnen (bzw. Ziel anlegen) |
 | Ctrl+, | Einstellungen |
 | Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |
