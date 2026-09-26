@@ -15,7 +15,8 @@ from PySide6.QtGui import QDropEvent
 from PySide6.QtWidgets import QAbstractItemView, QFileSystemModel, QInputDialog, QMenu, QMessageBox, QTreeView
 
 from notex.core import fileops
-from notex.theme.icons import FlatIconProvider
+from notex.theme.icons import LucideIconProvider, icon
+from notex.theme.theme import style_menu
 
 
 class FileTree(QTreeView):
@@ -29,7 +30,7 @@ class FileTree(QTreeView):
         self._expanded: set[str] = set()
 
         self.model_ = QFileSystemModel(self)
-        self.model_.setIconProvider(FlatIconProvider())
+        self.model_.setIconProvider(LucideIconProvider())
         self.model_.setFilter(QDir.Filter.AllDirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
         self.model_.setNameFilters([f"*{ext}" for ext in extensions])
         self.model_.setNameFilterDisables(False)  # nicht passende Dateien ausblenden statt ausgrauen
@@ -175,16 +176,20 @@ class FileTree(QTreeView):
             self.clearSelection()
             self.setCurrentIndex(QModelIndex())
 
-        menu = QMenu(self)
-        menu.addAction("Neue Datei", lambda: self.create_file(self.folder_for(path)))
-        menu.addAction("Neuer Ordner", lambda: self.create_folder(self.folder_for(path)))
+        menu = self.build_context_menu(path)
+        menu.exec(self.viewport().mapToGlobal(pos))
+
+    def build_context_menu(self, path: Path | None) -> QMenu:
+        menu = style_menu(QMenu(self))
+        menu.addAction(icon("file-plus"), "Neue Datei", lambda: self.create_file(self.folder_for(path)))
+        menu.addAction(icon("folder-plus"), "Neuer Ordner", lambda: self.create_folder(self.folder_for(path)))
         if path is not None:
             menu.addSeparator()
-            menu.addAction("Umbenennen\tF2", self.rename_selected)
-            menu.addAction("In den Papierkorb\tEntf", self.delete_selected)
+            menu.addAction(icon("pencil"), "Umbenennen\tF2", self.rename_selected)
+            menu.addAction(icon("trash"), "In den Papierkorb\tEntf", self.delete_selected)
         menu.addSeparator()
-        menu.addAction("Im Explorer anzeigen", lambda: fileops.reveal_in_file_manager(path or self.root))
-        menu.exec(self.viewport().mapToGlobal(pos))
+        menu.addAction(icon("external-link"), "Im Explorer anzeigen", lambda: fileops.reveal_in_file_manager(path or self.root))
+        return menu
 
     def create_file(self, folder: Path) -> None:
         suggestion = fileops.unique_path(folder, "Neu", ".txt").name

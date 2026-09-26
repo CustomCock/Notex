@@ -12,7 +12,8 @@ from PySide6.QtGui import QColor, QPainter, QTextCharFormat, QTextCursor, QTextD
 from PySide6.QtWidgets import QPlainTextEdit, QTextEdit, QWidget
 
 from notex.core.encoding import TextFile
-from notex.theme.theme import COLORS, editor_font
+from notex.theme.fonts import editor_font
+from notex.theme.tokens import COLORS
 
 MAX_HIGHLIGHTS = 2000   # mehr Treffer gleichzeitig zu markieren wäre nur langsam
 
@@ -143,7 +144,7 @@ class Editor(QPlainTextEdit):
         if term:
             flags = QTextDocument.FindFlag.FindCaseSensitively if case_sensitive else QTextDocument.FindFlag(0)
             fmt = QTextCharFormat()
-            fmt.setBackground(QColor(COLORS["paper_match"]))
+            fmt.setBackground(QColor(COLORS.paper_match))
             found = self.document().find(term, 0, flags)
             while not found.isNull() and len(self._search_selections) < MAX_HIGHLIGHTS:
                 selection = QTextEdit.ExtraSelection()
@@ -156,7 +157,7 @@ class Editor(QPlainTextEdit):
     # ---- Aktuelle Zeile + Extra-Selections ----------------------------------
     def _refresh_extra_selections(self) -> None:
         current_line = QTextEdit.ExtraSelection()
-        current_line.format.setBackground(QColor(COLORS["paper_line"]))
+        current_line.format.setBackground(QColor(COLORS.paper_line))
         current_line.format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)
         current_line.cursor = self.textCursor()
         current_line.cursor.clearSelection()
@@ -187,7 +188,7 @@ class Editor(QPlainTextEdit):
 
     def paint_line_numbers(self, event) -> None:
         painter = QPainter(self.line_numbers)
-        painter.fillRect(event.rect(), QColor(COLORS["paper_gutter"]))
+        painter.fillRect(event.rect(), QColor(COLORS.paper))
         painter.setFont(self.font())
         current_block = self.textCursor().blockNumber()
         width = self.line_numbers.width() - 6
@@ -197,7 +198,7 @@ class Editor(QPlainTextEdit):
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and top + height >= event.rect().top():
                 is_current = block.blockNumber() == current_block
-                painter.setPen(QColor(COLORS["paper_text"] if is_current else COLORS["paper_muted"]))
+                painter.setPen(QColor(COLORS.paper_text if is_current else COLORS.paper_muted))
                 painter.drawText(0, top, width, height, Qt.AlignmentFlag.AlignRight, str(block.blockNumber() + 1))
             block = block.next()
             top += round(self.blockBoundingRect(block).height())

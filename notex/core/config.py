@@ -31,8 +31,10 @@ DEFAULTS: dict[str, Any] = {
     "expanded_folders": [],   # relative Pfade unter data/, z. B. "Projekte/2026"
     "open_tabs": [],          # relative Pfade der offenen Dateien
     "active_tab": 0,
-    "font_size": 11,          # Zoomstufe = Schriftgröße in Punkt
+    "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "word_wrap": False,
+    "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
+    "reduce_animations": False,
     "search": {
         "by_name": True,
         "full_text": False,

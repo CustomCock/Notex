@@ -15,6 +15,7 @@ from notex.ui.file_watcher import OpenFileWatcher
 from notex.ui.find_bar import FindBar
 from notex.ui.sidebar import Sidebar
 from notex.ui.status_bar import StatusBar
+from notex.theme.icons import icon
 from notex.ui.winapi import apply_dark_titlebar
 
 
@@ -38,9 +39,9 @@ class MainWindow(QMainWindow):
         # Kleiner Button links neben den Tabs, der die Seitenleiste ein-/ausklappt.
         # Er sitzt bewusst außerhalb der Seitenleiste, damit er auch sichtbar ist, wenn sie weg ist.
         self.sidebar_button = QToolButton()
-        self.sidebar_button.setObjectName("FlatButton")
-        self.sidebar_button.setText("☰")
-        self.sidebar_button.setToolTip("Seitenleiste ein-/ausblenden (Ctrl+B)")
+        self.sidebar_button.setObjectName("IconButton")
+        self.sidebar_button.setIcon(icon("panel-left"))
+        self.sidebar_button.setToolTip("Seitenleiste ein-/ausblenden  Ctrl+B")
         self.sidebar_button.clicked.connect(self.toggle_sidebar)
         self.tabs.setCornerWidget(self.sidebar_button, Qt.Corner.TopLeftCorner)
 
@@ -143,7 +144,7 @@ class MainWindow(QMainWindow):
     def toggle_sidebar(self) -> None:
         self.set_sidebar_visible(not self.sidebar.isVisible())
 
-    def set_sidebar_visible(self, visible: bool) -> None:
+    def set_sidebar_visible(self, visible: bool, animate: bool = True) -> None:
         if not visible and self.sidebar.isVisible():
             sizes = self.splitter.sizes()
             if sizes and sizes[0] > 0:

@@ -1,64 +1,89 @@
-"""Kleine, flache Icons, die zur Palette passen – gezeichnet statt aus Dateien geladen.
+"""Lucide-Icons (ISC-Lizenz) als SVG, zur Laufzeit in Theme-Farbe eingefärbt.
 
-QFileSystemModel würde sonst die bunten Windows-Icons anzeigen, die im
-dunklen Theme fremd wirken.
+Die SVGs benutzen `stroke="currentColor"`. Wir ersetzen das durch die gewünschte
+Farbe und rendern per QSvgRenderer – dadurch bleiben die Icons auf jeder
+DPI-Skalierung scharf, weil sie erst in der Zielgröße gerastert werden.
 """
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtGui import QIcon, QIconEngine, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFileIconProvider
 
-from notex.theme.theme import COLORS
+from notex.theme.tokens import COLORS
 
-
-def _pixmap(size: int) -> tuple[QPixmap, QPainter]:
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    return pixmap, painter
+ICON_DIR = Path(__file__).resolve().parent.parent / "assets" / "icons"
 
 
 @lru_cache(maxsize=None)
-def folder_icon(size: int = 16) -> QIcon:
-    pixmap, painter = _pixmap(size)
-    color = QColor(COLORS["text_muted"])
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(color)
-    s = size
-    # Lasche oben links + Korpus
-    painter.drawRoundedRect(QRectF(s * 0.1, s * 0.2, s * 0.4, s * 0.2), 1, 1)
-    painter.drawRoundedRect(QRectF(s * 0.1, s * 0.3, s * 0.8, s * 0.5), 1.5, 1.5)
-    painter.end()
-    return QIcon(pixmap)
+def _svg_source(name: str) -> str:
+    path = ICON_DIR / f"{name}.svg"
+    if not path.exists():
+        raise FileNotFoundError(f"Icon fehlt: {path.name}")
+    return path.read_text(encoding="utf-8")
 
 
 @lru_cache(maxsize=None)
-def file_icon(size: int = 16) -> QIcon:
-    pixmap, painter = _pixmap(size)
-    color = QColor(COLORS["text_muted"])
-    pen = QPen(color)
-    pen.setWidthF(1.2)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    s = size
-    painter.drawRoundedRect(QRectF(s * 0.2, s * 0.12, s * 0.6, s * 0.76), 1.5, 1.5)
-    for y in (0.4, 0.55, 0.7):  # drei "Textzeilen"
-        painter.drawLine(QRectF(s * 0.32, s * y, s * 0.36, 0).topLeft(), QRectF(s * 0.68, s * y, 0, 0).topLeft())
-    painter.end()
-    return QIcon(pixmap)
+def _renderer(name: str, color: str, stroke_width: str) -> QSvgRenderer:
+    svg = _svg_source(name).replace("currentColor", color).replace('stroke-width="2"', f'stroke-width="{stroke_width}"')
+    renderer = QSvgRenderer(svg.encode("utf-8"))
+    renderer.setAspectRatioMode(Qt.AspectRatioMode.KeepAspectRatio)
+    return renderer
 
 
-class FlatIconProvider(QFileIconProvider):
-    """Liefert dem QFileSystemModel unsere Icons statt der System-Icons."""
+class SvgIconEngine(QIconEngine):
+    """Rendert das SVG bei Bedarf in der angefragten Pixelgröße."""
+
+    def __init__(self, name: str, color: str, disabled_color: str, stroke_width: str) -> None:
+        super().__init__()
+        self.name, self.color, self.disabled_color, self.stroke_width = name, color, disabled_color, stroke_width
+
+    def _color_for(self, mode: QIcon.Mode) -> str:
+        return self.disabled_color if mode == QIcon.Mode.Disabled else self.color
+
+    def paint(self, painter: QPainter, rect, mode, state) -> None:
+        _renderer(self.name, self._color_for(mode), self.stroke_width).render(painter, QRectF(rect))
+
+    def pixmap(self, size: QSize, mode, state) -> QPixmap:
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.paint(painter, pixmap.rect(), mode, state)
+        painter.end()
+        return pixmap
+
+    def scaledPixmap(self, size: QSize, mode, state, scale: float) -> QPixmap:
+        # Qt übergibt hier bereits die mit dem Device-Pixel-Ratio multiplizierte Größe
+        return self.pixmap(size, mode, state)
+
+    def clone(self) -> QIconEngine:
+        return SvgIconEngine(self.name, self.color, self.disabled_color, self.stroke_width)
+
+
+@lru_cache(maxsize=None)
+def icon(name: str, color: str = COLORS.text_muted, stroke_width: str = "1.75") -> QIcon:
+    """Ein eingefärbtes Lucide-Icon. Standard: gedämpfte Textfarbe, 1.75 px Strich."""
+    return QIcon(SvgIconEngine(name, color, COLORS.text_faint, stroke_width))
+
+
+def pixmap(name: str, size: int, color: str = COLORS.text_muted, dpr: float = 1.0) -> QPixmap:
+    """Fertig gerastertes Icon für eigene paintEvents, DPI-korrekt."""
+    pm = icon(name, color).pixmap(QSize(int(size * dpr), int(size * dpr)))
+    pm.setDevicePixelRatio(dpr)
+    return pm
+
+
+class LucideIconProvider(QFileIconProvider):
+    """Liefert dem QFileSystemModel Ordner-/Datei-Icons aus dem Lucide-Set."""
 
     def icon(self, info_or_type):  # type: ignore[override]
-        # Qt ruft die Methode mal mit QFileInfo, mal mit einem IconType-Enum auf.
         if isinstance(info_or_type, QFileIconProvider.IconType):
-            if info_or_type in (QFileIconProvider.IconType.Folder, QFileIconProvider.IconType.Drive):
-                return folder_icon()
-            return file_icon()
-        return folder_icon() if info_or_type.isDir() else file_icon()
+            is_dir = info_or_type in (QFileIconProvider.IconType.Folder, QFileIconProvider.IconType.Drive)
+        else:
+            is_dir = info_or_type.isDir()
+        return icon("folder" if is_dir else "file-text")

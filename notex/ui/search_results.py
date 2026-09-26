@@ -9,8 +9,8 @@ from PySide6.QtGui import QAbstractTextDocumentLayout, QPalette, QTextDocument
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTreeWidget, QTreeWidgetItem
 
 from notex.core.search import FileMatch, NameMatch
-from notex.theme.icons import file_icon
-from notex.theme.theme import COLORS
+from notex.theme.icons import icon
+from notex.theme.tokens import COLORS
 
 ROLE_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_LINE = Qt.ItemDataRole.UserRole + 2     # (line_no, column, length) oder None
@@ -20,7 +20,7 @@ def _highlight(text: str, start: int, end: int) -> str:
     """Escaped Text mit hervorgehobenem Bereich – als kleines HTML-Fragment."""
     return (
         html.escape(text[:start])
-        + f'<span style="background:{COLORS["selection"]}; color:{COLORS["text"]}; font-weight:bold">'
+        + f'<span style="background:{COLORS.selection}; color:{COLORS.text}; font-weight:bold">'
         + html.escape(text[start:end])
         + "</span>"
         + html.escape(text[end:])
@@ -28,7 +28,7 @@ def _highlight(text: str, start: int, end: int) -> str:
 
 
 def _muted(text: str) -> str:
-    return f'<span style="color:{COLORS["text_muted"]}">{html.escape(text)}</span>'
+    return f'<span style="color:{COLORS.text_muted}">{html.escape(text)}</span>'
 
 
 class HtmlDelegate(QStyledItemDelegate):
@@ -95,7 +95,7 @@ class SearchResults(QTreeWidget):
             self._name_header = self._header("Dateinamen")
         folder = match.relative.rsplit("/", 1)[0] + "/" if "/" in match.relative else ""
         item = QTreeWidgetItem([_highlight(match.path.name, match.start, match.end) + "  " + _muted(folder)])
-        item.setIcon(0, file_icon())
+        item.setIcon(0, icon("file-text"))
         item.setData(0, ROLE_PATH, str(match.path))
         item.setData(0, ROLE_LINE, None)
         item.setToolTip(0, match.relative)
@@ -105,7 +105,7 @@ class SearchResults(QTreeWidget):
         if with_headers and self._text_header is None:
             self._text_header = self._header("Volltext")
         parent = QTreeWidgetItem([html.escape(match.relative) + "  " + _muted(f"({len(match.lines)})")])
-        parent.setIcon(0, file_icon())
+        parent.setIcon(0, icon("file-text"))
         parent.setData(0, ROLE_PATH, str(match.path))
         parent.setData(0, ROLE_LINE, None)
         for line in match.lines:

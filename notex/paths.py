@@ -5,6 +5,7 @@ Nichts in AppData, nichts in der Registry.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -14,7 +15,11 @@ def app_root() -> Path:
 
     - Gebaut (PyInstaller setzt `sys.frozen`): der Ordner der Notex.exe.
     - Dev-Modus: der Projektordner, also der Ordner über diesem Paket.
+    - NOTEX_ROOT (Umgebungsvariable): nur für Tests und Screenshots.
     """
+    override = os.environ.get("NOTEX_ROOT")
+    if override:
+        return Path(override).resolve()
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
