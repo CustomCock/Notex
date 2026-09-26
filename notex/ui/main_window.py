@@ -16,6 +16,7 @@ from notex.ui.find_bar import FindBar
 from notex.ui.sidebar import Sidebar
 from notex.ui.status_bar import StatusBar
 from notex.theme.icons import icon
+from notex.theme.tokens import FONT_SIZE
 from notex.ui.winapi import apply_dark_titlebar
 
 
@@ -31,6 +32,7 @@ class MainWindow(QMainWindow):
         self.tabs = EditorTabs(root)
         self.tabs.font_size = config["font_size"]
         self.tabs.word_wrap = config["word_wrap"]
+        self.tabs.paper_mode = config["paper_mode"]
         self.find_bar = FindBar(self.tabs.current_editor)
         self.status = StatusBar()
         self.setStatusBar(self.status)
@@ -114,12 +116,21 @@ class MainWindow(QMainWindow):
         self.wrap_action = self._action("Zeilenumbruch", "Alt+Z", self.toggle_word_wrap, checkable=True)
         self.wrap_action.setChecked(self.config["word_wrap"])
         view_menu.addAction(self.wrap_action)
+        self.paper_action = self._action("Blatt zentrieren", "Alt+P", self.toggle_paper_mode, checkable=True)
+        self.paper_action.setChecked(self.config["paper_mode"])
+        view_menu.addAction(self.paper_action)
         view_menu.addSeparator()
         view_menu.addAction(self._action("Vergrößern", QKeySequence.StandardKey.ZoomIn, lambda: self.tabs.zoom(+1)))
         view_menu.addAction(self._action("Verkleinern", QKeySequence.StandardKey.ZoomOut, lambda: self.tabs.zoom(-1)))
-        view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(11)))
+        view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(FONT_SIZE.editor)))
         # Ctrl+Plus liegt je nach Tastatur auf "Ctrl+=" – beides abdecken
         self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
+
+    def toggle_paper_mode(self) -> None:
+        enabled = not self.tabs.paper_mode
+        self.tabs.set_paper_mode(enabled)
+        self.paper_action.setChecked(enabled)
+        self.config["paper_mode"] = enabled
 
     def toggle_word_wrap(self) -> None:
         enabled = not self.tabs.word_wrap

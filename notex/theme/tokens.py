@@ -80,7 +80,8 @@ class Layout:
     tab_height: int = 36
     status_height: int = 24
     scrollbar: int = 8
-    paper_padding: int = 48       # Innenabstand des Blatts (Text zum Rand)
+    paper_padding: int = 48       # Innenabstand des Blatts links (Rand -> Zeilennummern)
+    paper_padding_top: int = 40   # Innenabstand oben/unten
     paper_max_columns: int = 90   # Blatt-Modus: maximale Textbreite in Zeichen
     paper_margin: int = 24        # Abstand Blatt <-> Fensterrand
     editor_line_height: int = 150 # Prozent
