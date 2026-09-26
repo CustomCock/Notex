@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
         self._save_config = on_save_config
         self.setWindowTitle(APP_NAME)
 
-        self.sidebar = Sidebar(root, config["extensions"])
+        self.sidebar = Sidebar(root, config)
         self.tabs = EditorTabs(root)
         self.status = StatusBar()
         self.setStatusBar(self.status)
@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
 
     def _connect_signals(self) -> None:
         tree = self.sidebar.tree
-        tree.file_activated.connect(self.tabs.open_file)
+        self.sidebar.open_requested.connect(self._open_from_sidebar)
         tree.path_renamed.connect(self._on_path_renamed)
         tree.path_deleted.connect(self.tabs.close_paths_under)
 
@@ -90,6 +90,20 @@ class MainWindow(QMainWindow):
         view_menu = self.menuBar().addMenu("&Ansicht")
         self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
         view_menu.addAction(self.sidebar_action)
+        view_menu.addAction(self._action("Suche in Dateien", "Ctrl+Shift+F", self.focus_search))
+
+    def focus_search(self) -> None:
+        if not self.sidebar.isVisible():
+            self.set_sidebar_visible(True)
+        self.sidebar.focus_search()
+
+    def _open_from_sidebar(self, path: Path, location) -> None:
+        """Öffnet eine Datei aus Baum oder Trefferliste; `location` = (Zeile, Spalte, Länge) oder None."""
+        if location is None:
+            self.tabs.open_file(path)
+        else:
+            line, column, length = location
+            self.tabs.open_file(path, line=line, column=column, length=length)
 
     # ---- Seitenleiste ---------------------------------------------------------
     def toggle_sidebar(self) -> None:
@@ -204,5 +218,6 @@ class MainWindow(QMainWindow):
         if not self.tabs.confirm_close_all():
             event.ignore()
             return
+        self.sidebar.stop_search()
         self.save_state()
         event.accept()
