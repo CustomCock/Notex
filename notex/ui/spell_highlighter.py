@@ -119,6 +119,9 @@ class SpellHighlighter(QSyntaxHighlighter):
         self._grammar.clear()
         self.reset()
 
+    def in_code_fence(self, block: QTextBlock) -> bool:
+        return self.markdown and (block.userState() == STATE_IN_FENCE or is_code_fence(block.text()))
+
     def issues_at(self, block: QTextBlock, position_in_block: int) -> list[Issue]:
         data = block.userData()
         if not isinstance(data, BlockIssues):

@@ -18,6 +18,7 @@ from notex.paths import app_root
 from notex.theme.tokens import COLORS, DURATION, FONT_SIZE
 from notex.ui import anim
 from notex.ui.editor import Editor
+from notex.ui.grammar_service import GrammarService
 from notex.ui.paper import EditorPage
 from notex.ui.widgets import EditorTabBar
 
@@ -68,6 +69,10 @@ class EditorTabs(QTabWidget):
         self.config = config if config is not None else {}
         self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
         self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
+        self.grammar = GrammarService(self.config)
+        self.grammar.state_changed.connect(lambda _n: self.status_changed.emit())
+        if self.config.get("grammar", {}).get("enabled"):
+            self.grammar.restart()
         self.font_size = FONT_SIZE.editor
         self.word_wrap = False
         self.paper_mode = True
@@ -129,6 +134,7 @@ class EditorTabs(QTabWidget):
                 return None
             editor = Editor(path, text_file, self.font_size, checker=self.checker)
             editor.set_word_wrap(self.word_wrap)
+            self.grammar.attach(editor)
             self._apply_spell_to(editor)
             editor.document().modificationChanged.connect(lambda _m, e=editor: self._refresh_title(e))
             editor.cursorPositionChanged.connect(self.status_changed.emit)
@@ -147,6 +153,7 @@ class EditorTabs(QTabWidget):
         return editor
 
     def _remove(self, editor: Editor) -> None:
+        self.grammar.detach(editor)
         page = self.page_for(editor)
         if page is not None:
             self.removeTab(self.indexOf(page))
@@ -282,15 +289,28 @@ class EditorTabs(QTabWidget):
         return bool(cfg.get("enabled", False)) and path.suffix.lower() in self.config.get("spellcheck", {}).get("extensions", [])
 
     def _apply_spell_to(self, editor: Editor) -> None:
-        editor.set_spellcheck(self.spell_enabled_for(editor.path), self.grammar_enabled_for(editor.path))
+        grammar_on = self.grammar_enabled_for(editor.path)
+        editor.set_spellcheck(self.spell_enabled_for(editor.path), grammar_on)
+        if grammar_on:
+            self.grammar.schedule(id(editor))
 
     def apply_spell_settings(self) -> None:
         """Nach Änderung in Config/Einstellungen: alle Tabs neu einstellen."""
         self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
+        if self.config.get("grammar", {}).get("enabled"):
+            self.grammar.restart()
+        else:
+            self.grammar.shutdown()
         for editor in self.editors():
-            self._apply_spell_to(editor)
             if editor.highlighter is not None:
-                editor.highlighter.reset()
+                editor.highlighter.clear_grammar()
+            self._apply_spell_to(editor)
+
+    def grammar_note(self) -> str:
+        return self.grammar.note if self.config.get("grammar", {}).get("enabled") else ""
+
+    def shutdown(self) -> None:
+        self.grammar.shutdown()
 
     def open_paths(self) -> list[str]:
         return [self.relative(editor.path) for editor in self.editors()]

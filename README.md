@@ -33,6 +33,83 @@ Die Screenshots erzeugt `python tools/screenshot.py` automatisch (offscreen, mit
 - **Design**: matt schwarz/grau, das Blatt weiß und zentriert (Alt+P schaltet auf volle Breite),
   ein einziger dezenter Akzent, kurze Animationen (abschaltbar unter Ansicht)
 
+## Themes anpassen
+
+Einstellungen öffnest du mit **Ctrl+,** oder über das Zahnrad unten in der Seitenleiste.
+Alles wirkt sofort als Vorschau; **Abbrechen** stellt den Zustand von vorher wieder her,
+**Übernehmen** speichert in `config.json`.
+
+- **Darstellung**: Preset (Matt, Graphit, Mitternacht, Warm), alle Farb-Tokens per Farbwähler
+  oder Hex-Eingabe, Eckenradius 0–12 px, Dichte (Kompakt / Normal / Luftig), Animationen an/aus
+  und Geschwindigkeit. Neben einer Farbe erscheint ein Warnsymbol, wenn der Kontrast zum
+  Hintergrund unter 4.5:1 (WCAG) fällt.
+- **Blatt**: Varianten Weiß, Papier, Sepia, Dunkel; Blatt-, Text-, Zeilennummern- und
+  Auswahlfarbe, Schatten und Stärke, Innenabstand, Blatt-Modus und maximale Textbreite.
+- **Schrift**: UI- und Editor-Schrift (gebündelte plus installierte), Größen, Zeilenhöhe.
+
+Eigene Themes speicherst du mit **Speichern als …**; sie liegen als JSON in `themes/` neben
+der App und wandern mit dem Ordner mit. Duplizieren, Umbenennen, Löschen, Import und Export
+(.json) gibt es daneben. Eine kaputte oder unvollständige Theme-Datei bringt die App nicht zum
+Absturz: fehlende Werte werden aus dem Standard ergänzt, Fehler erscheinen als kurzer Toast.
+
+| Einstellungen | Mitternacht + Sepia | Warm + Papier |
+|---|---|---|
+| ![Einstellungen](docs/09-settings.png) | ![Mitternacht](docs/11-preset-mitternacht-sepia.png) | ![Warm](docs/12-preset-warm-papier.png) |
+
+## Rechtschreibung & Grammatik
+
+### Rechtschreibung (offline)
+
+Läuft komplett lokal mit Hunspell-Wörterbüchern für **Deutsch (de_DE)** und **Englisch (en_US)**
+aus den LibreOffice-Dictionaries (gebündelt in `notex/dictionaries/`, Lizenzen liegen dabei).
+Fehler bekommen eine rote Wellenlinie. Rechtsklick auf ein Wort zeigt bis zu fünf Vorschläge,
+**Zum Wörterbuch hinzufügen** (landet in `user_dictionary.txt` neben der App) und
+**In dieser Sitzung ignorieren**.
+
+- **F7** schaltet die Prüfung global an/aus, ebenso das Symbol in der Statusleiste.
+- Die Sprache (Deutsch / Englisch / Beide) stellst du in den Einstellungen ein; pro Tab lässt sie
+  sich über den Sprachknopf in der Statusleiste überschreiben (mit `*` markiert).
+- Geprüft wird standardmäßig nur in `.txt` und `.md`; für andere Endungen schaltest du es in den
+  Einstellungen zu.
+- Ausgelassen werden URLs, E-Mail-Adressen, Dateipfade, Hashes, Wörter mit Ziffern,
+  Abkürzungen in Großbuchstaben, CamelCase, snake_case, Inline-Code und Codeblöcke in Markdown.
+- Geprüft werden nur sichtbare und geänderte Absätze, jedes Wort wird pro Sprache nur einmal
+  nachgeschlagen. Das Wort, das du gerade tippst, bleibt bis zu einer kurzen Pause unmarkiert.
+
+Backend: **pyenchant** mit nativem Hunspell (das Windows-Wheel bringt die Bibliothek mit, die
+Wörterbücher findet es über `ENCHANT_CONFIG_DIR`). Fehlt enchant, springt **spylls** ein, eine
+reine Python-Implementierung von Hunspell: gleiche Ergebnisse, aber deutlich langsamer bei
+deutschen Vorschlägen.
+
+### Grammatik (optional, standardmäßig aus)
+
+Grammatik prüft [LanguageTool](https://languagetool.org) über seine HTTP-API. Treffer bekommen
+eine blaue Wellenlinie, Rechtsklick zeigt die Regelbeschreibung und Korrekturvorschläge.
+Die Prüfung läuft im Hintergrund, absatzweise, etwa 1,5 s nach dem letzten Tastendruck.
+Ist der Server nicht erreichbar, schaltet sie sich still ab und die Statusleiste zeigt
+„LanguageTool nicht erreichbar“; nach einer Minute wird es erneut versucht.
+
+- **Shift+F7** oder das Symbol in der Statusleiste schaltet die Grammatikprüfung um.
+- Standard ist ein **lokaler Server** unter `http://localhost:8081`. Dann verlässt kein Text
+  deinen Rechner.
+- Die **öffentliche API** (`https://api.languagetool.org`) funktioniert erst, wenn du sie in den
+  Einstellungen ausdrücklich erlaubst. Jeder geprüfte Absatz geht dann an einen externen Server.
+
+Lokalen LanguageTool-Server starten (Java 17+ nötig):
+
+```bat
+rem 1. ZIP von https://languagetool.org/download/LanguageTool-stable.zip laden und entpacken
+cd LanguageTool-6.x
+java -cp languagetool-server.jar org.languagetool.server.HTTPServer --port 8081 --allow-origin
+```
+
+Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann Server-URL
+`http://localhost:8081` eintragen).
+
+| Rechtschreibung mit Kontextmenü | Einstellungen: Rechtschreibung |
+|---|---|
+| ![Rechtschreibung](docs/14-spellcheck.png) | ![Einstellungen Rechtschreibung](docs/15-settings-spelling.png) |
+
 ### Tastenkürzel
 
 | Kürzel | Aktion |
@@ -46,6 +123,8 @@ Die Screenshots erzeugt `python tools/screenshot.py` automatisch (offscreen, mit
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Alt+Z | Zeilenumbruch |
 | Alt+P | Blatt zentrieren / volle Breite |
+| Ctrl+, | Einstellungen |
+| F7 / Shift+F7 | Rechtschreibung / Grammatik umschalten |
 | F2 / Entf | Umbenennen / In den Papierkorb (im Baum) |
 
 ## Ordnerstruktur der portablen App
@@ -84,7 +163,8 @@ python -m pytest
 ```
 
 Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche, Encoding-Erkennung,
-atomares Speichern und das Laden einer kaputten `config.json`.
+atomares Speichern, Config und Theme-Dateien (auch kaputte), Rechtschreibregeln und
+-Backends sowie den LanguageTool-Client gegen einen Fake-Server.
 
 ### Design-System
 
@@ -102,8 +182,11 @@ main.py                 Einstieg
 notex/
   paths.py              App-Ordner ermitteln (EXE-Ordner bzw. Projektordner)
   app.py                QApplication, Theme, Hauptfenster
-  core/                 Qt-frei: config, encoding, fileops, search
-  ui/                   Fenster und Widgets (Baum, Tabs, Blatt, Suche, Statusleiste, Toast)
+  core/                 Qt-frei: config, encoding, fileops, search, theme_model,
+                        theme_store, spell, spell_rules, grammar
+  ui/                   Fenster und Widgets (Baum, Tabs, Blatt, Suche, Statusleiste, Toast,
+                        Einstellungen, Rechtschreib-Highlighter, Grammatik-Service)
+  dictionaries/         Hunspell-Wörterbücher de_DE, en_US (mit Lizenzen)
   theme/                tokens.py, dark.qss, Fonts- und Icon-Lader
   assets/               App-Icon, Fonts, Lucide-Icons (mit Lizenzen)
 tools/                  make_icon.py, screenshot.py

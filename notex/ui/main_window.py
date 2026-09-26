@@ -461,5 +461,6 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.sidebar.stop_search()
+        self.tabs.shutdown()
         self.save_state()
         event.accept()
