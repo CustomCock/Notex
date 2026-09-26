@@ -26,6 +26,7 @@ from notex.paths import app_root
 from notex.theme.manager import theme_manager
 from notex.core import fileops
 from notex.core import text_ops as ops
+from notex.core.config import config_digest
 from notex.core.recent import add_recent, prune_recent
 from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe
 from notex.ui.about_dialog import AboutDialog
@@ -91,6 +92,12 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self._build_editor_actions()
         QTimer.singleShot(1500, self._check_association_path)
+        # Zustand regelmäßig sichern: Absturz oder Neustart kostet höchstens die letzte Sekunde
+        self._last_saved_state = ""
+        self._autosave = QTimer(self)
+        self._autosave.setInterval(1000)
+        self._autosave.timeout.connect(self._autosave_config)
+        self._autosave.start()
         self._restore_window_state()
         theme_manager().changed.connect(self.retheme)
 
@@ -726,6 +733,20 @@ class MainWindow(QMainWindow):
     def save_state(self) -> None:
         self._collect_window_state()
         self._save_config(self.config)
+        self._last_saved_state = config_digest(self.config)
+
+    def _autosave_config(self) -> None:
+        """Schreibt config.json nur, wenn sich seit dem letzten Mal etwas geändert hat (atomar)."""
+        if not self.isVisible():
+            return
+        self._collect_window_state()
+        digest = config_digest(self.config)
+        if digest != self._last_saved_state:
+            try:
+                self._save_config(self.config)
+                self._last_saved_state = digest
+            except OSError:
+                pass   # z. B. Stick abgezogen – beim nächsten Tick erneut versuchen
 
     # ---- Qt-Events --------------------------------------------------------
     def showEvent(self, event) -> None:

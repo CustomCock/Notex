@@ -64,3 +64,12 @@ def test_open_mapping_accepts_new_keys_and_rejects_bad_values(tmp_path: Path) ->
     assert cfg["font_by_extension"][".rs"] == "JetBrains Mono"  # neuer Schlüssel bleibt
     assert ".bad" not in cfg["font_by_extension"]               # falscher Typ verworfen
     assert cfg["font_by_extension"][".json"] == DEFAULTS["font_by_extension"][".json"]
+
+
+def test_config_digest_changes_with_content() -> None:
+    from notex.core.config import config_digest
+    a = load_config(Path("/nicht/da.json"))
+    b = load_config(Path("/nicht/da.json"))
+    assert config_digest(a) == config_digest(b)
+    b["font_size"] = 20
+    assert config_digest(a) != config_digest(b)

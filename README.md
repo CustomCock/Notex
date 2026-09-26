@@ -311,10 +311,11 @@ Diesen Ordner kannst du komplett kopieren, z. B. auf einen USB-Stick.
 
 ## Release über GitHub Actions
 
-Ein Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut die App
-auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
+Ein annotiertes Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut
+die App auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
+Die Version steht zentral in `notex/__init__.py` und muss zum Tag passen.
 
 ```bat
-git tag v0.1.0
-git push origin v0.1.0
+git tag -a v1.1.0 -m "Notex 1.1.0"
+git push origin v1.1.0
 ```

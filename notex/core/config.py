@@ -100,6 +100,12 @@ def _merge(default: Any, loaded: Any) -> Any:
     return loaded if isinstance(loaded, type(default)) else default
 
 
+def config_digest(config: dict[str, Any]) -> str:
+    """Kurzer Fingerabdruck der Config, um unnötiges Schreiben zu vermeiden."""
+    import hashlib
+    return hashlib.sha1(json.dumps(config, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def default_config() -> dict[str, Any]:
     return copy.deepcopy(DEFAULTS)
 
