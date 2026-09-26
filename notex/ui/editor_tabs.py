@@ -292,7 +292,7 @@ class EditorTabs(QTabWidget):
                 editor.highlighter.resolve_link = self.resolve_link
                 editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
                 editor.highlighter.lexer = self.lexer_for(path)
-                editor.highlighter.relink()   # der erste Durchlauf lief noch ohne Resolver und Lexer
+                editor.highlighter.schedule_reset()   # Resolver und Lexer gelten ab dem (einen) Durchlauf nach dem Laden
             toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             toolbar.visibility_changed.connect(self._on_toolbar_toggled)
@@ -301,9 +301,13 @@ class EditorTabs(QTabWidget):
             page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
             page.link_requested.connect(lambda target, e=editor: self.preview_link.emit(e, target))
             page.view_mode_changed.connect(lambda mode, pg=page: self.view_mode_changed.emit(mode) if pg is self.currentWidget() else None)
+            page.data_status_changed.connect(lambda pg=page: self.status_changed.emit() if pg is self.currentWidget() else None)
+            page.reencode_requested.connect(lambda encoding, pg=page: self._reencode(pg, encoding))
             index = self.addTab(page, path.name)
             if page.supports_preview and self.config.get("markdown_view", "edit") != "edit":
                 page.set_view_mode(self.config.get("markdown_view", "edit"))
+            elif page.data_kind == "table" and self.config.get("data_view", {}).get("csv_as_table", False):
+                page.set_view_mode("table")
             if editor.encrypted:
                 self._show_locked(page)
             self.setTabToolTip(index, self.relative(path))
@@ -407,7 +411,37 @@ class EditorTabs(QTabWidget):
         return True
 
     # ---- Speichern ---------------------------------------------------------
+    def flush_data_views(self, editor: Editor) -> None:
+        """Ungespeicherte Tabellen-/Baum-Änderungen aller Ansichten dieses Dokuments in den Text schreiben."""
+        pages = self.area.pages() if self.area is not None else self.pages()
+        for page in pages:
+            if page.editor.document() is editor.document():
+                page.flush_data_view()
+
+    def _reencode(self, page: EditorPage, encoding: str) -> None:
+        """Datenansicht: Datei mit einem anderen Encoding neu lesen (Erkennung überschreiben)."""
+        from notex.core.encoding import decode_as
+        from notex.ui import dialogs
+        editor = page.editor
+        if editor.is_dirty and not dialogs.confirm(
+                self, "Encoding ändern", f"„{editor.path.name}“ mit {encoding} neu lesen?",
+                yes="Neu lesen", no="Abbrechen", danger=True,
+                informative="Ungespeicherte Änderungen gehen dabei verloren."):
+            return
+        try:
+            text_file = decode_as(editor.path.read_bytes(), encoding)
+        except (OSError, LookupError) as error:
+            dialogs.warn(self, "Encoding ändern", str(error))
+            return
+        if page.data_view is not None:
+            page.data_view.dirty = False
+        editor.replace_content(text_file)
+        if page.data_view is not None and page.view_mode == page.data_view.kind:
+            page._load_data_view()
+        self.status_changed.emit()
+
     def save_editor(self, editor: Editor) -> bool:
+        self.flush_data_views(editor)
         if editor.encrypted:
             return self._save_encrypted(editor, editor.path)
         if getattr(editor, "read_only", False) or self.is_read_only(editor.path):
@@ -431,6 +465,7 @@ class EditorTabs(QTabWidget):
 
     def save_editor_as(self, editor: Editor, reason: str = "") -> bool:
         """„Speichern unter …“: neuer Pfad, Tab zieht mit, Watcher wird über file_closed/file_opened umgehängt."""
+        self.flush_data_views(editor)
         from PySide6.QtWidgets import QFileDialog
         if reason:
             from notex.ui import dialogs
@@ -833,9 +868,10 @@ class EditorTabs(QTabWidget):
         return page.view_mode if page is not None else "edit"
 
     def set_view_mode(self, mode: str) -> bool:
-        """Ansicht des aktuellen Tabs; False, wenn die Datei keine Vorschau hat (kein Markdown)."""
+        """Ansicht des aktuellen Tabs; False, wenn die Datei diese Ansicht nicht hat (Vorschau nur für Markdown,
+        Tabelle nur für CSV/TSV …)."""
         page = self.current_page()
-        if page is None or not page.supports_preview:
+        if page is None or mode not in page.view_modes:
             return False
         page.set_view_mode(mode)
         self.status_changed.emit()
@@ -843,7 +879,7 @@ class EditorTabs(QTabWidget):
 
     def cycle_view_mode(self) -> str | None:
         page = self.current_page()
-        if page is None or not page.supports_preview:
+        if page is None or not page.supports_alt_view:
             return None
         mode = page.cycle_view_mode()
         self.status_changed.emit()

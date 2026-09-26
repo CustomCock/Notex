@@ -249,8 +249,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Beenden", "Ctrl+Q", self.close))
 
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
-        edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
-        edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
+        edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.open_find(False)))
+        edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.open_find(True)))
         edit_menu.addAction(self._action("Ersetzen in Dateien …", "Ctrl+Shift+H", self.open_replace_in_files))
         lookup_menu = edit_menu.addMenu("Nachschlagen")
         self.lookup_wikipedia_action = self._action("Wikipedia nachschlagen", "Ctrl+Alt+W", lambda: self.lookup_current("wikipedia"))
@@ -834,15 +834,28 @@ class MainWindow(QMainWindow):
 
     def _with_editor(self, func) -> None:
         editor = self.tabs.current_editor()
-        if editor is not None:
+        if editor is not None and not self._in_data_view():
             func(editor)
+
+    def _in_data_view(self) -> bool:
+        """Tabelle/Baum sichtbar: Text-Befehle (Zeile duplizieren, Groß/klein …) würden den verdeckten Text ändern."""
+        from notex.ui.paper import DATA_MODES
+        page = self.tabs.current_page()
+        return page is not None and page.view_mode in DATA_MODES
+
+    def open_find(self, with_replace: bool) -> None:
+        """Ctrl+F/Ctrl+H – in der Tabellen-/Baumansicht springt der Fokus in deren Filterfeld."""
+        if self._in_data_view():
+            self.tabs.current_page().data_view.focus_filter()
+            return
+        self.find_bar.open(with_replace=with_replace)
 
     def _build_editor_actions(self) -> None:
         a, ed = self._editor_action, self._with_editor
         a("undo", "undo-2", "Rückgängig", None, lambda: ed(lambda e: e.undo())).setToolTip("Rückgängig  Ctrl+Z")
         a("redo", "redo-2", "Wiederholen", None, lambda: ed(lambda e: e.redo())).setToolTip("Wiederholen  Ctrl+Y")
-        a("find", "search", "Suchen", None, lambda: self.find_bar.open(with_replace=False)).setToolTip("Suchen  Ctrl+F")
-        a("replace", "replace", "Ersetzen", None, lambda: self.find_bar.open(with_replace=True)).setToolTip("Ersetzen  Ctrl+H")
+        a("find", "search", "Suchen", None, lambda: self.open_find(False)).setToolTip("Suchen  Ctrl+F")
+        a("replace", "replace", "Ersetzen", None, lambda: self.open_find(True)).setToolTip("Ersetzen  Ctrl+H")
         a("font_smaller", "minus", "Textgröße verkleinern (Ansicht, ändert nichts an der Datei)", None, lambda: self.tabs.zoom(-1))
         a("font_larger", "plus", "Textgröße vergrößern (Ansicht, ändert nichts an der Datei)", None, lambda: self.tabs.zoom(+1))
         a("zoom_reset", "rotate-ccw", "Zoom zurücksetzen", None, lambda: self.tabs.set_font_size(FONT_SIZE.editor)).setToolTip("Zoom zurücksetzen  Ctrl+0")
@@ -871,8 +884,8 @@ class MainWindow(QMainWindow):
         a("md_checkbox", "square-check", "Checkbox", "Ctrl+Alt+X", lambda: ed(lambda e: e.apply_line_op(ops.toggle_checkbox)))
         a("md_code", "code", "Code", "Ctrl+Alt+C", lambda: ed(lambda e: e.apply_text_op(ops.toggle_code)))
         a("md_link", "link", "Link", "Ctrl+K", lambda: ed(lambda e: e.apply_text_op(ops.toggle_link)))
-        self.preview_action = a("preview", "eye", "Markdown-Vorschau (Bearbeiten → Vorschau → Geteilt)", "Ctrl+Shift+V",
-                                self.cycle_preview)
+        self.preview_action = a("preview", "eye", "Ansicht umschalten (Markdown: Vorschau · CSV: Tabelle · JSON/YAML: Baum)",
+                                "Ctrl+Shift+V", self.cycle_preview)
         self.preview_action.setToolTip("Markdown-Vorschau umschalten  Ctrl+Shift+V")
         self.spell_toolbar_action = a("spell", "spell-check", "Rechtschreibung", None, self.toggle_spellcheck, checkable=True)
         self.spell_toolbar_action.setToolTip("Rechtschreibung prüfen  F7")
@@ -1584,16 +1597,22 @@ class MainWindow(QMainWindow):
                                 "square-split-vertical" if orientation == "vertical" else "square-split-horizontal")
 
     # ---- Markdown-Vorschau -------------------------------------------------------------
+    VIEW_MODE_NAMES = {"edit": "Bearbeiten", "preview": "Vorschau", "split": "Geteilte Ansicht", "table": "Tabelle",
+                       "tree": "Baum"}
+    VIEW_MODE_HINT = "Vorschau gibt es für Markdown (.md), die Tabelle für CSV/TSV, den Baum für JSON/YAML"
+
     def cycle_preview(self) -> None:
         mode = self.tabs.cycle_view_mode()
         if mode is None:
-            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+            self.toast.show_message(self.VIEW_MODE_HINT, "info")
             return
-        self.toast.show_message({"edit": "Bearbeiten", "preview": "Vorschau", "split": "Geteilte Ansicht"}[mode], "eye")
+        page = self.tabs.current_page()
+        name = "Text" if mode == "edit" and page is not None and not page.supports_preview else self.VIEW_MODE_NAMES[mode]
+        self.toast.show_message(name, {"table": "table", "tree": "list-tree"}.get(mode, "eye"))
 
     def set_preview_mode(self, mode: str) -> None:
         if not self.tabs.set_view_mode(mode):
-            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+            self.toast.show_message(self.VIEW_MODE_HINT, "info")
 
     def _on_preview_link(self, editor, target: str) -> None:
         """Link aus der Vorschau: relativer Pfad (a/b.md#Ziel) oder Wiki-Name (Plan#Ziel)."""
@@ -1851,6 +1870,10 @@ class MainWindow(QMainWindow):
         for mode, title in (("edit", "Markdown: Bearbeiten"), ("preview", "Markdown: Vorschau"), ("split", "Markdown: Geteilte Ansicht")):
             self.registry.add(f"preview:{mode}", title, lambda m=mode: self.set_preview_mode(m), category="Ansicht",
                               keywords="markdown vorschau preview rendern")
+        self.registry.add("view:table", "CSV/TSV: Als Tabelle anzeigen", lambda: self.set_preview_mode("table"),
+                          category="Ansicht", shortcut="Ctrl+Shift+V", keywords="csv tsv tabelle spalten excel")
+        self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
+                          category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
@@ -1921,6 +1944,11 @@ class MainWindow(QMainWindow):
             return
         relative = self.tabs.relative(editor.path)
         self.status.update_for(editor, relative)
+        page = self.tabs.current_page()
+        if page is not None and self._in_data_view():
+            parts = page.data_view.status_parts()
+            self.status.position_label.setText(page.data_view.position_text())
+            self.status.chars_label.setText(" · ".join(parts[:2]))
         self._sync_editor_actions()
         self.status.set_spell_state(
             self.tabs.spell_enabled_for(editor.path), self.tabs.grammar_enabled_for(editor.path),

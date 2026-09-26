@@ -11,6 +11,15 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   ob ihre Bilder mitkommen; „Unbenutzte Bilder finden“ mit Vorschau statt automatischem Löschen
 - Dateityp-Erkennung über Magic Bytes (eigene Signaturtabelle) als Grundlage für Viewer-Tabs; Symbole im Baum
   nach Dateityp
+- CSV/TSV als Tabelle (Ctrl+Shift+V, pro Tab): Trennzeichen, Quoting und Encoding automatisch erkannt und
+  überschreibbar, Kopfzeile umschaltbar, Sortieren per Spaltenklick (numerisch erkannt), Filter über alle Spalten,
+  Zellen/Zeilen/Spalten bearbeiten, Blöcke kopieren/einfügen; Speichern erhält Trennzeichen, Quoting-Stil, Encoding
+  und Zeilenenden; 100 000 Zeilen ohne Einfrieren; Einstellung „CSV/TSV direkt als Tabelle öffnen“
+- UTF-16-Dateien mit BOM werden erkannt (z. B. „Unicode-Text“-Export aus Excel)
+
+### Verbessert
+- Große Dateien öffnen deutlich schneller (100 000 Zeilen: ~12 s → ~2 s): kein Hervorheben während des Ladens,
+  ein statt drei Durchläufe danach, Einrückungen nur bei echter Schriftänderung neu berechnet
 
 ## [1.5.0] – 2026-09-26
 

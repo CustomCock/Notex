@@ -884,3 +884,51 @@ QFrame#LookupSkeleton {
     background: @selection;
     border-radius: 4px;
 }
+
+/* ---------- Datenansicht auf dem Blatt (CSV-Tabelle, JSON/YAML-Baum) ---------- */
+QFrame#DataFrame {
+    background: @paper;
+    border-radius: @r_panelpx;
+}
+QFrame#DataBar {
+    background: @surface;
+    border-top-left-radius: @r_panelpx;
+    border-top-right-radius: @r_panelpx;
+}
+QFrame#DataBar QLineEdit, QFrame#DataBar QComboBox {
+    background: @bg;
+}
+QLabel#DataInfo {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+}
+QTableView#CsvTable {
+    background: @paper;
+    alternate-background-color: @paper_line;
+    color: @paper_text;
+    gridline-color: @paper_line;
+    border: none;
+    selection-background-color: @paper_selection;
+    selection-color: @paper_text;
+}
+QTableView#CsvTable QHeaderView::section {
+    background: @paper;
+    color: @paper_muted;
+    border: none;
+    border-bottom: 1px solid @paper_line;
+    border-right: 1px solid @paper_line;
+    padding: 2px @sp_smpx;
+}
+QTableView#CsvTable QTableCornerButton::section {
+    background: @paper;
+    border: none;
+}
+QTableView#CsvTable QLineEdit {
+    background: @paper;
+    color: @paper_text;
+    border: 1px solid @accent;
+    border-radius: 0;
+    padding: 0 2px;
+    selection-background-color: @paper_selection;
+    selection-color: @paper_text;
+}

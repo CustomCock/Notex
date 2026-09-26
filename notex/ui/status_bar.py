@@ -12,7 +12,8 @@ from PySide6.QtWidgets import QMenu
 
 from notex.ui.editor import Editor
 
-ENCODING_LABELS = {"utf-8": "UTF-8", "utf-8-sig": "UTF-8 BOM", "cp1252": "cp1252"}
+ENCODING_LABELS = {"utf-8": "UTF-8", "utf-8-sig": "UTF-8 BOM", "cp1252": "cp1252", "latin-1": "ISO-8859-1",
+                   "utf-16": "UTF-16"}
 
 
 LANGUAGE_SHORT = {"de": "DE", "en": "EN", "both": "DE+EN"}

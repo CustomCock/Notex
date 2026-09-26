@@ -86,6 +86,7 @@ class Editor(QTextEdit):
         self._padding = LAYOUT.paper_padding   # aktueller Innenabstand (schrumpft bei schmalem Blatt)
         self._show_numbers = True
         self._indent_pending: set[int] = set()
+        self._indent_font_key: tuple = ()
         self._indent_timer = QTimer(self)
         self._indent_timer.setSingleShot(True)
         self._indent_timer.setInterval(0)
@@ -111,9 +112,15 @@ class Editor(QTextEdit):
             self._refresh_extra_selections()
             return
         self._loaded_once = True
-        self.setPlainText(text_file.text)
-        self._apply_line_height()
-        self._apply_hanging_indents()
+        if self.highlighter is not None:
+            self.highlighter.suspended = True     # setPlainText + Formate lösen sonst je einen vollen Durchlauf aus
+        try:
+            self.setPlainText(text_file.text)
+            self._apply_line_height()
+            self._apply_hanging_indents()
+        finally:
+            if self.highlighter is not None:
+                self.highlighter.suspended = False
         self._indent_timer.stop()          # das Laden selbst ist keine Tipp-Änderung
         self._indent_pending.clear()
         self.document().clearUndoRedoStacks()
@@ -182,6 +189,8 @@ class Editor(QTextEdit):
         ohne die Datei als geändert zu markieren (bei ungeänderter Datei bleibt auch Undo leer)."""
         if not self.document().blockCount() or not self.document().firstBlock().isValid():
             return
+        if self._indent_font_key == self._font_key():
+            return      # QSS-Polish setzt die Schrift mehrfach neu – gleiche Metrik, nichts zu tun
         modified = self.document().isModified()
         self._indent_timer.stop()
         self._indent_pending.clear()
@@ -226,12 +235,22 @@ class Editor(QTextEdit):
     def _apply_hanging_indents(self) -> None:
         """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen).
         Nur Blöcke mit Präfix bekommen ein Format – bei 40 000 Zeilen spart das die meiste Zeit."""
+        widths: dict[str, int] = {}
+        metrics = self.fontMetrics()
         block = self.document().firstBlock()
         while block.isValid():
             text = block.text()
             if text[:1] in (" ", "\t", "-", "*", "+") or text[:1].isdigit():
-                self._set_hanging_indent(block, self._indent_for(text))
+                prefix = hanging_prefix(text).replace("\t", "    ")
+                if prefix not in widths:
+                    widths[prefix] = metrics.horizontalAdvance(prefix) if prefix else 0
+                if widths[prefix] or block.blockFormat().leftMargin():   # „123,4“ (CSV) hat kein Präfix
+                    self._set_hanging_indent(block, widths[prefix])
             block = block.next()
+        self._indent_font_key = self._font_key()
+
+    def _font_key(self) -> tuple:
+        return self.font().key(), self.fontMetrics().horizontalAdvance("    ")
 
     def _on_block_changed(self, position: int, removed: int, added: int) -> None:
         block = self.document().findBlock(position)

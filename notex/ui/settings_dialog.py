@@ -401,6 +401,15 @@ class SettingsDialog(QDialog):
         page.note("Ctrl+V mit einem Bild oder Bilddateien auf eine .md ziehen legt das Bild in diesem Ordner neben der "
                   "Notiz ab und fügt ![](…) ein. In verschlüsselte Notizen (.ntx) werden keine Bilder eingefügt.")
 
+        page.section("Datenformate")
+        data_cfg = self.config.get("data_view", {})
+        csv_box = QCheckBox("CSV/TSV direkt als Tabelle öffnen")
+        csv_box.setChecked(bool(data_cfg.get("csv_as_table", False)))
+        csv_box.toggled.connect(lambda on: self.config.setdefault("data_view", {}).__setitem__("csv_as_table", on))
+        page.row("", csv_box)
+        page.note("Ctrl+Shift+V wechselt bei .csv/.tsv zwischen Text und Tabelle. Sortieren und Filtern ändern nur die "
+                  "Ansicht; Speichern behält Trennzeichen, Anführungszeichen-Stil, Encoding und Zeilenenden.")
+
         page.section("Versionshistorie")
         self.history_box = QCheckBox("Bei jedem Speichern einen Schnappschuss in history/ ablegen")
         self.history_box.toggled.connect(lambda on: self.config.setdefault("history", {}).__setitem__("enabled", on)

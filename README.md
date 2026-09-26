@@ -215,6 +215,25 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 - **Aufräumen:** „Unbenutzte Bilder finden …“ (Menü Datei, Command Palette) listet Bilder ohne Verweis mit
   Vorschau; nur Angekreuztes kommt in den Papierkorb. Gelöscht wird nie automatisch.
 
+## CSV als Tabelle
+
+`.csv`- und `.tsv`-Dateien lassen sich mit `Ctrl+Shift+V` (oder „CSV/TSV: Als Tabelle anzeigen“ in der Command
+Palette) zwischen **Text** und **Tabelle** umschalten – der Zustand gilt pro Tab. Einstellungen → Editor →
+Datenformate öffnet CSV/TSV auf Wunsch direkt als Tabelle.
+
+- **Erkennung:** Trennzeichen (Komma, Semikolon, Tab, senkrechter Strich), Anführungszeichen-Stil und Encoding
+  werden automatisch erkannt; alles lässt sich in der Leiste über der Tabelle überschreiben. Ein anderes Encoding
+  liest die Datei neu (UTF-8, UTF-8 BOM, cp1252, ISO-8859-1, UTF-16).
+- **Ansicht:** Kopfzeile ein/aus, Klick auf eine Spalte sortiert (Zahlen numerisch, auch `1.234,56`), Filterfeld
+  (`Ctrl+F`) sucht in allen Spalten, Spaltenbreiten ziehbar, Zeilennummern links zeigen die Zeile in der Datei.
+  Sortieren und Filtern ändern nur die Ansicht, nie die Reihenfolge in der Datei.
+- **Bearbeiten:** Doppelklick/F2 bearbeitet eine Zelle, Zeilen und Spalten einfügen/löschen über die Leiste,
+  `Ctrl+C`/`Ctrl+V` kopieren/fügen Tab-getrennte Blöcke (wie aus einer Tabellenkalkulation), `Entf` leert Zellen.
+- **Speichern** schreibt die Tabelle im erkannten Stil zurück: gleiches Trennzeichen, gleicher Quoting-Stil,
+  gleiches Encoding, gleiche Zeilenenden (CRLF/LF). Solange nichts geändert wurde, bleibt die Datei unangetastet.
+- Große Dateien (100 000 Zeilen) laufen über ein Tabellenmodell, das nur sichtbare Zellen zeichnet.
+- Verschlüsselte Notizen (`.ntx`) bekommen keine Tabellenansicht.
+
 ## Nachschlagen
 
 Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
@@ -480,7 +499,9 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+Shift+K | Backlinks-Panel |
-| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt |
+| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle |
+| Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
+| Ctrl+C / Ctrl+V / Entf (in der Tabelle) | Zellen als Tab-getrennten Block kopieren / einfügen / leeren |
 | Ctrl+\ | Editor teilen / Teilung aufheben |
 | Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |
 | Ctrl+Alt+→ | Tab in andere Gruppe verschieben |

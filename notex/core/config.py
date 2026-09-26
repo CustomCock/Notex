@@ -66,6 +66,10 @@ DEFAULTS: dict[str, Any] = {
     "images": {               # Bilder in Notizen (Einfügen per Ctrl+V / Drag & Drop in .md)
         "assets_folder": "assets",   # Ordner neben der Notiz
     },
+    "data_view": {            # Datenformate: CSV/TSV als Tabelle, JSON/YAML formatieren und als Baum
+        "csv_as_table": False,       # .csv/.tsv direkt in der Tabellenansicht öffnen
+        "json_indent": 2,            # Einrückung beim Formatieren (JSON und YAML)
+    },
     "lookup": {               # Nachschlagen (Kontextmenü, Ctrl+Alt+W/T/G)
         "online": True,           # Wikipedia/Wiktionary per API abfragen erlaubt
         "language": "auto",       # "auto" (Sprache des Tabs) | "de" | "en"
