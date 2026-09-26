@@ -39,10 +39,19 @@ DEFAULTS: dict[str, Any] = {
     "backlinks_visible": False,
     "backlinks_position": "bottom",   # "bottom" | "right"
     "active_tab": 0,
+    "split": {                # geteilter Editor: zweite Tab-Gruppe
+        "enabled": False,
+        "open_tabs": [],
+        "active_tab": 0,
+        "active_group": 0,
+        "orientation": "horizontal",   # nebeneinander | "vertical" = untereinander
+    },
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
     "toolbar_visible": True,  # Bearbeitungsleiste über dem Blatt ausgeklappt
     "line_numbers": True,
+    "markdown_view": "edit",      # Ansicht beim Öffnen von .md: "edit" | "preview" | "split"
+    "preview_sync_scroll": True,  # Vorschau scrollt mit dem Editor (geteilte Ansicht)
     "theme": default_theme(), # das aktive Theme, komplett (Presets/Dateien sind nur Vorlagen)
     "spellcheck": {
         "enabled": True,
@@ -54,13 +63,39 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "lookup": {               # Nachschlagen (Kontextmenü, Ctrl+Alt+W/T/G)
+        "online": True,           # Wikipedia/Wiktionary per API abfragen erlaubt
+        "language": "auto",       # "auto" (Sprache des Tabs) | "de" | "en"
+        "thumbnails": False,      # Vorschaubilder in der Karte
+        "engine": "google",       # "google" | "duckduckgo" | "startpage" | "custom"
+        "custom_url": "",         # eigene Such-URL, {q} = Begriff
+    },
+    "update_check": {         # höchstens einmal täglich GitHub-Releases prüfen, nie etwas herunterladen
+        "enabled": True,
+        "last_check": 0.0,    # Unix-Zeit der letzten Prüfung
+        "skipped": "",        # Version, auf die nicht mehr hingewiesen wird
+    },
+    "templates": {            # Vorlagen liegen in templates/ neben der App
+        "week_folder": "Wochen",            # Ordner in data/ für „Neue Woche“
+        "week_name": "KW{{week}} {{year}}",  # Dateiname (ohne .md) mit Platzhaltern
+        "week_template": "Woche.md",
+    },
+    "encryption": {           # verschlüsselte Notizen (.ntx)
+        "auto_lock_minutes": 5,   # nach so vielen Minuten ohne Eingabe sperren (0 = nie)
+    },
+    "history": {              # lokale Versionshistorie in history/ neben der App
+        "enabled": True,
+        "max_mb": 200,        # Obergrenze für die komprimierten Schnappschüsse
+    },
     "search": {
         "by_name": True,
         "full_text": False,
+        "regex": False,       # Chip „.*“: regulärer Ausdruck
+        "whole_word": False,  # Chip „Wort“: nur ganze Wörter
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
-                   ".xml", ".html", ".css", ".js", ".sql"],
-    "extensions_version": 2,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
+                   ".xml", ".html", ".css", ".js", ".sql", ".ntx"],
+    "extensions_version": 3,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
     "syntax_highlighting": True,
     "syntax_extensions": [".py", ".json", ".ini", ".log", ".sh", ".ps1", ".bat", ".yaml", ".yml", ".xml",
                           ".html", ".css", ".js", ".sql", ".md"],
@@ -141,6 +176,10 @@ def migrate(config: dict[str, Any], raw: Any) -> dict[str, Any]:
             if ext not in existing:
                 existing.append(ext)
         config["extensions"] = existing
+    elif isinstance(raw, dict) and "extensions" in raw and raw_version < 3:
+        # v1.3: verschlüsselte Notizen im Baum anzeigen
+        if ".ntx" not in config["extensions"]:
+            config["extensions"] = list(config["extensions"]) + [".ntx"]
     config["extensions_version"] = DEFAULTS["extensions_version"]
     return config
 

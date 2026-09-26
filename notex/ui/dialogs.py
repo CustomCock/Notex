@@ -42,3 +42,11 @@ def ask_text(parent: QWidget | None, title: str, label: str, default: str = "") 
     text, ok = QInputDialog.getText(parent, title, label, QLineEdit.EchoMode.Normal, default)
     text = text.strip()
     return text if ok and text else None
+
+
+def choose(parent: QWidget | None, title: str, label: str, items: list[str]) -> str | None:
+    """Auswahl aus einer Liste; None bei Abbruch."""
+    if not items:
+        return None
+    item, ok = QInputDialog.getItem(parent, title, label, items, 0, False)
+    return item if ok and item else None

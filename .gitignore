@@ -15,6 +15,8 @@ dist/
 # Laufzeitdaten der portablen App (liegen neben der EXE, nicht im Repo)
 config.json
 data/
+history/
+templates/
 
 # Von build.py erzeugt
 *.spec

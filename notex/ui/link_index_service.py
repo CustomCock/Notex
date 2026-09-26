@@ -10,6 +10,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from notex.core.fileops import is_encrypted_path
+
 from notex.core.encoding import decode_bytes
 from notex.core.wikilinks import LinkIndex
 
@@ -27,6 +29,8 @@ class _Scanner(QThread):
         index = LinkIndex()
         index.set_files(self.files)
         for rel in self.files:
+            if is_encrypted_path(rel):   # verschlüsselte Notizen: Inhalt bleibt unbekannt
+                continue
             path = self.root / rel
             try:
                 if path.stat().st_size > MAX_BYTES:
@@ -68,10 +72,14 @@ class LinkIndexService(QObject):
         self.index.set_files(files)
 
     def update_text(self, rel: str, text: str) -> None:
+        if is_encrypted_path(rel):
+            return
         self.index.update_file(rel, text)
         self.updated.emit()
 
     def update_path(self, rel: str) -> None:
+        if is_encrypted_path(rel):
+            return
         path = self.root / rel
         try:
             text = decode_bytes(path.read_bytes()).text

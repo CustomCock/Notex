@@ -97,7 +97,10 @@ class StatusBar(QStatusBar):
         eol = "CRLF" if editor.eol == "\r\n" else "LF"
         self.path_label.setText(relative_path)
         self.position_label.setText(f"Z {line}, S {col}")
-        self.encoding_label.setText(f"{ENCODING_LABELS.get(editor.encoding, editor.encoding)} · {eol}")
+        if getattr(editor, "encrypted", False):
+            self.encoding_label.setText("verschlüsselt · gesperrt" if editor.locked else "verschlüsselt · AES-256-GCM")
+        else:
+            self.encoding_label.setText(f"{ENCODING_LABELS.get(editor.encoding, editor.encoding)} · {eol}")
         # characterCount statt toPlainText: bei 5 MB kostet das Kopieren des Texts sonst 12 ms pro Tastendruck
         self.chars_label.setText(f"{max(0, editor.document().characterCount() - 1)} Zeichen")
         self.dirty_label.setText("Ungespeichert" if editor.is_dirty else "Gespeichert")

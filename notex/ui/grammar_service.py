@@ -119,6 +119,8 @@ class GrammarService(QObject):
 
     # ---- Editoren --------------------------------------------------------------------
     def attach(self, editor) -> None:
+        if getattr(editor, "encrypted", False):   # verschlüsselte Notizen gehen nie an LanguageTool
+            return
         key = id(editor)
         self._editors[key] = editor
         timer = QTimer(self)
@@ -148,7 +150,7 @@ class GrammarService(QObject):
     def _flush(self, key: int) -> None:
         """Sichtbare Blöcke ohne Grammatik-Ergebnis zur Prüfung einreihen."""
         editor = self._editors.get(key)
-        if editor is None or self._worker is None or editor.highlighter is None:
+        if editor is None or self._worker is None or editor.highlighter is None or getattr(editor, "encrypted", False):
             return
         highlighter = editor.highlighter
         if not highlighter.grammar_enabled:

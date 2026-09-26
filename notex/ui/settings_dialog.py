@@ -80,8 +80,9 @@ class SettingsPage(QWidget):
 
 
 class SettingsDialog(QDialog):
-    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "System", "Tastenkürzel"]
-    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "sliders-horizontal", "keyboard"]
+    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "System", "Tastenkürzel"]
+    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "book-open", "sliders-horizontal",
+                      "keyboard"]
 
     def __init__(self, window, store: ThemeStore) -> None:
         super().__init__(window)
@@ -111,7 +112,7 @@ class SettingsDialog(QDialog):
             self.categories.addItem(QListWidgetItem(icon(icon_name), name))
         self.pages = QStackedWidget()
         for builder in (self._build_appearance, self._build_paper, self._build_font, self._build_editor,
-                        self._build_spelling, self._build_system, self._build_shortcuts):
+                        self._build_spelling, self._build_lookup, self._build_system, self._build_shortcuts):
             page = builder()
             page.finish()
             scroll = QScrollArea()
@@ -376,6 +377,88 @@ class SettingsDialog(QDialog):
         page.note("Nur sichtbare Blöcke werden gefärbt; Dateien über 2 MB bleiben ohne Highlighting. "
                   "In .md-Dateien werden ```python-Blöcke usw. mit dem passenden Lexer gefärbt.")
 
+        page.section("Markdown-Vorschau")
+        self.markdown_view_box = QComboBox()
+        self.markdown_view_box.addItem("Bearbeiten", "edit")
+        self.markdown_view_box.addItem("Vorschau", "preview")
+        self.markdown_view_box.addItem("Geteilt (Blatt + Vorschau)", "split")
+        self.markdown_view_box.currentIndexChanged.connect(
+            lambda i: self.config.__setitem__("markdown_view", self.markdown_view_box.itemData(i)) if not self._loading else None)
+        page.row(".md öffnen als", self.markdown_view_box)
+        self.sync_scroll_box = QCheckBox("Vorschau scrollt mit dem Editor (geteilte Ansicht)")
+        self.sync_scroll_box.toggled.connect(lambda on: (self.config.__setitem__("preview_sync_scroll", on),
+                                                         self.window_.tabs.apply_preview_settings()) if not self._loading else None)
+        page.row("", self.sync_scroll_box)
+        page.note("Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt. Die Vorschau lädt nie von selbst aus dem "
+                  "Internet: externe Bilder erscheinen als „Bild laden“, externe Links öffnen den Browser erst auf Klick.")
+
+        page.section("Versionshistorie")
+        self.history_box = QCheckBox("Bei jedem Speichern einen Schnappschuss in history/ ablegen")
+        self.history_box.toggled.connect(lambda on: self.config.setdefault("history", {}).__setitem__("enabled", on)
+                                         if not self._loading else None)
+        page.row("", self.history_box)
+        self.history_spin = QSpinBox()
+        self.history_spin.setRange(10, 5000)
+        self.history_spin.setSingleStep(50)
+        self.history_spin.setSuffix(" MB")
+        self.history_spin.valueChanged.connect(lambda v: self.config.setdefault("history", {}).__setitem__("max_mb", v)
+                                               if not self._loading else None)
+        page.row("Höchstens", self.history_spin)
+        history_row = QHBoxLayout()
+        history_row.setContentsMargins(0, 0, 0, 0)
+        self.history_size = QLabel()
+        self.history_size.setObjectName("SettingsNote")
+        clear_history = QPushButton("Verlauf leeren …")
+        clear_history.clicked.connect(self._clear_history)
+        history_row.addWidget(self.history_size, 1)
+        history_row.addWidget(clear_history)
+        history_widget = QWidget()
+        history_widget.setLayout(history_row)
+        page.add(history_widget)
+        page.note("Ctrl+Shift+Y zeigt die Versionen der aktuellen Datei mit Unterschieden. Ältere Versionen werden "
+                  "ausgedünnt (24 h alles, dann stündlich, täglich, wöchentlich). Verschlüsselte Notizen (.ntx) "
+                  "bekommen nie einen Verlauf.")
+
+        page.section("Vorlagen")
+        self.week_folder_edit = QLineEdit()
+        self.week_folder_edit.setToolTip("Ordner in data/, in dem „Neue Woche“ (Alt+W) die Wochenpläne anlegt")
+        self.week_folder_edit.editingFinished.connect(
+            lambda: self.config.setdefault("templates", {}).__setitem__("week_folder", self.week_folder_edit.text().strip() or "Wochen"))
+        page.row("Wochen-Ordner", self.week_folder_edit)
+        self.week_name_edit = QLineEdit()
+        self.week_name_edit.setToolTip("Dateiname ohne .md, Platzhalter wie in Vorlagen: {{week}} {{year}} {{date:%Y-%m-%d}}")
+        self.week_name_edit.editingFinished.connect(
+            lambda: self.config.setdefault("templates", {}).__setitem__("week_name", self.week_name_edit.text().strip() or "KW{{week}} {{year}}"))
+        page.row("Wochen-Dateiname", self.week_name_edit)
+        templates_button = QPushButton("Vorlagen-Ordner öffnen")
+        templates_button.clicked.connect(lambda: getattr(self.window_, "open_templates_folder", lambda: None)())
+        page.row("", templates_button)
+        page.note("Vorlagen sind .md/.txt-Dateien in templates/ neben der App. Platzhalter: {{date}} {{time}} {{weekday}} "
+                  "{{week}} {{year}} {{title}} {{cursor}}, Versätze wie {{date+1}} und Formate wie {{date:%Y-%m-%d}}. "
+                  "Ctrl+Shift+T: neue Datei aus Vorlage, Alt+W: Neue Woche.")
+
+        page.section("Verschlüsselte Notizen")
+        self.autolock_spin = QSpinBox()
+        self.autolock_spin.setRange(0, 240)
+        self.autolock_spin.setSuffix(" min")
+        self.autolock_spin.setSpecialValueText("nie")
+        self.autolock_spin.valueChanged.connect(
+            lambda v: self.config.setdefault("encryption", {}).__setitem__("auto_lock_minutes", v) if not self._loading else None)
+        page.row("Automatisch sperren nach", self.autolock_spin)
+        page.note(".ntx-Dateien sind mit AES-256-GCM verschlüsselt, der Schlüssel entsteht per Argon2id aus dem "
+                  "Passwort. Klartext liegt nie auf der Platte: kein Verlauf, keine Suche, keine Grammatikprüfung, "
+                  "kein Wörterbuch-Eintrag. Ctrl+Shift+L sperrt sofort. Details: docs/ENCRYPTION.md")
+
+        page.section("Geteilter Editor")
+        self.split_box = QComboBox()
+        self.split_box.addItem("Nebeneinander", "horizontal")
+        self.split_box.addItem("Untereinander", "vertical")
+        self.split_box.currentIndexChanged.connect(
+            lambda i: self.window_.tabs.set_orientation(self.split_box.itemData(i)) if not self._loading else None)
+        page.row("Gruppen anordnen", self.split_box)
+        page.note("Ctrl+\\ teilt den Editor in zwei Tab-Gruppen; Tabs lassen sich per Drag zwischen den Gruppen "
+                  "ziehen, dieselbe Datei kann in beiden offen sein (ein Dokument, zwei Ansichten).")
+
         page.section("Wiki-Links")
         self.wiki_box = QCheckBox("[[Links]] hervorheben und auflösen (Ctrl+Klick öffnet)")
         self.wiki_box.toggled.connect(lambda on: (self.config.__setitem__("wiki_links", on), self.window_.tabs.relink_all()) if not self._loading else None)
@@ -402,6 +485,47 @@ class SettingsDialog(QDialog):
         else:
             page.section("Rechtschreibung")
             page.note("Noch nicht verfügbar.")
+        return page
+
+    def _build_lookup(self) -> SettingsPage:
+        page = SettingsPage()
+        cfg = self.config.setdefault("lookup", {})
+        page.section("Nachschlagen")
+        online = QCheckBox("Wikipedia und Wiktionary online abfragen")
+        online.setChecked(bool(cfg.get("online", True)))
+        online.toggled.connect(lambda on: cfg.__setitem__("online", on))
+        page.row("", online)
+        language = QComboBox()
+        for label, value in (("Automatisch (Sprache des Tabs)", "auto"), ("Deutsch", "de"), ("Englisch", "en")):
+            language.addItem(label, value)
+        language.setCurrentIndex(max(0, language.findData(cfg.get("language", "auto"))))
+        language.currentIndexChanged.connect(lambda i: cfg.__setitem__("language", language.itemData(i)))
+        page.row("Sprache", language)
+        thumbs = QCheckBox("Vorschaubilder in der Karte anzeigen (lädt ein Bild von upload.wikimedia.org)")
+        thumbs.setChecked(bool(cfg.get("thumbnails", False)))
+        thumbs.toggled.connect(lambda on: cfg.__setitem__("thumbnails", on))
+        page.row("", thumbs)
+        page.note("Rechtsklick auf ein Wort oder eine Markierung → Wikipedia (Ctrl+Alt+W) oder Wiktionary (Ctrl+Alt+T) "
+                  "zeigt eine kleine Karte, ein Klick darauf öffnet den Artikel im Browser. Notex fragt nur bei dieser "
+                  "Aktion, nie beim bloßen Markieren; wird nichts gefunden, versucht es die andere Sprache.")
+
+        page.section("Websuche")
+        engine = QComboBox()
+        for label, value in (("Google", "google"), ("DuckDuckGo", "duckduckgo"), ("Startpage", "startpage"),
+                             ("Eigene URL", "custom")):
+            engine.addItem(label, value)
+        engine.setCurrentIndex(max(0, engine.findData(cfg.get("engine", "google"))))
+        custom = QLineEdit(str(cfg.get("custom_url", "")))
+        custom.setPlaceholderText("https://suche.example.org/?q={q}")
+        custom.setToolTip("{q} wird durch den Suchbegriff ersetzt; ohne {q} wird ?q=Begriff angehängt")
+        custom.setEnabled(engine.currentData() == "custom")
+        engine.currentIndexChanged.connect(lambda i: (cfg.__setitem__("engine", engine.itemData(i)),
+                                                      custom.setEnabled(engine.itemData(i) == "custom")))
+        custom.editingFinished.connect(lambda: cfg.__setitem__("custom_url", custom.text().strip()))
+        page.row("Suchmaschine", engine)
+        page.row("Eigene URL", custom)
+        page.note("Ctrl+Alt+G öffnet nur den Browser mit der Suche – Notex selbst ruft dabei nichts ab. "
+                  "Aus verschlüsselten Notizen (.ntx) fragt Notex vor jedem Senden nach.")
         return page
 
     def _build_system(self) -> SettingsPage:
@@ -452,6 +576,17 @@ class SettingsDialog(QDialog):
         self.line_height_spin.setValue(theme["font"]["line_height"])
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
+        self.markdown_view_box.setCurrentIndex(max(0, self.markdown_view_box.findData(cfg.get("markdown_view", "edit"))))
+        tpl = cfg.get("templates", {})
+        self.week_folder_edit.setText(str(tpl.get("week_folder", "Wochen")))
+        self.week_name_edit.setText(str(tpl.get("week_name", "KW{{week}} {{year}}")))
+        self.autolock_spin.setValue(int(cfg.get("encryption", {}).get("auto_lock_minutes", 5)))
+        hist = cfg.get("history", {})
+        self.history_box.setChecked(bool(hist.get("enabled", True)))
+        self.history_spin.setValue(int(hist.get("max_mb", 200)))
+        self._update_history_size()
+        self.split_box.setCurrentIndex(max(0, self.split_box.findData(cfg.get("split", {}).get("orientation", "horizontal"))))
+        self.sync_scroll_box.setChecked(bool(cfg.get("preview_sync_scroll", True)))
         self.syntax_box.setChecked(bool(cfg.get("syntax_highlighting", True)))
         for ext, chip in self.syntax_chips.items():
             chip.setChecked(ext in cfg.get("syntax_extensions", []))
@@ -461,6 +596,23 @@ class SettingsDialog(QDialog):
         self.backlinks_box.setCurrentIndex(max(0, self.backlinks_box.findData(cfg.get("backlinks_position", "bottom"))))
         self._refresh_theme_list()
         self._loading = False
+
+    def _update_history_size(self) -> None:
+        history = getattr(self.window_, "history", None)
+        if history is None:
+            self.history_size.setText("")
+            return
+        size = history.object_bytes()
+        self.history_size.setText(f"Belegt: {size / 1024 / 1024:.1f} MB in {len(history.tracked_paths())} Dateien")
+
+    def _clear_history(self) -> None:
+        from notex.ui import dialogs
+        history = getattr(self.window_, "history", None)
+        if history is not None and dialogs.confirm(self, "Verlauf leeren", "Alle gespeicherten Versionen löschen?",
+                                                   yes="Löschen", danger=True,
+                                                   informative="Die Dateien selbst bleiben unverändert."):
+            history.clear()
+            self._update_history_size()
 
     def _refresh_theme_list(self) -> None:
         self.theme_list.clear()

@@ -47,7 +47,10 @@ class Editor(QTextEdit):
     link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
     completion_requested = Signal(str, str)   # ("file", Präfix) oder ("heading", Ziel) nach "[[" bzw. "#"
 
-    def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None) -> None:
+    def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None,
+                 share_with: "Editor | None" = None) -> None:
+        """`share_with`: zweite Ansicht desselben Dokuments (geteilter Editor) – gleicher Text, gleiches Undo,
+        gleicher Highlighter; nur Cursor, Scrollposition und Auswahl sind eigen."""
         super().__init__()
         self.path = path
         self.encoding = text_file.encoding
@@ -57,8 +60,17 @@ class Editor(QTextEdit):
         self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
         self.read_only = False
+        self.shared = share_with is not None
+        self.encrypted = str(path).lower().endswith(".ntx")   # verschlüsselte Notiz: Klartext nur im Speicher
+        self.key = None          # KeyState, solange entsperrt
+        self.locked = self.encrypted
         self.highlighter: SpellHighlighter | None = None
-        if checker is not None:
+        if share_with is not None:
+            self.setDocument(share_with.document())
+            self.highlighter = share_with.highlighter
+            if self.highlighter is not None:
+                self.highlighter.add_view(self)
+        elif checker is not None:
             self.highlighter = SpellHighlighter(self.document(), self, checker, markdown=path.suffix.lower() == ".md")
 
         self.setObjectName("Editor")
@@ -85,12 +97,20 @@ class Editor(QTextEdit):
         self.document().contentsChanged.connect(self._on_contents_changed)
         self.cursorPositionChanged.connect(self._refresh_extra_selections)
 
+        self._loaded_once = False
         self.set_font_size(font_size)
         self.load(text_file)
 
     # ---- Inhalt ---------------------------------------------------------------
     def load(self, text_file: TextFile) -> None:
         self.encoding, self.eol = text_file.encoding, text_file.eol
+        if self.shared and not self._loaded_once:
+            # zweite Ansicht: das Dokument hat schon Inhalt, Formate und Undo-Stack
+            self._loaded_once = True
+            self._update_margins()
+            self._refresh_extra_selections()
+            return
+        self._loaded_once = True
         self.setPlainText(text_file.text)
         self._apply_line_height()
         self._apply_hanging_indents()
@@ -572,16 +592,69 @@ class Editor(QTextEdit):
             return []
         return self.highlighter.issues_at(cursor.block(), cursor.positionInBlock())
 
+    context_menu_hook = None   # (editor, menu, term) -> None; setzt das Hauptfenster (Text + Nachschlagen)
+
+    def lookup_term(self) -> str:
+        """Suchbegriff: Markierung, sonst das Wort am Cursor – getrimmt, einzeilig, max. 200 Zeichen."""
+        from notex.core.lookup import prepare_term
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        return prepare_term(cursor.selectedText())
+
+    def term_rect(self) -> QRect:
+        """Bildschirm-Rechteck der Markierung bzw. des Worts am Cursor – Anker für die Nachschlage-Karte."""
+        cursor = QTextCursor(self.textCursor())
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        start, end = QTextCursor(cursor), QTextCursor(cursor)
+        start.setPosition(cursor.selectionStart())
+        end.setPosition(cursor.selectionEnd())
+        a, b = self.cursorRect(start), self.cursorRect(end)
+        if a.top() != b.top():                       # mehrzeilig: ganze Breite der Zeilen
+            rect = QRect(self.viewport().rect().left(), a.top(), self.viewport().width(), b.bottom() - a.top())
+        else:
+            rect = a.united(b)
+        clipped = rect.intersected(self.viewport().rect())
+        rect = clipped if not clipped.isEmpty() else rect
+        return QRect(self.viewport().mapToGlobal(rect.topLeft()), rect.size())
+
     def build_context_menu(self, pos) -> QMenu:
-        """Standardmenü, davor Vorschläge für ein markiertes Wort bzw. die Grammatik-Regel."""
-        cursor = self.cursorForPosition(pos)
-        issues = self.issues_at_cursor(cursor)
-        menu = style_menu(self.createStandardContextMenu(pos))
+        """Vorschläge (Rechtschreibung/Grammatik) oben, dann Bearbeiten, Text und Nachschlagen.
+        Rechtsklick außerhalb der Markierung setzt den Cursor dorthin – dann gilt das Wort unter dem Mauszeiger."""
+        from PySide6.QtGui import QKeySequence
+        click = self.cursorForPosition(pos)
+        current = self.textCursor()
+        inside = current.hasSelection() and current.selectionStart() <= click.position() <= current.selectionEnd()
+        if not inside:
+            self.setTextCursor(click)
+        issues = self.issues_at_cursor(click)
+        menu = style_menu(QMenu(self))
+        for issue in issues:
+            self._add_issue_actions(menu, None, click, issue)
         if issues:
-            first = menu.actions()[0] if menu.actions() else None
-            for issue in issues:
-                self._add_issue_actions(menu, first, cursor, issue)
-            menu.insertSeparator(first)
+            menu.addSeparator()
+
+        has_selection = self.textCursor().hasSelection()
+        writable = not self.isReadOnly()
+
+        def add(icon_name: str, text: str, shortcut, slot, enabled: bool) -> None:
+            action = QAction(icon(icon_name), text, menu)
+            if shortcut is not None:
+                action.setShortcut(QKeySequence(shortcut))
+                action.setShortcutVisibleInContextMenu(True)
+            action.setEnabled(enabled)
+            action.triggered.connect(slot)
+            menu.addAction(action)
+
+        add("scissors", "Ausschneiden", QKeySequence.StandardKey.Cut, self.cut, has_selection and writable)
+        add("copy", "Kopieren", QKeySequence.StandardKey.Copy, self.copy, has_selection)
+        add("clipboard-paste", "Einfügen", QKeySequence.StandardKey.Paste, self.paste, writable and self.canPaste())
+        add("trash", "Löschen", QKeySequence.StandardKey.Delete, lambda: self._grouped(lambda: self.textCursor().removeSelectedText()),
+            has_selection and writable)
+        add("scan-text", "Alles markieren", QKeySequence.StandardKey.SelectAll, self.selectAll, not self.document().isEmpty())
+        if self.context_menu_hook is not None:
+            self.context_menu_hook(self, menu, self.lookup_term())
         return menu
 
     def contextMenuEvent(self, event) -> None:
@@ -606,9 +679,10 @@ class Editor(QTextEdit):
                 action = QAction(suggestion, menu)
                 action.triggered.connect(lambda _c=False, s=suggestion: self._replace_issue(cursor, issue, s))
                 menu.insertAction(before, action)
-            add = QAction(icon("plus"), "Zum Wörterbuch hinzufügen", menu)
-            add.triggered.connect(lambda: (checker.add_to_dictionary(issue.word), self.highlighter.reset()))
-            menu.insertAction(before, add)
+            if not self.encrypted:   # user_dictionary.txt ist Klartext auf der Platte – nie aus .ntx-Notizen
+                add = QAction(icon("plus"), "Zum Wörterbuch hinzufügen", menu)
+                add.triggered.connect(lambda: (checker.add_to_dictionary(issue.word), self.highlighter.reset()))
+                menu.insertAction(before, add)
             ignore = QAction("In dieser Sitzung ignorieren", menu)
             ignore.triggered.connect(lambda: (checker.ignore_for_session(issue.word), self.highlighter.reset()))
             menu.insertAction(before, ignore)

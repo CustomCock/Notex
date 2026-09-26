@@ -11,11 +11,19 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+if os.environ.get("QT_QPA_PLATFORM", "offscreen") == "offscreen":
+    # Virtueller Full-HD-Bildschirm: sonst ist er 800×600 und Qt kürzt lange Menüs auf diese Höhe
+    import json as _json
+    import tempfile as _tempfile
+    _screens = Path(_tempfile.gettempdir()) / "notex-offscreen-screens.json"
+    _screens.write_text(_json.dumps({"screens": [{"name": "shot", "x": 0, "y": 0, "width": 1920, "height": 1080,
+                                                   "logicalDpi": 96, "dpr": 1}]}), encoding="utf-8")
+    os.environ["QT_QPA_PLATFORM"] = f"offscreen:configfile={_screens}"
 if os.environ.get("NOTEX_SCALE"):
     os.environ["QT_SCALE_FACTOR"] = os.environ["NOTEX_SCALE"]
 
@@ -98,7 +106,20 @@ WIKI_SAMPLE = (
     "Kaputter Link: [[gibt-es-nicht]].\n\n```python\nprint([[kein]])  # in Codeblöcken zählen Links nicht\n```\n"
 )
 
+PREVIEW_SAMPLE = (
+    "# Wochenplan\n\nSiehe [[osint-checkliste|OSINT]] und die [Python-Notizen](../Python/notizen.md#Pathlib).\n\n"
+    "## Aufgaben\n\n- [x] Rechtschreibprüfung testen\n- [ ] Release taggen\n- [ ] Screenshots erneuern\n\n"
+    "## Notizen\n\n> Portabel heißt: alles neben der EXE, nichts in AppData.\n\n"
+    "| Version | Inhalt |\n|---|---|\n| 1.1 | Wiki-Links, Syntax |\n| 1.2 | Vorschau, Split View |\n\n"
+    "```python\nfrom pathlib import Path\nroot = Path(__file__).resolve().parent\n```\n\n"
+    "![Logo](https://example.org/logo.png)\n"
+)
+
 SAMPLE = {
+    "Projekte/Notex/nachschlagen.md": (
+        "# Wörter zum Nachschlagen\n\nSerendipität ist ein schönes Wort für glückliche Zufallsfunde.\n\n"
+        "Ein Haus am Fluss, eine Bank im Park.\n"),
+    "Projekte/Notex/vorschau.md": PREVIEW_SAMPLE,
     "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
     "Projekte/Python/snippets.py": CODE_SAMPLE,
     "Projekte/Notex/server.log": LOG_SAMPLE,
@@ -130,6 +151,11 @@ def write_sample() -> None:
 
 
 def save(widget, name: str) -> None:
+    # Die Schritte sind vorab getaktet; läuft einer lang, feuert der nächste sofort – dann nicht mitten
+    # in einer Tab-Überblendung aufnehmen
+    from notex.ui.editor_tabs import FadeOverlay
+    for fade in widget.window().findChildren(FadeOverlay):
+        fade.hide()
     pixmap = widget.grab()
     pixmap.save(str(OUT / f"{name}.png"))
     print("gespeichert:", OUT / f"{name}.png")
@@ -137,6 +163,12 @@ def save(widget, name: str) -> None:
 
 def compose(window, popup, name: str, offset: QPoint) -> None:
     """Fenster + Popup (Menü) in ein Bild zeichnen, weil offscreen kein Screen-Grab geht."""
+    from notex.ui.editor_tabs import FadeOverlay
+    for fade in window.findChildren(FadeOverlay):
+        fade.hide()
+    # Popup ganz ins Bild holen (exec() würde es am Bildschirmrand ebenso verschieben)
+    size = popup.size().expandedTo(popup.sizeHint())
+    offset = QPoint(min(offset.x(), window.width() - size.width() - 8), min(offset.y(), window.height() - size.height() - 8))
     base = window.grab().toImage()
     top = popup.grab().toImage()
     painter = QPainter(base)
@@ -293,7 +325,105 @@ def main() -> int:
         later(2100, lambda: save(window, "24-syntax-python"))
         later(2200, lambda: window.tabs.open_file(data / "Projekte/Notex/server.log"))
         later(2600, lambda: save(window, "25-syntax-log"))
-        later(2700, lambda: (window.close(), app.quit()))
+        # v1.2: Markdown-Vorschau geteilt
+        later(2700, lambda: (window.tabs.open_file(data / "Projekte/Notex/vorschau.md"), window.set_preview_mode("split")))
+        later(3300, lambda: save(window, "26-markdown-preview"))
+        later(3400, lambda: (window.set_preview_mode("edit"), window.tabs.open_file(data / "Projekte/Python/notizen.md"),
+                             window.tabs.split(), window.tabs.open_file(data / "Projekte/Python/snippets.py")))
+        later(4000, lambda: save(window, "27-split-view"))
+        # v1.2: Ersetzen in Dateien
+        later(4100, lambda: (window.tabs.unsplit(), window.sidebar.search_field.setText("portabel"),
+                             window.open_replace_in_files(), window._replace_dialog.replace_field.setText("portable")))
+        later(5000, lambda: save(window._replace_dialog, "28-replace-in-files"))
+        # v1.3: Versionsverlauf
+        def open_history():
+            from notex.ui.history_dialog import HistoryDialog
+            window._replace_dialog.close()
+            target = data / "Projekte/Notex/README.md"
+            editor = window.tabs.open_file(target)
+            rel = window.tabs.relative(target)
+            window.history.snapshot(rel, editor.toPlainText().replace("- schnell", "- schnell\n- klein"), now=time.time() - 3 * 86400)
+            window.history.snapshot(rel, editor.toPlainText().replace("ruhig", "leise"), now=time.time() - 7200)
+            window.history.snapshot(rel, editor.toPlainText(), now=time.time() - 60)
+            editor.insert_text("Neuer Absatz, noch nicht gespeichert.\n\n")
+            window._shot_history = HistoryDialog(window, window.history, rel, editor.toPlainText())
+            window._shot_history.list.setCurrentRow(1)
+            window._shot_history.show()
+        later(5100, open_history)
+        later(5700, lambda: save(window._shot_history, "29-history"))
+        def open_locked():
+            from notex.core import crypto_notes
+            window._shot_history.close()
+            window.tabs.current_editor().document().setModified(False)
+            target = data / "Security/zugangsdaten.ntx"
+            key = crypto_notes.new_key("screenshot", crypto_notes.KDF_SCRYPT, (10, 8, 1))
+            target.write_bytes(crypto_notes.seal("nur ein Beispiel", key))
+            window.tabs.open_file(target)
+        later(5800, open_locked)
+        later(6400, lambda: save(window, "30-encrypted-locked"))
+        later(6500, lambda: window.new_week())
+        later(7000, lambda: save(window, "31-new-week"))
+        def open_update():
+            from notex.core.update_check import Release
+            from notex.ui.update_service import UpdateDialog
+            release = Release((1, 5, 0), "v1.5.0", "Notex 1.5.0", "https://github.com/CustomCock/Notex/releases/tag/v1.5.0",
+                              "2026-10-10T10:00:00Z", "## Neu\n- Beispielhafte Versionshinweise\n- Noch ein Punkt\n\n"
+                              "**Full Changelog**: v1.4.0...v1.5.0")
+            window._shot_update = UpdateDialog(window, release)
+            window._shot_update.show()
+        later(7100, open_update)
+        later(7500, lambda: save(window._shot_update, "32-update"))
+        # v1.5: Kontextmenü und Nachschlage-Karte (vorbereitete Ergebnisse, kein Netz)
+        def lookup_shots():
+            from notex.core import lookup as lk
+            window._shot_update.close()
+            editor = window.tabs.open_file(data / "Projekte/Notex/nachschlagen.md")
+            QApplication.processEvents()
+            found = editor.document().find("Serendipität")
+            editor.setTextCursor(found)
+            menu = editor.build_context_menu(editor.cursorRect(found).center())
+            menu.show()
+            origin = editor.viewport().mapTo(window, editor.cursorRect(found).bottomRight())
+            compose(window, menu, "33-context-menu", origin + QPoint(4, 4))
+            menu.close()
+            card = window._lookup_card()
+            window._shot_card = card
+            anchor = editor.term_rect()
+            summary = lk.Summary("wikipedia", "de", "Serendipität", "glücklicher Zufallsfund",
+                                 "Serendipität bezeichnet eine zufällige Beobachtung von etwas ursprünglich nicht "
+                                 "Gesuchtem, das sich als neue und überraschende Entdeckung erweist. Der Begriff geht "
+                                 "auf das persische Märchen „Die drei Prinzen von Serendip“ zurück, das Horace Walpole "
+                                 "1754 in einem Brief erwähnte. In der Wissenschaftsgeschichte gelten die Entdeckung des "
+                                 "Penicillins und der Röntgenstrahlung als bekannte Beispiele.",
+                                 "https://de.wikipedia.org/wiki/Serendipit%C3%A4t")
+            card.show_result("wikipedia", "Serendipität", summary, anchor, ["de", "en"])
+            later_rel(300, lambda: compose_card(card, "34-lookup-wikipedia"))
+            definition = lk.Definition("wiktionary", "de", "Haus", "Deutsch", [lk.PartOfSpeech("Substantiv", [
+                "Gebäude, das Menschen zum Wohnen dient", "(übertragen): alle Bewohner eines Hauses",
+                "(Astrologie): einer der zwölf Abschnitte des Tierkreises", "Dynastie, Adelsgeschlecht",
+                "(Theater): Spielstätte", "Firma, Unternehmen", "Parlament, Kammer"])],
+                "haʊ̯s, Plural ˈhɔɪ̯zɐ", "mittelhochdeutsch hūs, althochdeutsch hūs", "https://de.wiktionary.org/wiki/Haus")
+            later_rel(500, lambda: card.show_result("wiktionary", "Haus", definition, anchor, ["de", "en"]))
+            later_rel(800, lambda: compose_card(card, "35-lookup-wiktionary"))
+            disamb = lk.Disambiguation("wikipedia", "de", "Bank", [
+                ("Bank (Möbel)", "eine Sitzgelegenheit für mehrere Personen"),
+                ("Bank (Kreditinstitut)", "ein Unternehmen, das Geldgeschäfte betreibt"),
+                ("Sandbank", "eine Erhebung im Meer"), ("Werkbank", "ein Arbeitstisch"),
+                ("Bank (Einheit)", "eine Speichereinheit")], "https://de.wikipedia.org/wiki/Bank")
+            later_rel(1000, lambda: card.show_result("wikipedia", "Bank", disamb, anchor, ["de", "en"]))
+            later_rel(1300, lambda: compose_card(card, "36-lookup-disambiguation"))
+            later_rel(1500, lambda: card.show_error("wikipedia", "Serendipität", "offline", anchor))
+            later_rel(1800, lambda: compose_card(card, "37-lookup-error"))
+            later_rel(2000, lambda: (card.close(), window.close(), app.quit()))
+
+        def compose_card(card, name):
+            origin = window.mapFromGlobal(card.geometry().topLeft())
+            compose(window, card, name, origin)
+
+        def later_rel(ms, fn):
+            QTimer.singleShot(ms, fn)
+
+        later(7600, lookup_shots)
 
     later(500, s_empty)
     later(60000, app.quit)

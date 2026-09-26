@@ -10,8 +10,15 @@ keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich
 3. `Notex.exe` starten. Beim ersten Start entstehen `data/` und `config.json` daneben.
 
 Mehr ist nicht nötig. SmartScreen warnt beim ersten Start, weil die EXE nicht signiert ist:
-„Weitere Informationen“ → „Trotzdem ausführen“. Ein Update ist ein Ersetzen von `Notex.exe`
-und `_internal/`; `data/`, `config.json`, `themes/` und `fonts/user/` bleiben liegen.
+„Weitere Informationen“ → „Trotzdem ausführen“. Die ZIP bitte komplett entpacken, nicht die
+`Notex.exe` direkt aus dem ZIP-Fenster starten: Windows legt sie dann in einen Temp-Ordner, und
+Notizen würden dort landen (Notex warnt in dem Fall beim Start).
+
+**Update:** Notex schließen, im bestehenden Ordner `Notex.exe` und `_internal/` durch die aus der
+neuen ZIP ersetzen (`licenses/`, `docs/`, `LICENSE`, `CHANGELOG.md` gleich mit). `data/`, `history/`,
+`templates/`, `config.json`, `themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
+neu entpackt, bekommt beim nächsten Start die Frage, ob die Windows-Dateizuordnung auf den neuen
+Pfad gesetzt werden soll (auch später möglich unter Einstellungen → System → „Pfad aktualisieren“).
 
 ![Editor mit geöffneter Datei](docs/03-editor.png)
 
@@ -30,7 +37,8 @@ Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche ent
 
 - **Verzeichnisbaum** von `data/` links, Dateien per Klick im Editor öffnen, mehrere Tabs
 - **Suche** (Ctrl+Shift+F): rekursiv, case-insensitive, nach Dateiname und/oder Volltext,
-  läuft im Hintergrund-Thread, Klick auf einen Treffer springt in die Zeile
+  läuft im Hintergrund-Thread, Klick auf einen Treffer springt in die Zeile. Filter, Regex und
+  „Ganzes Wort“ siehe [Suche und Ersetzen in Dateien](#suche-und-ersetzen-in-dateien)
 - **Editor**: weißes Blatt auf dunklem Tisch, Zeilennummern, aktuelle Zeile hervorgehoben,
   Suchen/Ersetzen (Ctrl+F / Ctrl+H), Zoom (Ctrl+Mausrad, Ctrl+Plus/Minus)
 - **Bearbeitungsleiste** über dem Blatt (Ctrl+Shift+E): Verlauf, Suchen, Textschrift, Ansicht,
@@ -49,6 +57,28 @@ Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche ent
   Zoom, Blatt-Modus, Bearbeitungsleiste, Zeilennummern, Such-Chips, Theme, zuletzt geöffnet
 - **Design**: matt schwarz/grau, das Blatt weiß und zentriert (Alt+P schaltet auf volle Breite),
   ein einziger dezenter Akzent, kurze Animationen (abschaltbar unter Ansicht)
+
+## Linux
+
+Seit 1.4 gibt es auch einen Linux-Build: `Notex-vX.Y.Z-linux-x86_64.tar.gz` aus den Releases, gebaut auf
+Ubuntu 22.04 (läuft auf Distributionen mit glibc ≥ 2.35, z. B. Ubuntu 22.04+, Debian 12, Fedora 36+).
+
+```bash
+tar -xzf Notex-v1.4.0-linux-x86_64.tar.gz -C ~/Apps
+~/Apps/Notex/Notex
+```
+
+- Portabel wie unter Windows: `data/`, `config.json`, `history/`, `templates/` liegen neben der Datei `Notex`.
+- Qt braucht auf manchen Systemen noch `libxcb-cursor0` (Ubuntu/Debian: `sudo apt install libxcb-cursor0`).
+- Rechtschreibung nutzt Enchant/Hunspell des Systems, falls installiert (`libenchant-2-2`), sonst das
+  eingebaute spylls mit den mitgelieferten Wörterbüchern.
+- **Einstellungen → System → „Im Anwendungsmenü registrieren“** legt `notex.desktop`, den MIME-Typ für
+  `.ntx` und das Icon in `~/.local/share` an – kein root, nichts systemweit. Danach steht Notex im Menü und
+  unter „Öffnen mit“. Standardprogramm wird es nur, wenn man es selbst festlegt
+  (`xdg-mime default notex.desktop text/plain`). Nach dem Verschieben des Ordners fragt Notex beim Start
+  nach und registriert neu.
+- Die Windows-Dateizuordnung, die dunkle Titelleiste und die Taskleisten-Gruppierung sind Windows-only und
+  werden unter Linux übersprungen.
 
 ## Dateien von außen und Dateizuordnung
 
@@ -106,6 +136,163 @@ Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Tex
 „verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt Notex „X Links in Y
 Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
 offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
+
+## Suche und Ersetzen in Dateien
+
+Das Suchfeld links versteht eine kleine Abfragesprache:
+
+| Eingabe | Bedeutung |
+|---|---|
+| `apfel kuchen` | beide Wörter müssen in derselben Zeile stehen (bzw. im Dateinamen) |
+| `"grüne birne"` | genaue Phrase mit Leerzeichen |
+| `ext:md` oder `ext:md,txt` | nur diese Endungen (auch welche, die nicht im Baum stehen) |
+| `path:projekte` | nur Pfade, die „projekte“ enthalten |
+| `-path:archiv` | Pfade mit „archiv“ ausschließen |
+
+Die Chips unter dem Feld schalten **`.*`** (regulärer Ausdruck, Python-Syntax) und **Wort** (nur ganze
+Wörter) zu. Eine ungültige Regex bekommt einen roten Rahmen und die Fehlermeldung als Tooltip. Jeder
+Regex-Treffer hat ein Zeitlimit von 0,25 s pro Zeile, damit ein Muster wie `(a|a)+$` Notex nicht
+einfriert; die Suche bricht dann mit „Timeout“ ab.
+
+**Ctrl+Shift+H** öffnet „Ersetzen in Dateien“: gleicher Suchbegriff, Ersatztext (bei Regex mit `\1` für
+Gruppen), darunter jede betroffene Zeile als *vorher → nachher* mit Häkchen. Ersetzt wird nur, was
+angekreuzt ist. Offene Dateien mit ungespeicherten Änderungen werden im Editor ersetzt (rückgängig
+machbar, nicht gespeichert), offene gespeicherte Dateien werden danach gespeichert, alle anderen
+atomar mit ihrem Encoding und Zeilenende geschrieben.
+
+![Ersetzen in Dateien](docs/28-replace-in-files.png)
+
+## Versionsverlauf
+
+Jedes Speichern legt einen Schnappschuss in `history/` neben der App ab (komprimiert, gleiche Inhalte
+nur einmal). Auch das Öffnen, Neuladen nach externer Änderung, „Ersetzen in Dateien“ und das
+Anpassen von Links sichern den vorherigen Stand. **Ctrl+Shift+Y** zeigt die Versionen der aktuellen
+Datei mit farbigem Diff zum aktuellen Text; „Wiederherstellen“ ersetzt den Editor-Text als ein
+Undo-Schritt und speichert nicht.
+
+- Umbenennen und Verschieben im Baum nehmen den Verlauf mit.
+- Ausdünnung: 24 h alles, bis 7 Tage stündlich, bis 30 Tage täglich, bis 1 Jahr wöchentlich, danach
+  monatlich; die neueste Version bleibt immer.
+- Obergrenze (Standard 200 MB) und „Verlauf leeren“ unter Einstellungen → Editor.
+- Verschlüsselte Notizen (`.ntx`) bekommen nie einen Verlauf, externe Dateien außerhalb von `data/`
+  ebenfalls nicht.
+
+![Versionsverlauf](docs/29-history.png)
+
+## Vorlagen und „Neue Woche“
+
+Vorlagen sind `.md`- oder `.txt`-Dateien in `templates/` neben der App. Beim ersten Benutzen legt Notex
+drei an: Woche, Tagesnotiz, Besprechung. **Ctrl+Shift+T** erzeugt eine neue Datei aus einer Vorlage im
+gewählten Ordner; jede Vorlage steht auch als „Vorlage: …“ in der Command Palette.
+
+| Platzhalter | Ergebnis |
+|---|---|
+| `{{date}}` / `{{date:%Y-%m-%d}}` | 26.09.2026 / beliebiges strftime-Format |
+| `{{time}}` | 14:05 |
+| `{{weekday}}` | Samstag |
+| `{{week}}` / `{{year}}` | ISO-Kalenderwoche (zweistellig) / Jahr (mit `{{week}}` das ISO-Jahr) |
+| `{{title}}` | Name der neuen Datei ohne Endung |
+| `{{cursor}}` | hier steht der Cursor danach |
+| `{{date+1}}`, `{{weekday+2}}` | Tagesversatz, z. B. für Wochenpläne |
+
+**Alt+W** („Neue Woche“) legt in `data/Wochen/` den Plan der aktuellen ISO-Woche an, z. B.
+`KW39 2026.md` mit Montag bis Freitag samt Datum; gibt es ihn schon, wird er geöffnet. „Nächste Woche
+anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter Einstellungen → Editor ein.
+
+![Neue Woche](docs/31-new-week.png)
+
+## Nachschlagen
+
+Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
+Kontextmenü mit Rechtschreib-/Grammatikvorschlägen (falls vorhanden), Bearbeiten (Ausschneiden, Kopieren,
+Einfügen, Löschen, Alles markieren), Text (GROSS, klein, Wortanfänge groß, bei `.md` zusätzlich Fett,
+Kursiv, Code, Link – dieselben Aktionen wie in der Bearbeitungsleiste) und Nachschlagen:
+
+- **Wikipedia: „Begriff“** (Ctrl+Alt+W) und **Wiktionary: „Begriff“** (Ctrl+Alt+T) zeigen eine kleine
+  Karte direkt unter (bei Platzmangel über) der Markierung: Quelle, Titel, Kurzbeschreibung und Auszug bzw.
+  Wortart, Bedeutungen, Aussprache (IPA) und Herkunft. Ein Klick irgendwo auf die Karte öffnet den Artikel im
+  Browser; unten wechselt „Wiktionary“/„Wikipedia“ die Quelle in derselben Karte. Unscharfe Begriffe laufen
+  über die Suche, Begriffsklärungen erscheinen als anklickbare Liste. Esc, Klick daneben oder × schließt.
+- **Bei Google suchen: „Begriff“** (Ctrl+Alt+G) öffnet nur den Browser – Notex ruft dabei nichts ab. Statt
+  Google lassen sich DuckDuckGo, Startpage oder eine eigene URL mit `{q}` einstellen.
+
+Nachgeschlagen wird nur bei dieser ausdrücklichen Aktion, nie beim bloßen Markieren, über die offiziellen
+Wikimedia-APIs (keine KI, kein Scraping) mit eigenem User-Agent, eine Anfrage nach der anderen, 5 s Timeout,
+Ergebnisse pro Sitzung zwischengespeichert. Sprache ist die Rechtschreib-Sprache des Tabs; findet sich nichts,
+versucht Notex die andere (Deutsch/Englisch). Offline, „nicht gefunden“ oder zu viele Anfragen zeigt die
+Karte selbst an, jeweils mit „Bei Google suchen ↗“ als Ausweg. Aus verschlüsselten Notizen (`.ntx`) fragt
+Notex vor jedem Senden nach („In dieser Sitzung nicht mehr fragen“ möglich). Einstellungen → Nachschlagen:
+online an/aus, Sprache (Automatisch/Deutsch/Englisch), Vorschaubilder (Standard aus), Suchmaschine.
+
+| Kontextmenü | Wikipedia | Wiktionary |
+|---|---|---|
+| ![Kontextmenü](docs/33-context-menu.png) | ![Wikipedia-Karte](docs/34-lookup-wikipedia.png) | ![Wiktionary-Karte](docs/35-lookup-wiktionary.png) |
+
+| Begriffsklärung | Fehler |
+|---|---|
+| ![Begriffsklärung](docs/36-lookup-disambiguation.png) | ![Fehlerzustand](docs/37-lookup-error.png) |
+
+**Warum Wiktionary über die Action-API?** Die REST-Definition-API gibt es nur auf en.wiktionary und sie
+liefert weder Herkunft noch Aussprache. `action=parse&prop=wikitext` gibt es auf beiden Wikis gleich; Notex
+liest daraus Wortarten, Bedeutungen, IPA und Herkunft und wandelt das Wiki-Markup in lesbaren Text um.
+
+## Updates
+
+Notex sieht höchstens einmal am Tag in der öffentlichen Release-Liste auf GitHub nach, ob es eine neuere
+Version gibt, und zeigt dann einen Hinweis. **Es wird nie etwas heruntergeladen oder installiert.**
+„Hilfe › Nach Updates suchen …“ prüft sofort und zeigt die Versionshinweise; „Release-Seite öffnen“
+öffnet den Browser, „Diese Version überspringen“ schweigt bis zur nächsten. Abschalten unter
+Einstellungen → System. Übertragen wird nur die normale HTTPS-Anfrage an api.github.com (IP-Adresse,
+User-Agent `Notex/<Version>`), keine Kennung und keine Nutzungsdaten.
+
+![Update verfügbar](docs/32-update.png)
+
+## Verschlüsselte Notizen
+
+Dateien mit der Endung `.ntx` sind mit einem Passwort verschlüsselt: AES-256-GCM, der Schlüssel entsteht
+per Argon2id aus dem Passwort, alles über die Bibliothek `cryptography`, keine eigene Kryptografie. Beim
+Öffnen zeigt der Tab einen Sperrbildschirm, nach dem Passwort erscheint der Text. Gespeichert wird nur
+Chiffretext, jedes Mal mit neuer Nonce.
+
+- **Neue verschlüsselte Notiz** (Ctrl+Shift+Alt+N) oder im Baum eine Datei `name.ntx` anlegen
+- **Datei verschlüsseln …** macht aus einer offenen Datei eine `.ntx`, löscht ihren Verlauf und bietet
+  an, das Original in den Papierkorb zu legen
+- **Ctrl+Shift+L** sperrt alle offenen `.ntx` sofort, automatisch nach 5 Minuten ohne Eingabe
+  (einstellbar); ungespeicherte Änderungen werden vorher verschlüsselt gesichert
+- **Passwort ändern …** im Menü Datei
+- Klartext kommt nie auf die Platte: kein Verlauf, keine Volltextsuche, kein Link-Index, keine
+  Grammatikprüfung, kein Wörterbuch-Eintrag. Dateinamen sind **nicht** verschlüsselt.
+
+Ohne Passwort gibt es keinen Weg zurück. Format, Parameter und Grenzen stehen in
+[docs/ENCRYPTION.md](docs/ENCRYPTION.md).
+
+![Verschlüsselte Notiz, gesperrt](docs/30-encrypted-locked.png)
+
+## Markdown-Vorschau
+
+`Ctrl+Shift+V` wechselt bei `.md`-Dateien zwischen Bearbeiten, Vorschau und geteilter Ansicht (Blatt links,
+gerendertes Markdown rechts, Scrollen synchron). Die Vorschau ist bewusst zurückhaltend:
+
+- Kein JavaScript, kein rohes HTML aus der Datei, keine Netzverbindung ohne Klick. Externe Bilder erscheinen
+  als „Bild laden“, externe Links öffnen den Browser erst beim Anklicken.
+- Aufgaben `- [ ]` lassen sich in der Vorschau anhaken, die Datei wird sofort geändert.
+- `[[Wiki-Links]]`, relative Links (`ordner/notiz.md#Abschnitt`) und `#Anker` funktionieren.
+- Codeblöcke (```python usw.) bekommen die Syntax-Farben des Themes, Tabellen und ~~Durchstreichen~~ werden gerendert.
+
+Einstellungen → Editor legt fest, wie `.md`-Dateien öffnen (Bearbeiten, Vorschau, Geteilt) und ob die
+Vorschau mitscrollt.
+
+![Markdown-Vorschau](docs/26-markdown-preview.png)
+
+## Split View
+
+`Ctrl+\` teilt den Editor in zwei Tab-Gruppen, die aktuelle Datei erscheint in beiden (ein Dokument, zwei
+Ansichten, gemeinsames Undo). Tabs lassen sich per Drag zwischen den Gruppen ziehen; wird ein Tab am
+rechten oder unteren Rand abgelegt, entsteht die zweite Gruppe. `Ctrl+Alt+\` stellt die Gruppen
+untereinander statt nebeneinander, `Ctrl+Alt+→` verschiebt den Tab in die andere Gruppe. Schließt der
+letzte Tab einer Gruppe, verschwindet sie. Die Aufteilung überlebt einen Neustart.
+
+![Split View](docs/27-split-view.png)
 
 ## Syntax-Highlighting
 
@@ -261,6 +448,16 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+B | Seitenleiste ein-/ausklappen |
 | Ctrl+Shift+F | Suche in Dateien (Esc leert sie) |
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
+| Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
+| Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
+| Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
+| Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
+| Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
+| Ctrl+Alt+W | Wikipedia zur Markierung (Karte) |
+| Ctrl+Alt+T | Wiktionary zur Markierung (Karte) |
+| Ctrl+Alt+G | Websuche zur Markierung (nur Browser) |
+| Hilfe › Nach Updates suchen | Update-Check sofort (kein Kürzel, auch in der Command Palette) |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |
@@ -268,6 +465,11 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+Shift+K | Backlinks-Panel |
+| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt |
+| Ctrl+\ | Editor teilen / Teilung aufheben |
+| Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |
+| Ctrl+Alt+→ | Tab in andere Gruppe verschieben |
+| Ctrl+Alt+Shift+→ | Datei auch in anderer Gruppe öffnen |
 | Ctrl+Klick | Wiki-Link öffnen (bzw. Ziel anlegen) |
 | Ctrl+, | Einstellungen |
 | Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |
@@ -282,11 +484,15 @@ Notex/
   Notex.exe
   _internal/      <- Python + Qt, nicht anfassen
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
-  config.json     <- Einstellungen und Zustand (wird beim Beenden geschrieben)
+  history/        <- Versionsverlauf (entsteht beim ersten Speichern, darf gelöscht werden)
+  templates/      <- Vorlagen (.md/.txt), beim ersten Benutzen mit drei Beispielen angelegt
+  config.json     <- Einstellungen und Zustand (wird jede Sekunde bei Änderung gesichert)
+  themes/, fonts/user/, user_dictionary.txt   <- eigene Themes, Schriften, Wörterbuch (optional)
+  licenses/, docs/ENCRYPTION.md, LICENSE, THIRD_PARTY_LICENSES.md, CHANGELOG.md
 ```
 
 Welche Dateiendungen im Baum erscheinen, steht in `config.json` unter `extensions`
-(Default: `.txt .md .log .csv .json .py .ini .sh .ps1 .bat .yaml .yml .xml .html .css .js .sql`). `fulltext_max_mb` begrenzt die Dateigröße
+(Default: `.txt .md .log .csv .json .py .ini .sh .ps1 .bat .yaml .yml .xml .html .css .js .sql .ntx`). `fulltext_max_mb` begrenzt die Dateigröße
 für die Volltextsuche (Default 5 MB).
 
 ## Bekannte Einschränkungen
@@ -298,6 +504,23 @@ für die Volltextsuche (Default 5 MB).
 - Sehr große Dateien (mehrere hundert MB) sind nicht das Ziel; getestet sind 5-MB-Logdateien.
 - Rechtschreibung kennt nur Deutsch und Englisch; weitere Hunspell-Wörterbücher lassen sich nach
   `notex/dictionaries/` legen, werden aber nicht in der Oberfläche angeboten.
+- Die Markdown-Vorschau nutzt Qts Rich-Text-Engine, kein Browser: CSS wird nur teilweise
+  unterstützt (z. B. keine abgerundeten Codeblöcke, keine Fußnoten, kein Mermaid/LaTeX).
+  Scroll-Sync arbeitet proportional, nicht zeilengenau.
+- Der geteilte Editor hat höchstens zwei Gruppen.
+- Regex-Timeout gilt pro Zeile; eine Suche über viele Dateien mit einem gerade noch schnellen
+  Muster kann trotzdem einige Sekunden dauern (sie läuft im Hintergrund und ist abbrechbar).
+- Verschlüsselte Notizen schützen den Inhalt, nicht Dateinamen, Ordner, Größe oder Änderungszeit.
+  Entsperrter Text steht im Arbeitsspeicher und kann vom Betriebssystem ausgelagert werden; wer das
+  ausschließen will, braucht zusätzlich BitLocker o. Ä. Details in [docs/ENCRYPTION.md](docs/ENCRYPTION.md).
+- Der Versionsverlauf liegt unverschlüsselt in `history/` (für normale Dateien gewollt). Wer eine Datei
+  später verschlüsselt, sollte „Datei verschlüsseln“ benutzen – das löscht ihren Verlauf.
+- Die Schlüsselableitung (Argon2id, 64 MiB) braucht beim Entsperren je nach Rechner 0,2–1 s.
+- Der Linux-Build ist auf Ubuntu 22.04 gebaut und in CI getestet; Wayland/X11-Eigenheiten einzelner
+  Desktops (Fensterposition, Einzelinstanz-Fokus) können abweichen. macOS wird nicht unterstützt.
+- Der Update-Check fragt api.github.com; ohne Netz oder bei GitHub-Rate-Limit bleibt er still.
+- Nachschlagen: Das Wiktionary-Format ist Wikitext mit vielen Vorlagen; seltene Vorlagen werden weggelassen
+  statt übersetzt, einzelne Bedeutungen können dadurch knapper ausfallen als auf der Webseite.
 
 ## Entwicklung
 
@@ -312,6 +535,11 @@ pip install -r requirements-dev.txt
 python main.py
 ```
 
+Lokaler Build: `build.bat` legt die venv an, installiert alles und ruft `python build.py` auf.
+`build.py` bricht ab, wenn PySide6 & Co. im verwendeten Python fehlen, denn PyInstaller würde
+sonst stumm eine Exe ohne Qt erzeugen. Immer denselben Interpreter für `pip install` und den
+Build nehmen (`py -3.12 -m pip …` und `py -3.12 build.py`).
+
 Im Dev-Modus liegen `data/` und `config.json` im Projektordner (beide in `.gitignore`).
 
 ### Tests
@@ -320,9 +548,12 @@ Im Dev-Modus liegen `data/` und `config.json` im Projektordner (beide in `.gitig
 python -m pytest
 ```
 
-Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche, Encoding-Erkennung,
-atomares Speichern, Config und Theme-Dateien (auch kaputte), Rechtschreibregeln und
--Backends sowie den LanguageTool-Client gegen einen Fake-Server.
+Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche (Abfragesprache, Regex,
+Timeout, Ersetzen), Encoding-Erkennung, atomares Speichern, Config und Theme-Dateien (auch
+kaputte), Rechtschreibregeln und -Backends, den LanguageTool-Client gegen einen Fake-Server,
+Fuzzy-Suche, Wiki-Links, Syntax-Lexing, Markdown-Renderer mit Sanitizer, den Zustand des
+geteilten Editors, den Versionsverlauf und das Format der verschlüsselten Notizen (Roundtrip,
+falsches Passwort, Manipulation, Nonce, Formatversion).
 
 ### Design-System
 
@@ -340,15 +571,19 @@ main.py                 Einstieg
 notex/
   paths.py              App-Ordner ermitteln (EXE-Ordner bzw. Projektordner)
   app.py                QApplication, Theme, Hauptfenster
-  core/                 Qt-frei: config, encoding, fileops, search, theme_model,
-                        theme_store, spell, spell_rules, grammar
-  ui/                   Fenster und Widgets (Baum, Tabs, Blatt, Suche, Statusleiste, Toast,
-                        Einstellungen, Rechtschreib-Highlighter, Grammatik-Service)
+  core/                 Qt-frei: config, encoding, fileops, search, theme_model, theme_store,
+                        spell, spell_rules, grammar, text_ops, fuzzy, actions, file_index,
+                        wikilinks, syntax, markdown, split_state, history, crypto_notes,
+                        templates, update_check, linux_desktop, lookup, recent, ipc, winreg_assoc
+  ui/                   Fenster und Widgets (Baum, Tabs, Editorgruppen, Blatt, Vorschau, Suche,
+                        Ersetzen in Dateien, Versionsverlauf, Sperrbildschirm, Palette,
+                        Backlinks, Statusleiste, Toast,
+                        Einstellungen, Highlighter, Grammatik-Service)
   dictionaries/         Hunspell-Wörterbücher de_DE, en_US (mit Lizenzen)
   theme/                tokens.py, dark.qss, Fonts- und Icon-Lader
   assets/               App-Icon, Fonts, Lucide-Icons (mit Lizenzen)
 tools/                  make_icon.py, screenshot.py
-docs/                   Screenshots
+docs/                   Screenshots, ENCRYPTION.md
 tests/                  pytest
 build.py / build.bat    PyInstaller-Build
 .github/workflows/      Tests bei jedem Push, Release-Build bei Tag v*
@@ -366,10 +601,14 @@ Diesen Ordner kannst du komplett kopieren, z. B. auf einen USB-Stick.
 ## Release über GitHub Actions
 
 Ein annotiertes Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut
-die App auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
+die App auf `windows-latest` (ZIP) und `ubuntu-22.04` (tar.gz) und hängt beides an ein GitHub-Release.
 Die Version steht zentral in `notex/__init__.py` und muss zum Tag passen.
 
 ```bat
-git tag -a v1.1.0 -m "Notex 1.1.0"
-git push origin v1.1.0
+git tag -a v1.4.0 -m "Notex 1.4.0"
+git push origin v1.4.0
 ```
+
+Ändert ein Push auf einem Branch `build.py`, die requirements oder den Workflow selbst, laufen beide
+Builds ebenfalls – ohne Release, die Ergebnisse liegen als Artefakte am Workflow-Lauf. Die Tests laufen
+bei jedem Push auf Ubuntu und Windows.

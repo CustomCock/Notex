@@ -11,7 +11,8 @@ from PySide6.QtWidgets import QMainWindow, QSplitter, QStackedWidget, QVBoxLayou
 from notex import APP_NAME
 from notex.core.encoding import read_text_file
 from notex.ui import dialogs
-from notex.ui.editor_tabs import EditorTabs
+from notex.ui.editor_area import EditorArea
+from notex.core import split_state
 from notex.ui.empty_state import EmptyState
 from notex.ui.toast import Toast
 from notex.ui.file_watcher import OpenFileWatcher
@@ -38,7 +39,8 @@ from notex.core.wikilinks import find_heading_line, link_name, rewrite_links, un
 from notex.core.encoding import read_text_file as _read_text_file
 from notex.core.fileops import save_text_file
 from notex.core.recent import add_recent, prune_recent
-from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe
+from notex.core.history import History, history_folder
+from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe, is_temporary_location
 from notex.ui.about_dialog import AboutDialog
 from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
@@ -60,7 +62,7 @@ class MainWindow(QMainWindow):
         config["recent_files"] = prune_recent(config["recent_files"])
 
         self.sidebar = Sidebar(root, config)
-        self.tabs = EditorTabs(root, config)
+        self.tabs = EditorArea(root, config)   # eine oder zwei Tab-Gruppen, spricht wie ein EditorTabs
         self.tabs.font_size = config["font_size"]
         self.tabs.paper_mode = config["paper_mode"]
         self.links = LinkIndexService(root)
@@ -83,7 +85,7 @@ class MainWindow(QMainWindow):
         self.sidebar_button = IconButton("panel-left", "Seitenleiste ein-/ausblenden  Ctrl+B")
         self.sidebar_button.clicked.connect(self.toggle_sidebar)
         self._sidebar_anim = None
-        self.tabs.setCornerWidget(self.sidebar_button, Qt.Corner.TopLeftCorner)
+        self.tabs.set_corner_widget(self.sidebar_button)
 
         # Rechte Seite: Tabs oben, darunter (ausblendbar) die Suchen/Ersetzen-Leiste
         editor_area = QWidget()
@@ -113,6 +115,26 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.splitter)
 
         self.association = build_association()   # None im Dev-Modus oder außerhalb von Windows
+        hist_cfg = config.get("history", {})
+        self.history = History(history_folder(app_root()), max_bytes=int(hist_cfg.get("max_mb", 200)) * 1024 * 1024)
+        self._snapshots_since_limit = 0
+        QTimer.singleShot(5000, self._enforce_history_limit)
+        self._update_worker = None
+        from notex.core.lookup import LookupService, SendGuard
+        self.lookup_service = LookupService()
+        self.send_guard = SendGuard()
+        self._card = None
+        self._available_release = None
+        QTimer.singleShot(8000, self.check_updates)   # nach dem Start, nie blockierend
+        # Verschlüsselte Notizen nach Inaktivität sperren
+        import time as _time
+        self._last_activity = _time.monotonic()
+        self._lock_timer = QTimer(self)
+        self._lock_timer.setInterval(15_000)
+        self._lock_timer.timeout.connect(self._check_auto_lock)
+        self._lock_timer.start()
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().installEventFilter(self)
         self.registry = ActionRegistry()
         self.registry.recent = list(config.get("recent_commands", []))
         self.file_index = FileIndexService(root, config)
@@ -147,8 +169,11 @@ class MainWindow(QMainWindow):
         self.tabs.status_changed.connect(self._update_status)
         self.tabs.file_opened.connect(self._on_file_opened)
         self.tabs.link_activated.connect(self._on_link_activated)
+        self.tabs.preview_link.connect(self._on_preview_link)
         self.tabs.completion_requested.connect(self._on_completion_requested)
         self.tabs.file_saved.connect(self._on_saved_for_links)
+        self.tabs.file_saved.connect(lambda path: self._snapshot(path))
+        self.tabs.file_opened.connect(lambda path: self._snapshot(path, label="geöffnet"))
         self.tabs.currentChanged.connect(lambda _i: self._refresh_backlinks())
         self.file_index.updated.connect(self._on_file_index_updated)
         self.links.updated.connect(lambda: self._relink_timer.start())
@@ -193,6 +218,17 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self._action("Datei öffnen …", "Ctrl+O", self.open_file_dialog))
         file_menu.addAction(self._action("Zuletzt geöffnet …", "Ctrl+R", self.show_recent))
+        file_menu.addAction(self._action("Versionsverlauf …", "Ctrl+Shift+Y", self.show_history))
+        file_menu.addSeparator()
+        file_menu.addAction(self._action("Neue Datei aus Vorlage …", "Ctrl+Shift+T", lambda: self.new_from_template()))
+        file_menu.addAction(self._action("Neue Woche", "Alt+W", lambda: self.new_week()))
+        file_menu.addAction(self._action("Nächste Woche anlegen", None, lambda: self.new_week(next_week=True)))
+        file_menu.addAction(self._action("Vorlagen-Ordner öffnen", None, self.open_templates_folder))
+        file_menu.addSeparator()
+        file_menu.addAction(self._action("Neue verschlüsselte Notiz …", "Ctrl+Shift+Alt+N", self.new_encrypted_note))
+        file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
+        file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
+        file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
@@ -206,6 +242,13 @@ class MainWindow(QMainWindow):
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
         edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
         edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
+        edit_menu.addAction(self._action("Ersetzen in Dateien …", "Ctrl+Shift+H", self.open_replace_in_files))
+        lookup_menu = edit_menu.addMenu("Nachschlagen")
+        self.lookup_wikipedia_action = self._action("Wikipedia nachschlagen", "Ctrl+Alt+W", lambda: self.lookup_current("wikipedia"))
+        self.lookup_wiktionary_action = self._action("Wiktionary nachschlagen", "Ctrl+Alt+T", lambda: self.lookup_current("wiktionary"))
+        self.lookup_web_action = self._action("Im Web suchen (Browser)", "Ctrl+Alt+G", lambda: self.lookup_current("web"))
+        for action in (self.lookup_wikipedia_action, self.lookup_wiktionary_action, self.lookup_web_action):
+            lookup_menu.addAction(action)
         edit_menu.addSeparator()
         self.spell_action = self._action("Rechtschreibung prüfen", "F7", self.toggle_spellcheck, checkable=True)
         self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
@@ -222,6 +265,12 @@ class MainWindow(QMainWindow):
         self.backlinks_action.setChecked(bool(self.config.get("backlinks_visible", False)))
         view_menu.addAction(self.backlinks_action)
         view_menu.addSeparator()
+        self.split_action = self._action("Editor teilen", "Ctrl+\\", self.toggle_split, checkable=True)
+        view_menu.addAction(self.split_action)
+        view_menu.addAction(self._action("Teilung: nebeneinander / untereinander", "Ctrl+Alt+\\", self.toggle_split_orientation))
+        view_menu.addAction(self._action("Tab in andere Gruppe verschieben", "Ctrl+Alt+Right", self.tabs.move_current_to_other_group))
+        view_menu.addAction(self._action("Datei auch in anderer Gruppe öffnen", "Ctrl+Alt+Shift+Right", self.tabs.open_in_other_group))
+        view_menu.addSeparator()
         self.paper_action = self._action("Blatt zentrieren", "Alt+P", self.toggle_paper_mode, checkable=True)
         self.paper_action.setChecked(self.config["paper_mode"])
         view_menu.addAction(self.paper_action)
@@ -233,6 +282,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self._action("Verkleinern", QKeySequence.StandardKey.ZoomOut, lambda: self.tabs.zoom(-1)))
         view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(FONT_SIZE.editor)))
         help_menu = self.menuBar().addMenu("&Hilfe")
+        help_menu.addAction(self._action("Nach Updates suchen …", None, lambda: self.check_updates(manual=True)))
         help_menu.addAction(self._action(f"Über {APP_NAME}", None, lambda: AboutDialog(self).exec()))
         # Ctrl+Plus liegt je nach Tastatur auf "Ctrl+=" – beides abdecken
         self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
@@ -297,10 +347,8 @@ class MainWindow(QMainWindow):
         except OSError as error:
             dialogs.warn(self, "Nach data/ übernehmen", str(error))
             return
-        index = self.tabs.indexOf(self.tabs.page_for(self.tabs.editor_for(new_path))) if self.tabs.editor_for(new_path) else -1
-        if index >= 0:
-            from PySide6.QtGui import QIcon
-            self.tabs.setTabIcon(index, QIcon())
+        for editor in self.tabs.views_of(new_path):
+            self.tabs.refresh_tab_icon(editor)
         self._refresh_open_files()
         self.toast.show_message(f"{'Verschoben' if move else 'Kopiert'} nach data/ · {new_path.name}", "check")
         self.sidebar.tree.select_path(new_path)
@@ -401,21 +449,81 @@ class MainWindow(QMainWindow):
 
     # ---- Windows-Dateizuordnung ----------------------------------------------------
     def _check_association_path(self) -> None:
-        """Wurde der Notex-Ordner verschoben, zeigt die Registrierung noch auf die alte EXE."""
+        """Start aus dem Temp-Ordner warnen; wurde der Notex-Ordner verschoben, zeigt die Registrierung noch
+        auf die alte EXE – dann einmal nachfragen, ob sie auf den neuen Pfad umgeschrieben werden soll."""
+        exe = current_exe()
+        if exe and is_temporary_location(exe):
+            dialogs.warn(self, "Notex läuft aus einem temporären Ordner",
+                         "Die Notex.exe wurde vermutlich direkt aus der ZIP gestartet.",
+                         informative="Windows hat sie nach %TEMP% entpackt. Notizen (data/) und Einstellungen würden "
+                                     "dort landen und beim nächsten Aufräumen verschwinden.\n\n"
+                                     "Bitte die ZIP komplett entpacken (Rechtsklick → „Alle extrahieren…“), "
+                                     "z. B. nach C:\\Apps\\Notex, und Notex.exe von dort starten.")
+            return
+        linux = self._linux_integration()
+        if linux is not None:
+            try:
+                status = linux.status()
+                if status.registered and not status.matches(linux.exe) and dialogs.confirm(
+                        self, "Notex-Ordner verschoben", "Der Starter im Anwendungsmenü zeigt noch auf den alten Ort.",
+                        yes="Neu registrieren", no="Später", informative=f"Registriert: {status.exe_path}\nJetzt hier: {linux.exe}"):
+                    linux.install()
+            except OSError:
+                pass
+            return
         if self.association is None:
             return
         try:
             status = self.association.status()
         except Exception:  # noqa: BLE001 – Registry-Zugriff darf den Start nie stören
             return
-        if status.registered and not status.matches(self.association.exe_path):
-            self.toast.show_message("Notex-Ordner verschoben – Einstellungen > System > „Pfad aktualisieren“", "triangle-alert")
+        if not status.registered or status.matches(self.association.exe_path):
+            return
+        where = "existiert nicht mehr" if not status.exe_exists else "ist eine andere Kopie"
+        if dialogs.confirm(self, "Notex-Ordner verschoben",
+                           "Die Dateizuordnung zeigt noch auf die alte Notex.exe.",
+                           yes="Pfad aktualisieren", no="Später",
+                           informative=f"Registriert: {status.exe_path} ({where}).\n"
+                                       f"Jetzt hier: {self.association.exe_path}\n\n"
+                                       "Solange der alte Pfad eingetragen ist, blendet Windows Notex unter „Öffnen mit“ "
+                                       "und in den Standard-Apps aus. Aktualisieren schreibt nur die Pfade neu, die "
+                                       "gewählten Endungen bleiben."):
+            try:
+                self.association.update_path()
+                self.toast.show_message("Dateizuordnung auf den neuen Pfad gesetzt", "check")
+            except OSError as error:
+                dialogs.warn(self, "Pfad aktualisieren", str(error))
+        else:
+            self.toast.show_message("Später: Einstellungen > System > „Pfad aktualisieren“", "triangle-alert")
 
     def build_system_settings(self, page) -> None:
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
         from notex.ui.widgets import Chip
+        from PySide6.QtWidgets import QCheckBox
+
+        page.section("Updates")
+        update_box = QCheckBox("Einmal täglich auf GitHub nach neuen Versionen sehen")
+        update_box.setChecked(bool(self.config.get("update_check", {}).get("enabled", True)))
+        update_box.toggled.connect(lambda on: self.config.setdefault("update_check", {}).__setitem__("enabled", on))
+        page.add(update_box)
+        check_now = QPushButton("Jetzt prüfen")
+        check_now.clicked.connect(lambda: self.check_updates(manual=True))
+        check_row = QHBoxLayout()
+        check_row.setContentsMargins(0, 0, 0, 0)
+        check_row.addWidget(check_now)
+        check_row.addStretch(1)
+        check_widget = QWidget()
+        check_widget.setLayout(check_row)
+        page.add(check_widget)
+        page.note("Es wird nur die öffentliche Release-Liste abgerufen (api.github.com), ohne Kennung oder "
+                  "Nutzungsdaten. Notex lädt und installiert nie etwas selbst – es zeigt nur einen Hinweis.")
+
+        import sys as _sys
+        if _sys.platform.startswith("linux"):
+            self._build_linux_settings(page)
+            return
 
         page.section("Windows-Dateizuordnung")
         status_label = QLabel()
@@ -471,8 +579,15 @@ class MainWindow(QMainWindow):
             status = self.association.status()
             if status.registered:
                 same = status.matches(self.association.exe_path)
+                if same:
+                    hint = ""
+                elif status.exe_exists:
+                    hint = "\nAchtung: zeigt auf eine andere Kopie von Notex. „Pfad aktualisieren“ trägt diese hier ein."
+                else:
+                    hint = ("\nAchtung: diese Notex.exe existiert nicht mehr (Ordner verschoben oder gelöscht). Windows "
+                            "blendet Notex deshalb unter „Öffnen mit“ aus – „Pfad aktualisieren“ behebt das.")
                 status_label.setText(f"Registriert: ja · Endungen: {', '.join(status.extensions) or '–'}\n"
-                                     f"Pfad: {status.exe_path}" + ("" if same else "\nAchtung: zeigt auf eine andere Notex.exe (Ordner verschoben?)"))
+                                     f"Pfad: {status.exe_path}{hint}")
             else:
                 status_label.setText("Registriert: nein. Die Registrierung schreibt nur in HKCU (kein Admin) und "
                                      "überschreibt keine bestehende Zuordnung – Notex erscheint unter „Öffnen mit“ "
@@ -621,6 +736,11 @@ class MainWindow(QMainWindow):
     # ---- Reaktionen auf Baum / Watcher -----------------------------------------
     def _on_path_renamed(self, old: Path, new: Path) -> None:
         self.tabs.rename_open_file(old, new)
+        if not self.tabs.is_external(new):
+            try:
+                self.history.rename(self.tabs.relative(old), self.tabs.relative(new))   # Verlauf zieht mit
+            except OSError:
+                pass
         QTimer.singleShot(0, lambda: self._update_links_after_rename(old, new))
         # Watcher auf die neuen Pfade umhängen
         for editor in self.tabs.editors():
@@ -633,6 +753,9 @@ class MainWindow(QMainWindow):
         editor = self.tabs.editor_for(path)
         if editor is None:
             return
+        if editor.encrypted:
+            self._on_external_change_encrypted(editor)
+            return
         hint = "Achtung: Deine ungespeicherten Änderungen gehen dabei verloren." if editor.is_dirty else ""
         reload = dialogs.confirm(
             self, "Datei extern geändert",
@@ -642,10 +765,37 @@ class MainWindow(QMainWindow):
         if reload:
             try:
                 editor.replace_content(read_text_file(path))
+                self._snapshot(path, label="extern geändert")
             except OSError as error:
                 dialogs.warn(self, "Neu laden fehlgeschlagen", str(error))
         else:
             editor.document().setModified(True)  # Inhalt weicht jetzt von der Platte ab
+        self._update_status()
+
+    def _on_external_change_encrypted(self, editor) -> None:
+        """Verschlüsselte Datei wurde von außen geändert: gesperrt → nichts zu tun; entsperrt → mit Schlüssel neu laden."""
+        from notex.core import crypto_notes
+        group = self.tabs.group_of(editor)
+        if editor.locked or group is None:
+            if group is not None:
+                page = group.page_for(editor)
+                if page is not None:
+                    group._show_locked(page)
+            return
+        if not dialogs.confirm(self, "Datei extern geändert",
+                               f"„{editor.path.name}“ wurde außerhalb von {APP_NAME} geändert. Neu laden?",
+                               yes="Neu laden", no="Behalten", danger=editor.is_dirty,
+                               informative="Achtung: Deine ungespeicherten Änderungen gehen dabei verloren." if editor.is_dirty else ""):
+            editor.document().setModified(True)
+            return
+        try:
+            text = crypto_notes.open_with_key(editor.path.read_bytes(), editor.key)
+        except (OSError, crypto_notes.NtxError) as error:
+            editor.document().setModified(False)
+            group.lock(editor, message=f"Neu laden mit dem bisherigen Schlüssel nicht möglich: {error}")
+            return
+        from notex.core.encoding import TextFile
+        editor.replace_content(TextFile(text, "utf-8", "\n"))
         self._update_status()
 
     def _on_external_remove(self, path: Path) -> None:
@@ -687,6 +837,9 @@ class MainWindow(QMainWindow):
         a("zoom_reset", "rotate-ccw", "Zoom zurücksetzen", None, lambda: self.tabs.set_font_size(FONT_SIZE.editor)).setToolTip("Zoom zurücksetzen  Ctrl+0")
         self.paper_toolbar_action = a("paper_mode", "minimize-2", "Blatt-Modus / volle Breite", None, self.toggle_paper_mode, checkable=True)
         self.paper_toolbar_action.setToolTip("Blatt zentrieren / volle Breite  Alt+P")
+        self.split_toolbar_action = a("split", "square-split-horizontal", "Editor teilen / Teilung aufheben", None,
+                                      self.toggle_split, checkable=True)
+        self.split_toolbar_action.setToolTip("Editor teilen  Ctrl+\\")
         self.line_numbers_action = a("line_numbers", "hash", "Zeilennummern", "Ctrl+Alt+N",
                                      lambda: self.tabs.set_line_numbers(not self.tabs.line_numbers), checkable=True)
         a("dup_line", "copy-plus", "Zeile duplizieren", "Ctrl+D", lambda: ed(lambda e: e.apply_line_op(ops.duplicate_lines)))
@@ -707,6 +860,9 @@ class MainWindow(QMainWindow):
         a("md_checkbox", "square-check", "Checkbox", "Ctrl+Alt+X", lambda: ed(lambda e: e.apply_line_op(ops.toggle_checkbox)))
         a("md_code", "code", "Code", "Ctrl+Alt+C", lambda: ed(lambda e: e.apply_text_op(ops.toggle_code)))
         a("md_link", "link", "Link", "Ctrl+K", lambda: ed(lambda e: e.apply_text_op(ops.toggle_link)))
+        self.preview_action = a("preview", "eye", "Markdown-Vorschau (Bearbeiten → Vorschau → Geteilt)", "Ctrl+Shift+V",
+                                self.cycle_preview)
+        self.preview_action.setToolTip("Markdown-Vorschau umschalten  Ctrl+Shift+V")
         self.spell_toolbar_action = a("spell", "spell-check", "Rechtschreibung", None, self.toggle_spellcheck, checkable=True)
         self.spell_toolbar_action.setToolTip("Rechtschreibung prüfen  F7")
         self.grammar_toolbar_action = a("grammar", "languages", "Grammatik (LanguageTool)", None, self.toggle_grammar, checkable=True)
@@ -715,6 +871,621 @@ class MainWindow(QMainWindow):
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+        self.tabs.context_menu_hook = self._extend_context_menu
+
+    # ---- Linux-Desktop-Integration ----------------------------------------------------------
+    def _linux_integration(self):
+        """DesktopIntegration für die laufende gebaute App, sonst None (Dev-Modus, anderes System)."""
+        import sys as _sys
+        from notex.core.linux_desktop import DesktopIntegration
+        exe = current_exe()
+        if not _sys.platform.startswith("linux") or exe is None:
+            return None
+        import notex
+        return DesktopIntegration(exe, Path(notex.__file__).resolve().parent / "assets" / "notex.png")
+
+    def _build_linux_settings(self, page) -> None:
+        from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+        page.section("Linux-Desktop-Integration")
+        status_label = QLabel()
+        status_label.setObjectName("SettingsNote")
+        status_label.setWordWrap(True)
+        page.add(status_label)
+        register = QPushButton("Im Anwendungsmenü registrieren")
+        remove = QPushButton("Registrierung entfernen")
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(register)
+        row.addWidget(remove)
+        row.addStretch(1)
+        buttons = QWidget()
+        buttons.setLayout(row)
+        page.add(buttons)
+        page.note("Legt nur Dateien in ~/.local/share an (notex.desktop, MIME-Typ für .ntx, Icon) – kein root, "
+                  "nichts systemweit. Danach steht Notex im Anwendungsmenü und unter „Öffnen mit“. Zum Standardprogramm "
+                  "macht man es selbst, z. B. über die Dateieigenschaften oder `xdg-mime default notex.desktop text/plain`. "
+                  "Nach dem Verschieben des Notex-Ordners einfach erneut registrieren.")
+
+        def refresh() -> None:
+            integration = self._linux_integration()
+            if integration is None:
+                status_label.setText("Nicht verfügbar: nur aus der gebauten App (Notex-Ordner mit ausführbarer Datei).")
+                register.setEnabled(False)
+                remove.setEnabled(False)
+                return
+            status = integration.status()
+            if status.registered:
+                moved = "" if status.matches(integration.exe) else "\nAchtung: zeigt auf einen anderen Ort – erneut registrieren."
+                status_label.setText(f"Registriert: {integration.desktop_file}\nProgramm: {status.exe_path}{moved}")
+            else:
+                status_label.setText("Nicht registriert.")
+            register.setText("Erneut registrieren" if status.registered else "Im Anwendungsmenü registrieren")
+            remove.setEnabled(status.registered)
+
+        def do_register() -> None:
+            integration = self._linux_integration()
+            try:
+                integration.install()
+            except OSError as error:
+                dialogs.warn(self, "Registrieren", str(error))
+                return
+            refresh()
+            self.toast.show_message("Notex im Anwendungsmenü registriert", "check")
+
+        def do_remove() -> None:
+            integration = self._linux_integration()
+            try:
+                integration.uninstall()
+            except OSError as error:
+                dialogs.warn(self, "Registrierung entfernen", str(error))
+                return
+            refresh()
+            self.toast.show_message("Registrierung entfernt", "check")
+
+        register.clicked.connect(do_register)
+        remove.clicked.connect(do_remove)
+        refresh()
+
+    # ---- Nachschlagen ------------------------------------------------------------------------
+    def _lookup_cfg(self) -> dict:
+        return self.config.setdefault("lookup", {})
+
+    def _lookup_langs(self, editor) -> list[str]:
+        from notex.core.lookup import languages_for
+        tab = editor.language or self.config.get("spellcheck", {}).get("language", "de")
+        return languages_for(str(self._lookup_cfg().get("language", "auto")), tab)
+
+    def _extend_context_menu(self, editor, menu, term: str) -> None:
+        """Kontextmenü des Editors: Text-Aktionen (die der Bearbeitungsleiste) und Nachschlagen."""
+        from notex.core import lookup as lk
+        from notex.theme.icons import icon as _icon
+        from PySide6.QtGui import QAction
+        actions = self.tabs.editor_actions
+        writable = not editor.isReadOnly()
+        menu.addSeparator()
+        keys = ["upper", "lower", "title"] + (["md_bold", "md_italic", "md_code", "md_link"]
+                                              if editor.path.suffix.lower() in (".md", ".markdown") else [])
+        for key in keys:
+            action = actions.get(key)
+            if action is not None:
+                action.setEnabled(writable)
+                action.setShortcutVisibleInContextMenu(True)
+                menu.addAction(action)
+        menu.addSeparator()
+        cfg = self._lookup_cfg()
+        online = bool(cfg.get("online", True))
+        label = lk.menu_label(term) if term else "–"
+
+        def add(icon_name: str, text: str, shortcut: str, source: str, enabled: bool, tooltip: str = "") -> None:
+            from PySide6.QtGui import QKeySequence
+            native = QKeySequence(shortcut).toString(QKeySequence.SequenceFormat.NativeText)   # „Strg+Alt+W“ wie die anderen
+            action = QAction(_icon(icon_name), f"{text}\t{native}", menu)
+            action.setEnabled(enabled)
+            if tooltip:
+                action.setToolTip(tooltip)
+            action.triggered.connect(lambda _c=False, e=editor, t=term, s=source: self.lookup_term(s, e, t))
+            menu.addAction(action)
+
+        off = "" if online else " (in den Einstellungen aus)"
+        add("book-open", f"Wikipedia: {label}{off}", "Ctrl+Alt+W", "wikipedia", bool(term) and online)
+        add("book-a", f"Wiktionary: {label}{off}", "Ctrl+Alt+T", "wiktionary", bool(term) and online)
+        text = lk.search_menu_text(term, cfg.get("engine", "google"), cfg.get("custom_url", "")) if term else "Im Web suchen"
+        add("globe", text, "Ctrl+Alt+G", "web", bool(term))
+        menu.setToolTipsVisible(True)
+
+    def lookup_current(self, source: str) -> None:
+        editor = self.tabs.current_editor()
+        if editor is None or editor.locked:
+            self.toast.show_message("Erst eine Datei öffnen und etwas markieren", "info")
+            return
+        term = editor.lookup_term()
+        if not term:
+            self.toast.show_message("Nichts markiert – Wort markieren oder den Cursor in ein Wort setzen", "info")
+            return
+        self.lookup_term(source, editor, term)
+
+    def _confirm_send(self, editor, service: str) -> bool:
+        """Bei .ntx vor jedem Senden fragen (bis „In dieser Sitzung nicht mehr fragen“)."""
+        from notex.core.lookup import confirmation_text
+        if not self.send_guard.needs_confirmation(bool(getattr(editor, "encrypted", False))):
+            return True
+        from PySide6.QtWidgets import QCheckBox, QMessageBox
+        box = QMessageBox(self)
+        box.setWindowTitle("Aus verschlüsselter Notiz senden?")
+        box.setText(confirmation_text(service))
+        box.setInformativeText("Die Notiz ist verschlüsselt – der markierte Begriff verlässt Notex dabei unverschlüsselt.")
+        box.setIcon(QMessageBox.Icon.Warning)
+        remember = QCheckBox("In dieser Sitzung nicht mehr fragen")
+        box.setCheckBox(remember)
+        yes = box.addButton("Fortfahren", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is not yes:
+            return False
+        if remember.isChecked():
+            self.send_guard.remember()
+        return True
+
+    def lookup_term(self, source: str, editor, term: str) -> None:
+        """Wikipedia/Wiktionary in der Karte, Websuche nur im Browser. Netz nur bei dieser ausdrücklichen Aktion."""
+        from notex.core import lookup as lk
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        term = lk.prepare_term(term)
+        if not term:
+            return
+        cfg = self._lookup_cfg()
+        if source == "web":
+            engine, custom = cfg.get("engine", "google"), cfg.get("custom_url", "")
+            if self._confirm_send(editor, lk.search_engine_name(engine, custom)):
+                QDesktopServices.openUrl(QUrl(lk.search_url(term, engine, custom)))
+            return
+        if not cfg.get("online", True):
+            self.toast.show_message("Nachschlagen online ist ausgeschaltet (Einstellungen › Nachschlagen)", "info")
+            return
+        if not self._confirm_send(editor, "Wikipedia" if source == "wikipedia" else "Wiktionary"):
+            return
+        card = self._lookup_card()
+        card.open(source, term, self._lookup_langs(editor), editor.term_rect())
+
+    def _lookup_card(self):
+        from notex.ui.lookup_card import LookupCard
+        if getattr(self, "_card", None) is None:
+            self._card = LookupCard(self, self.lookup_service, self.config)
+        return self._card
+
+    # ---- Update-Check ------------------------------------------------------------------------
+    def check_updates(self, manual: bool = False) -> None:
+        """Automatisch höchstens einmal pro Tag (abschaltbar), manuell jederzeit. Lädt nie etwas herunter."""
+        from notex.core import update_check
+        from notex.ui.update_service import UpdateWorker
+        cfg = self.config.setdefault("update_check", {})
+        if not manual and (not cfg.get("enabled", True) or not update_check.should_check(float(cfg.get("last_check", 0) or 0))):
+            return
+        if self._update_worker is not None and self._update_worker.isRunning():
+            return
+        worker = UpdateWorker()
+        worker.done.connect(lambda payload, error, m=manual: self._on_update_result(payload, error, m))
+        worker.finished.connect(lambda w=worker: setattr(self, "_update_worker", None) if self._update_worker is w else None)
+        self._update_worker = worker
+        worker.start()
+        if manual:
+            self.toast.show_message("Suche nach Updates …", "refresh-cw")
+
+    def _on_update_result(self, payload, error: str, manual: bool) -> None:
+        import time as _time
+        from notex import __version__
+        from notex.core import update_check
+        cfg = self.config.setdefault("update_check", {})
+        if error:
+            if manual:
+                dialogs.warn(self, "Nach Updates suchen", "Die Release-Liste konnte nicht abgerufen werden.",
+                             informative=f"{error}\n\nOffline oder Proxy? Die Seite {update_check.RELEASES_PAGE} "
+                                         "lässt sich auch im Browser öffnen.")
+            return
+        cfg["last_check"] = _time.time()
+        release = update_check.update_available(payload, __version__, "" if manual else str(cfg.get("skipped", "")))
+        self._available_release = release
+        if release is None:
+            if manual:
+                self.toast.show_message(f"{APP_NAME} {__version__} ist aktuell", "check")
+            return
+        if manual:
+            self._show_update_dialog(release)
+        else:
+            self.toast.show_message(f"{APP_NAME} {release.version_text} verfügbar – Hilfe › Nach Updates suchen", "download")
+
+    def _show_update_dialog(self, release) -> None:
+        from notex.ui.update_service import UpdateDialog
+        dialog = UpdateDialog(self, release)
+        dialog.skip_requested.connect(lambda version: self.config.setdefault("update_check", {}).__setitem__("skipped", version))
+        dialog.exec()
+
+    # ---- Vorlagen ---------------------------------------------------------------------------
+    def templates_folder(self) -> Path:
+        from notex.core.templates import ensure_defaults
+        folder = app_root() / "templates"
+        try:
+            ensure_defaults(folder)
+        except OSError:
+            pass
+        return folder
+
+    def _create_from_text(self, path: Path, text: str, cursor: int | None) -> None:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fileops.atomic_write_bytes(path, text.encode("utf-8"))
+        except OSError as error:
+            dialogs.warn(self, "Neue Datei", str(error))
+            return
+        self.file_index.request_rescan()
+        editor = self.tabs.open_file(path)
+        self.sidebar.tree.select_path(path)
+        if editor is not None and cursor is not None:
+            c = editor.textCursor()
+            c.setPosition(min(cursor, len(editor.toPlainText())))
+            editor.setTextCursor(c)
+            editor.center_cursor()
+
+    def new_from_template(self, name: str | None = None) -> None:
+        from datetime import datetime
+        from notex.core.templates import default_file_name, list_templates, render
+        folder = self.templates_folder()
+        names = [p.name for p in list_templates(folder)]
+        if name is None:
+            if not names:
+                self.toast.show_message("Keine Vorlagen – Vorlagen-Ordner öffnen und .md/.txt ablegen", "info")
+                return
+            name = dialogs.choose(self, "Neue Datei aus Vorlage", "Vorlage:", names)
+            if name is None:
+                return
+        try:
+            template = (folder / name).read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeDecodeError) as error:
+            dialogs.warn(self, "Vorlage", str(error))
+            return
+        now = datetime.now()
+        tree = self.sidebar.tree
+        target_folder = tree.folder_for(tree.selected_path())
+        file_name = dialogs.ask_text(self, "Neue Datei aus Vorlage", "Dateiname:", default_file_name(name, now))
+        if not file_name:
+            return
+        if "." not in file_name:
+            file_name += Path(name).suffix or ".md"
+        if fileops.is_encrypted_path(file_name):
+            dialogs.warn(self, "Neue Datei aus Vorlage", "Vorlagen erzeugen Klartext – für .ntx „Neue verschlüsselte Notiz“ nutzen.")
+            return
+        path = target_folder / file_name
+        if not fileops.is_within(path.resolve(), self.root.resolve()):
+            dialogs.warn(self, "Neue Datei aus Vorlage", "Der Dateiname führt aus data/ heraus.")
+            return
+        if path.exists():
+            dialogs.warn(self, "Neue Datei aus Vorlage", f"„{file_name}“ gibt es schon.")
+            return
+        rendered = render(template, now, title=Path(file_name).stem)
+        self._create_from_text(path, rendered.text, rendered.cursor)
+
+    def new_week(self, next_week: bool = False) -> None:
+        """Wochenplan für die aktuelle (oder nächste) ISO-Woche anlegen – gibt es ihn schon, wird er geöffnet."""
+        from datetime import datetime, timedelta
+        from notex.core.templates import monday_of, render, render_name, template_text
+        cfg = self.config.get("templates", {})
+        now = datetime.now()
+        monday = monday_of(now.date()) + timedelta(days=7 if next_week else 0)
+        folder_name = str(cfg.get("week_folder", "Wochen")).strip().strip("/\\") or "Wochen"
+        folder = (self.root / folder_name)
+        if not fileops.is_within(folder, self.root):
+            folder = self.root / "Wochen"
+        name = render_name(str(cfg.get("week_name", "KW{{week}} {{year}}")), now, base=monday) + ".md"
+        path = folder / name
+        if path.exists():
+            self.tabs.open_file(path)
+            self.sidebar.tree.select_path(path)
+            self.toast.show_message(f"{name} gibt es schon – geöffnet", "calendar-clock")
+            return
+        template = template_text(self.templates_folder(), str(cfg.get("week_template", "Woche.md"))) \
+            or template_text(self.templates_folder(), "Woche.md") or ""
+        rendered = render(template, now, title=Path(name).stem, base=monday)
+        self._create_from_text(path, rendered.text, rendered.cursor)
+        self.toast.show_message(f"{name} angelegt", "calendar-clock")
+
+    def open_templates_folder(self) -> None:
+        fileops.reveal_in_file_manager(self.templates_folder())
+
+    def _refresh_template_commands(self) -> None:
+        """Jede Vorlage als eigener Befehl in der Command Palette („Vorlage: Besprechung“)."""
+        from notex.core.templates import list_templates
+        for command in list(self.registry.all()):
+            if command.id.startswith("template:"):
+                self.registry.remove(command.id)
+        for path in list_templates(self.templates_folder()):
+            self.registry.add(f"template:{path.name}", f"Vorlage: {path.stem}", lambda n=path.name: self.new_from_template(n),
+                              category="Datei", keywords="neu vorlage template")
+
+    # ---- Verschlüsselte Notizen ------------------------------------------------------------
+    def eventFilter(self, watched, event) -> bool:
+        from PySide6.QtCore import QEvent
+        if event.type() in (QEvent.Type.KeyPress, QEvent.Type.MouseButtonPress, QEvent.Type.Wheel):
+            import time as _time
+            self._last_activity = _time.monotonic()
+        return False
+
+    def _check_auto_lock(self) -> None:
+        import time as _time
+        minutes = int(self.config.get("encryption", {}).get("auto_lock_minutes", 5))
+        if minutes > 0 and _time.monotonic() - self._last_activity >= minutes * 60:
+            if self.lock_all():
+                self._last_activity = _time.monotonic()   # fehlgeschlagen: erst nach dem nächsten Intervall erneut (keine Warnflut)
+
+    def lock_all(self, manual: bool = False) -> list[str]:
+        """Alle entsperrten .ntx sperren. Gibt die Namen zurück, die nicht gesperrt werden konnten."""
+        unlocked = [e for e in self.tabs.editors() if e.encrypted and not e.locked]
+        failed = [e.path.name for e in unlocked if not self.tabs.group_of(e).lock(e)]
+        if manual or (unlocked and not failed):
+            if unlocked:
+                self.toast.show_message(f"{len(unlocked) - len(failed)} verschlüsselte Notiz(en) gesperrt", "lock")
+            elif manual:
+                self.toast.show_message("Keine entsperrte verschlüsselte Notiz offen", "lock")
+        if failed:
+            dialogs.warn(self, "Sperren", "Nicht gesperrt, weil das Speichern fehlschlug: " + ", ".join(failed))
+        return failed
+
+    def new_encrypted_note(self) -> None:
+        from notex.core import crypto_notes
+        from notex.ui.lock_overlay import PasswordDialog
+        tree = self.sidebar.tree
+        folder = tree.folder_for(tree.selected_path())
+        name = dialogs.ask_text(self, "Neue verschlüsselte Notiz", "Name:", fileops.unique_path(folder, "Geheim", ".ntx").name)
+        if not name:
+            return
+        if not name.lower().endswith(".ntx"):
+            name += ".ntx"
+        path = folder / name
+        if path.exists():
+            dialogs.warn(self, "Neue verschlüsselte Notiz", f"„{name}“ gibt es schon.")
+            return
+        dialog = PasswordDialog(self, "Passwort festlegen", f"Passwort für „{name}“. Ohne dieses Passwort kommt niemand "
+                                "an den Inhalt – auch Notex nicht. Es gibt keine Wiederherstellung.")
+        if not dialog.exec():
+            return
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            key = crypto_notes.new_key(dialog.password)
+            fileops.atomic_write_bytes(path, crypto_notes.seal("", key))
+        except OSError as error:
+            QApplication.restoreOverrideCursor()
+            dialogs.warn(self, "Neue verschlüsselte Notiz", str(error))
+            return
+        QApplication.restoreOverrideCursor()
+        editor = self.tabs.open_file(path)
+        if editor is not None:
+            self.tabs.group_of(editor).unlock_with_key(editor, "", key)
+        self.file_index.request_rescan()
+        tree.select_path(path)
+
+    def encrypt_current_file(self) -> None:
+        """Aktuelle Klartext-Datei als .ntx verschlüsseln; Verlauf des Originals löschen, Original auf Wunsch in den Papierkorb."""
+        from notex.core import crypto_notes
+        from notex.ui.lock_overlay import PasswordDialog
+        editor = self.tabs.current_editor()
+        if editor is None or editor.encrypted:
+            self.toast.show_message("Erst eine unverschlüsselte Datei öffnen", "lock")
+            return
+        source = editor.path
+        target = fileops.unique_path(source.parent, source.stem, ".ntx")
+        dialog = PasswordDialog(self, "Datei verschlüsseln", f"„{source.name}“ wird als „{target.name}“ verschlüsselt "
+                                "gespeichert. Ohne das Passwort gibt es keinen Weg zurück.")
+        if not dialog.exec():
+            return
+        text = editor.toPlainText()
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            key = crypto_notes.new_key(dialog.password)
+            fileops.atomic_write_bytes(target, crypto_notes.seal(text, key))
+        except OSError as error:
+            QApplication.restoreOverrideCursor()
+            dialogs.warn(self, "Datei verschlüsseln", str(error))
+            return
+        QApplication.restoreOverrideCursor()
+        if not self.tabs.is_external(source):
+            self.history.forget(self.tabs.relative(source))   # Klartext-Versionen des Originals entfernen
+        for view in self.tabs.views_of(source):
+            view.document().setModified(False)
+            self.tabs.group_of(view).remove_page(self.tabs.group_of(view).page_for(view), ask=False)
+        new_editor = self.tabs.open_file(target)
+        if new_editor is not None:
+            self.tabs.group_of(new_editor).unlock_with_key(new_editor, text, key)
+        if dialogs.confirm(self, "Original entfernen?", f"„{source.name}“ liegt noch unverschlüsselt auf der Platte.",
+                           yes="In den Papierkorb", no="Behalten",
+                           informative="Danach den Papierkorb leeren. Auf SSDs und in Backups können Reste "
+                                       "des Klartexts trotzdem noch eine Weile existieren."):
+            try:
+                fileops.move_to_trash(source)
+                self.tabs.close_paths_under(source)
+                self.links.remove(self.tabs.relative(source))
+            except Exception as error:  # noqa: BLE001 – send2trash hat eigene Fehlertypen
+                dialogs.warn(self, "Original entfernen", str(error))
+        self.file_index.request_rescan()
+        self.sidebar.tree.select_path(target)
+
+    def change_note_password(self) -> None:
+        from notex.ui.lock_overlay import PasswordDialog
+        editor = self.tabs.current_editor()
+        if editor is None or not editor.encrypted:
+            self.toast.show_message("Erst eine verschlüsselte Notiz öffnen", "lock")
+            return
+        if editor.locked:
+            self.toast.show_message("Erst entsperren", "lock")
+            return
+        dialog = PasswordDialog(self, "Passwort ändern", f"Neues Passwort für „{editor.path.name}“.", ask_current=True)
+        if not dialog.exec():
+            return
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        error = self.tabs.group_of(editor).change_password(editor, dialog.current_password, dialog.password)
+        QApplication.restoreOverrideCursor()
+        if error:
+            dialogs.warn(self, "Passwort ändern", error)
+        else:
+            self.toast.show_message("Passwort geändert", "key-round")
+
+    # ---- Versionshistorie ----------------------------------------------------------------
+    def _history_enabled(self) -> bool:
+        return bool(self.config.get("history", {}).get("enabled", True))
+
+    def _snapshot(self, path: Path, text: str | None = None, label: str = "") -> None:
+        """Schnappschuss nach Speichern/Öffnen/Neuladen. Nie für externe Dateien oder .ntx (Klartext!)."""
+        if not self._history_enabled() or self.tabs.is_external(path) or path.suffix.lower() == ".ntx":
+            return
+        if text is None:
+            editor = self.tabs.editor_for(path)
+            if editor is None:
+                return
+            text = editor.toPlainText()
+        try:
+            if self.history.snapshot(self.tabs.relative(path), text, label=label) is not None:
+                self._snapshots_since_limit += 1
+                if self._snapshots_since_limit >= 50:
+                    self._enforce_history_limit()
+        except OSError:
+            pass   # Historie darf Speichern nie blockieren
+
+    def _write_tracked(self, path: Path, text_file, new_text: str, label: str) -> None:
+        """Datei außerhalb des Editors neu schreiben – vorher den alten Stand in die Historie."""
+        self._snapshot(path, text_file.text, label=label)
+        save_text_file(path, new_text, text_file.encoding, text_file.eol)
+        self._snapshot(path, new_text)
+
+    def _enforce_history_limit(self) -> None:
+        self._snapshots_since_limit = 0
+        self.history.max_bytes = int(self.config.get("history", {}).get("max_mb", 200)) * 1024 * 1024
+        try:
+            self.history.enforce_limit()
+        except OSError:
+            pass
+
+    def show_history(self) -> None:
+        editor = self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Erst eine Datei öffnen", "info")
+            return
+        if editor.path.suffix.lower() == ".ntx":
+            self.toast.show_message("Verschlüsselte Notizen haben keinen Verlauf (sonst läge Klartext auf der Platte)", "lock")
+            return
+        if self.tabs.is_external(editor.path):
+            self.toast.show_message("Verlauf gibt es nur für Dateien in data/", "info")
+            return
+        from notex.ui.history_dialog import HistoryDialog
+        dialog = HistoryDialog(self, self.history, self.tabs.relative(editor.path), editor.toPlainText())
+        dialog.restore_requested.connect(lambda text, e=editor: self._restore_version(e, text))
+        dialog.exec()
+
+    def _restore_version(self, editor, text: str) -> None:
+        self._snapshot(editor.path, label="vor Wiederherstellen")   # aktuellen Stand sichern, falls ungespeichert
+        self.tabs.replace_text_keep_cursor(editor, text)
+        self.toast.show_message("Version wiederhergestellt – Ctrl+Z nimmt es zurück, Ctrl+S speichert", "timer-reset")
+
+    # ---- Ersetzen in Dateien -------------------------------------------------------------
+    def open_replace_in_files(self) -> None:
+        from notex.ui.replace_dialog import ReplaceInFilesDialog
+        dialog = getattr(self, "_replace_dialog", None)
+        if dialog is None:
+            dialog = ReplaceInFilesDialog(self, self.root, self.config)
+            dialog.apply_requested.connect(self._apply_replace_in_files)
+            self._replace_dialog = dialog
+        # offene, ungespeicherte Dateien: den Editor-Text nehmen, nicht die Platte
+        dialog.overrides = {e.path: e.toPlainText() for e in self.tabs.editors()
+                            if e.is_dirty and not e.encrypted and not self.tabs.is_external(e.path)}
+        query = self.sidebar.search_field.text() if self.sidebar.search_field.text().strip() else dialog.find_field.text()
+        dialog.prefill(query, self.sidebar.regex.isChecked(), self.sidebar.whole_word.isChecked())
+        dialog.show()
+        dialog.raise_()
+        dialog.refresh()
+
+    def _apply_replace_in_files(self, query, replacement: str, chosen: dict) -> None:
+        from notex.core.search import apply_replace
+        files = lines_total = 0
+        failed: list[str] = []
+        for path, line_numbers in chosen.items():
+            views = self.tabs.views_of(path)
+            editor = views[0] if views else None
+            try:
+                if editor is not None:
+                    new_text, count = apply_replace(editor.toPlainText(), query, replacement, line_numbers)
+                    if count:
+                        was_clean = not editor.is_dirty
+                        self.tabs.replace_text_keep_cursor(editor, new_text)
+                        if was_clean:
+                            self.tabs.group_of(editor).save_editor(editor)
+                else:
+                    text_file = _read_text_file(path)
+                    new_text, count = apply_replace(text_file.text, query, replacement, line_numbers)
+                    if count:
+                        self._write_tracked(path, text_file, new_text, "vor Ersetzen")
+                        if not self.tabs.is_external(path):
+                            self.links.update_path(self.tabs.relative(path))
+            except (OSError, UnicodeDecodeError) as error:
+                failed.append(f"{path.name}: {error}")
+                continue
+            if count:
+                files += 1
+                lines_total += count
+        if failed:
+            dialogs.warn(self, "Ersetzen in Dateien", "Nicht alle Dateien konnten geschrieben werden:",
+                         informative="\n".join(failed[:10]))
+        self.toast.show_message(f"{lines_total} Zeilen in {files} Dateien ersetzt", "replace-all")
+        self.file_index.request_rescan()
+
+    # ---- Geteilter Editor ----------------------------------------------------------------
+    def toggle_split(self) -> None:
+        if self.tabs.current_editor() is None and not self.tabs.is_split:
+            self.toast.show_message("Erst eine Datei öffnen, dann teilen", "info")
+            self.split_action.setChecked(False)
+            return
+        split = self.tabs.toggle_split()
+        self.split_action.setChecked(split)
+        self.toast.show_message("Editor geteilt – Tabs lassen sich zwischen den Gruppen ziehen" if split else "Teilung aufgehoben",
+                                "square-split-horizontal")
+
+    def toggle_split_orientation(self) -> None:
+        orientation = self.tabs.toggle_orientation()
+        self.toast.show_message("Gruppen untereinander" if orientation == "vertical" else "Gruppen nebeneinander",
+                                "square-split-vertical" if orientation == "vertical" else "square-split-horizontal")
+
+    # ---- Markdown-Vorschau -------------------------------------------------------------
+    def cycle_preview(self) -> None:
+        mode = self.tabs.cycle_view_mode()
+        if mode is None:
+            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+            return
+        self.toast.show_message({"edit": "Bearbeiten", "preview": "Vorschau", "split": "Geteilte Ansicht"}[mode], "eye")
+
+    def set_preview_mode(self, mode: str) -> None:
+        if not self.tabs.set_view_mode(mode):
+            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+
+    def _on_preview_link(self, editor, target: str) -> None:
+        """Link aus der Vorschau: relativer Pfad (a/b.md#Ziel) oder Wiki-Name (Plan#Ziel)."""
+        name, _, heading = target.partition("#")
+        name = name.strip()
+        if not name:
+            return
+        candidate = self.root / name
+        if candidate.is_file() and fileops.is_within(candidate, self.root):
+            rel = self.tabs.relative(candidate)
+        else:
+            rel = self.links.resolve(name)
+        if rel is None:
+            from notex.ui.spell_highlighter import LinkSpan
+            self._on_link_activated(editor, LinkSpan(0, 0, name, heading or None, None))
+            return
+        opened = self.tabs.open_file(self.root / rel)
+        if opened is not None and heading:
+            line = find_heading_line(opened.toPlainText(), heading)
+            if line:
+                opened.goto_line(line)
 
     # ---- Wiki-Links und Backlinks ------------------------------------------------------
     def _on_file_index_updated(self) -> None:
@@ -763,7 +1534,7 @@ class MainWindow(QMainWindow):
         name = link_name(rel)
         result = []
         for other in self.file_index.index.files[:limit_files]:
-            if other == rel:
+            if other == rel or fileops.is_encrypted_path(other):
                 continue
             editor = self.tabs.editor_for(self.root / other)
             try:
@@ -796,7 +1567,7 @@ class MainWindow(QMainWindow):
                 lines = tf.text.split("\n")
                 word = lines[line - 1][start:end]
                 lines[line - 1] = lines[line - 1][:start] + (f"[[{target_name}|{word}]]" if word != target_name else f"[[{word}]]") + lines[line - 1][end:]
-                save_text_file(path, "\n".join(lines), tf.encoding, tf.eol)
+                self._write_tracked(path, tf, "\n".join(lines), "vor Verlinken")
                 self.links.update_text(str(rel).replace("\\", "/"), "\n".join(lines))
             except (OSError, IndexError) as error:
                 dialogs.warn(self, "Verlinken", str(error))
@@ -908,7 +1679,7 @@ class MainWindow(QMainWindow):
                     for o, n in pairs:
                         text, _ = rewrite_links(text, files + [o], o, n)
                     if text != tf.text:
-                        save_text_file(path, text, tf.encoding, tf.eol)
+                        self._write_tracked(path, tf, text, "vor Link-Anpassung")
                     self.links.update_text(source, text)
             except (OSError, UnicodeDecodeError) as error:
                 dialogs.warn(self, "Links anpassen", f"{source}: {error}")
@@ -948,6 +1719,9 @@ class MainWindow(QMainWindow):
                               category="Einstellungen")
         self.registry.add("palette:files", "Quick Open", lambda: self.show_palette("files"), category="Navigation", shortcut="Ctrl+P")
         self.registry.add("palette:commands", "Command Palette", lambda: self.show_palette("commands"), category="Navigation", shortcut="Ctrl+Shift+P")
+        for mode, title in (("edit", "Markdown: Bearbeiten"), ("preview", "Markdown: Vorschau"), ("split", "Markdown: Geteilte Ansicht")):
+            self.registry.add(f"preview:{mode}", title, lambda m=mode: self.set_preview_mode(m), category="Ansicht",
+                              keywords="markdown vorschau preview rendern")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
@@ -957,6 +1731,8 @@ class MainWindow(QMainWindow):
         self.registry.add(id, title, callback, category=category, shortcut=shortcut, **kw)
 
     def show_palette(self, mode: str) -> None:
+        if mode == "commands":
+            self._refresh_template_commands()
         self.palette.recent_files = [self.tabs.relative(Path(p)) if not self.tabs.is_external(Path(p)) else p
                                      for p in self.config.get("recent_files", [])]
         self.file_index.set_externals([p for p in self.config.get("recent_files", []) if self.tabs.is_external(Path(p))])
@@ -990,6 +1766,8 @@ class MainWindow(QMainWindow):
         """Checkbare Toolbar-Aktionen an den aktuellen Zustand angleichen."""
         editor = self.tabs.current_editor()
         self.paper_toolbar_action.setChecked(self.tabs.paper_mode)
+        self.split_toolbar_action.setChecked(self.tabs.is_split)
+        self.split_action.setChecked(self.tabs.is_split)
         self.line_numbers_action.setChecked(self.tabs.line_numbers)
         self.toolbar_action.setChecked(self.tabs.toolbar_visible)
         if editor is not None:
@@ -1030,13 +1808,9 @@ class MainWindow(QMainWindow):
         self.apply_backlinks_position()
         self.sidebar.tree.restore_expanded(self.config["expanded_folders"])
 
-        for entry in self.config["open_tabs"]:
-            path = self.tabs.resolve_saved(entry)
-            if path.is_file():
-                self.tabs.open_file(path)
+        state = split_state.from_config(self.config, exists=lambda entry: self.tabs.resolve_saved(entry).is_file())
+        self.tabs.restore_state(state)
         self.empty_state.set_recent(self.config["recent_files"])
-        if 0 <= self.config["active_tab"] < self.tabs.count():
-            self.tabs.setCurrentIndex(self.config["active_tab"])
 
     def _collect_window_state(self) -> None:
         win = self.config["window"]
@@ -1050,8 +1824,7 @@ class MainWindow(QMainWindow):
                 self.config["sidebar"]["width"] = sizes[0]
         self.config["sidebar"]["visible"] = self.sidebar.isVisible()
         self.config["expanded_folders"] = self.sidebar.tree.expanded_folders()
-        self.config["open_tabs"] = self.tabs.open_paths()
-        self.config["active_tab"] = max(0, self.tabs.currentIndex())
+        self.config.update(self.tabs.state().to_config())
 
     def save_state(self) -> None:
         self._collect_window_state()
@@ -1091,5 +1864,7 @@ class MainWindow(QMainWindow):
         self.file_index.shutdown()
         self.links.shutdown()
         self.tabs.shutdown()
+        if self._card is not None:
+            self._card.shutdown()
         self.save_state()
         event.accept()

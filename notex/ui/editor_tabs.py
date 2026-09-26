@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QPainter, QTextCursor
 from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
@@ -47,6 +47,8 @@ class FadeOverlay(QWidget):
         self.raise_()
         self.show()
         anim.animate(self, 1.0, 0.0, DURATION.fade, self._step, self.hide)
+        # Sicherheitsnetz: bleibt die Animation hängen (volle Ereignisschleife), nie dauerhaft etwas verdecken
+        QTimer.singleShot(max(300, 3 * DURATION.fade), self.hide)
 
     def _step(self, value: float) -> None:
         self.alpha = value
@@ -68,26 +70,46 @@ class EditorTabs(QTabWidget):
     text_font_changed = Signal(str)     # Familie ("" = Standard)
     files_dropped = Signal(list)        # Dateien aufs Blatt gezogen
     link_activated = Signal(object, object)     # Editor, LinkSpan
+    preview_link = Signal(object, str)          # Editor, Ziel aus der Markdown-Vorschau
+    view_mode_changed = Signal(str)             # "edit" | "preview" | "split" des aktuellen Tabs
     completion_requested = Signal(object, str, str)   # Editor, Art, Text
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
+    tabs_emptied = Signal()             # letzter Tab dieser Gruppe geschlossen
+    tab_drop = Signal(int, int, object, bool)   # Quellgruppe, Index, Zielgruppe, „neue Gruppe gewünscht“
 
-    def __init__(self, root: Path, config: dict | None = None) -> None:
+    def __init__(self, root: Path, config: dict | None = None, shared: "EditorTabs | None" = None) -> None:
+        """`shared`: zweite Gruppe des geteilten Editors – teilt Checker, Grammatikdienst und Ansichtszustand."""
         super().__init__()
         self.root = root
         self.config = config if config is not None else {}
-        self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
-        self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
-        self.grammar = GrammarService(self.config)
-        self.grammar.state_changed.connect(lambda _n: self.status_changed.emit())
-        if self.config.get("grammar", {}).get("enabled"):
-            self.grammar.restart()
-        self.font_size = FONT_SIZE.editor
-        self.paper_mode = True
-        self.editor_actions: dict = {}          # QActions aus dem Hauptfenster für die Bearbeitungsleiste
-        self.resolve_link = lambda target: None  # setzt das Hauptfenster (Link-Index)
-        self.open_font_settings = lambda: None  # setzt das Hauptfenster
-        self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
-        self.line_numbers = bool(self.config.get("line_numbers", True))
+        self.area = None                         # EditorArea, wenn es mehrere Gruppen geben kann
+        if shared is not None:
+            self.checker = shared.checker
+            self.grammar = shared.grammar
+            self.font_size = shared.font_size
+            self.paper_mode = shared.paper_mode
+            self.editor_actions = shared.editor_actions
+            self.resolve_link = shared.resolve_link
+            self.open_font_settings = shared.open_font_settings
+            self.toolbar_visible = shared.toolbar_visible
+            self.line_numbers = shared.line_numbers
+            self.context_menu_hook = shared.context_menu_hook
+        else:
+            self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
+            self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
+            self.grammar = GrammarService(self.config)
+            self.grammar.state_changed.connect(lambda _n: self.status_changed.emit())
+            if self.config.get("grammar", {}).get("enabled"):
+                self.grammar.restart()
+            self.font_size = FONT_SIZE.editor
+            self.paper_mode = True
+            self.editor_actions: dict = {}          # QActions aus dem Hauptfenster für die Bearbeitungsleiste
+            self.resolve_link = lambda target: None  # setzt das Hauptfenster (Link-Index)
+            self.open_font_settings = lambda: None  # setzt das Hauptfenster
+            self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
+            self.line_numbers = bool(self.config.get("line_numbers", True))
+            self.context_menu_hook = None          # setzt das Hauptfenster (Text + Nachschlagen im Kontextmenü)
+        self.setAcceptDrops(True)
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)
         self.tab_bar.close_requested.connect(self.close_tab)
@@ -101,7 +123,10 @@ class EditorTabs(QTabWidget):
     def _on_current_changed(self, index: int) -> None:
         # Kurzer Fade nur bei echtem Wechsel zwischen zwei offenen Tabs
         if index >= 0 and self._last_index >= 0 and index != self._last_index and self.currentWidget():
-            self._fade.run(self.currentWidget().geometry())
+            # geometry() ist relativ zum internen Stack – in Koordinaten des Tab-Widgets umrechnen,
+            # sonst deckt die Blende die Tab-Leiste ab und lässt unten einen Streifen frei
+            page = self.currentWidget()
+            self._fade.run(QRect(page.mapTo(self, QPoint(0, 0)), page.size()))
         self._last_index = index
         self.currentChanged.connect(lambda _index: self.status_changed.emit())
 
@@ -150,16 +175,30 @@ class EditorTabs(QTabWidget):
         return path.exists() and not os.access(path, os.W_OK)
 
     # ---- Öffnen / Schließen ------------------------------------------------
-    def open_file(self, path: Path, line: int | None = None, column: int = 0, length: int = 0) -> Editor | None:
+    def open_file(self, path: Path, line: int | None = None, column: int = 0, length: int = 0,
+                  share_from: Editor | None = None) -> Editor | None:
+        """`share_from`: zweite Ansicht eines schon offenen Editors (gleiches Dokument, geteilter Editor)."""
         path = Path(path)
         editor = self.editor_for(path)
         if editor is None:
-            try:
-                text_file = read_text_file(path)
-            except OSError as error:
-                QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
-                return None
-            editor = Editor(path, text_file, self.font_size, checker=self.checker)
+            if share_from is not None and share_from.path == path:
+                from notex.core.encoding import TextFile
+                text_file = TextFile("", share_from.encoding, share_from.eol)
+                editor = Editor(path, text_file, self.font_size, checker=self.checker, share_with=share_from)
+            elif fileops.is_encrypted_path(path):
+                # verschlüsselt: gesperrt öffnen, Inhalt erst nach Passwort (nie als Text von der Platte lesen)
+                from notex.core.encoding import TextFile
+                if not path.is_file():
+                    QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\nDatei nicht gefunden")
+                    return None
+                editor = Editor(path, TextFile("", "utf-8", "\n"), self.font_size, checker=self.checker)
+            else:
+                try:
+                    text_file = read_text_file(path)
+                except OSError as error:
+                    QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
+                    return None
+                editor = Editor(path, text_file, self.font_size, checker=self.checker)
             editor.set_text_font(self.font_family_for(path))
             self.grammar.attach(editor)
             self._apply_spell_to(editor)
@@ -170,6 +209,7 @@ class EditorTabs(QTabWidget):
             editor.files_dropped.connect(self.files_dropped)
             editor.link_activated.connect(lambda span, e=editor: self.link_activated.emit(e, span))
             editor.completion_requested.connect(lambda kind, text, e=editor: self.completion_requested.emit(e, kind, text))
+            editor.context_menu_hook = self.context_menu_hook
             if editor.highlighter is not None:
                 editor.highlighter.resolve_link = self.resolve_link
                 editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
@@ -179,39 +219,67 @@ class EditorTabs(QTabWidget):
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             toolbar.visibility_changed.connect(self._on_toolbar_toggled)
             editor.set_line_numbers(self.line_numbers)
-            page = EditorPage(editor, self.paper_mode, toolbar)
+            page = EditorPage(editor, self.paper_mode, toolbar, root=self.root)
+            page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
+            page.link_requested.connect(lambda target, e=editor: self.preview_link.emit(e, target))
+            page.view_mode_changed.connect(lambda mode, pg=page: self.view_mode_changed.emit(mode) if pg is self.currentWidget() else None)
             index = self.addTab(page, path.name)
+            if page.supports_preview and self.config.get("markdown_view", "edit") != "edit":
+                page.set_view_mode(self.config.get("markdown_view", "edit"))
+            if editor.encrypted:
+                self._show_locked(page)
             self.setTabToolTip(index, self.relative(path))
-            if self.is_external(path):
+            if editor.encrypted:
+                self.setTabIcon(index, icon("lock"))
+            elif self.is_external(path):
                 self.setTabIcon(index, icon("external-link"))   # dezentes Kennzeichen: außerhalb von data/
             editor.read_only = self.is_read_only(path)
             self.file_opened.emit(path)
         self.setCurrentWidget(self.page_for(editor))
-        if line is not None:
+        if editor.locked:
+            page = self.page_for(editor)
+            if page is not None and page.lock_overlay is not None:
+                page.lock_overlay.focus_password()
+        elif line is not None:
             editor.goto_line(line, column, length)
         else:
             editor.setFocus()
         self.status_changed.emit()
         return editor
 
+    def _other_views(self, editor: Editor) -> list[Editor]:
+        """Weitere Ansichten desselben Dokuments in anderen Gruppen (geteilter Editor)."""
+        if self.area is None:
+            return []
+        return [e for e in self.area.views_of(editor.path) if e is not editor]
+
     def _remove(self, editor: Editor) -> None:
         self.grammar.detach(editor)
+        if editor.highlighter is not None and self._other_views(editor):
+            editor.highlighter.remove_view(editor)
         page = self.page_for(editor)
         if page is not None:
             self.removeTab(self.indexOf(page))
+            if page.preview is not None:
+                page.preview.shutdown()
             page.deleteLater()
         self.file_closed.emit(editor.path)
+        if self.count() == 0:
+            self.tabs_emptied.emit()
+
+    def remove_page(self, page: EditorPage, ask: bool = True) -> bool:
+        editor = page.editor
+        if ask and editor.is_dirty and not self._other_views(editor) and not self._ask_save(editor):
+            return False
+        self._remove(editor)
+        self.status_changed.emit()
+        return True
 
     def close_tab(self, index: int) -> bool:
         page = self.widget(index)
         if not isinstance(page, EditorPage):
             return False
-        editor = page.editor
-        if editor.is_dirty and not self._ask_save(editor):
-            return False
-        self._remove(editor)
-        self.status_changed.emit()
-        return True
+        return self.remove_page(page, ask=True)
 
     def close_current(self) -> None:
         if self.count():
@@ -226,8 +294,10 @@ class EditorTabs(QTabWidget):
 
     def confirm_close_all(self) -> bool:
         """Vor dem Beenden: für jeden ungespeicherten Tab nachfragen. False = Abbruch."""
+        asked: set[int] = set()
         for editor in self.editors():
-            if editor.is_dirty:
+            if editor.is_dirty and id(editor.document()) not in asked:
+                asked.add(id(editor.document()))
                 self.setCurrentWidget(self.page_for(editor))
                 if not self._ask_save(editor):
                     return False
@@ -253,6 +323,8 @@ class EditorTabs(QTabWidget):
 
     # ---- Speichern ---------------------------------------------------------
     def save_editor(self, editor: Editor) -> bool:
+        if editor.encrypted:
+            return self._save_encrypted(editor, editor.path)
         if getattr(editor, "read_only", False) or self.is_read_only(editor.path):
             return self.save_editor_as(editor, reason="Die Datei ist schreibgeschützt.")
         try:
@@ -285,8 +357,19 @@ class EditorTabs(QTabWidget):
         if not target:
             return False
         new_path = Path(target)
+        if editor.encrypted:
+            if not fileops.is_encrypted_path(new_path):
+                new_path = new_path.with_name(new_path.name + ".ntx")   # verschlüsselt bleibt verschlüsselt
+            if not self._save_encrypted(editor, new_path, emit=False):
+                return False
+        elif fileops.is_encrypted_path(new_path):
+            from notex.ui import dialogs
+            dialogs.warn(self, "Speichern unter", "Unter .ntx speichern verschlüsselt nicht.",
+                         informative="Zum Verschlüsseln „Datei → Datei verschlüsseln …“ benutzen.")
+            return False
         try:
-            save_text_file(new_path, editor.toPlainText(), editor.encoding, editor.eol)
+            if not editor.encrypted:
+                save_text_file(new_path, editor.toPlainText(), editor.encoding, editor.eol)
         except OSError as error:
             QMessageBox.critical(self, "Speichern fehlgeschlagen", f"{new_path}\n\n{error}")
             return False
@@ -297,7 +380,7 @@ class EditorTabs(QTabWidget):
         editor.document().setModified(False)
         self._refresh_title(editor)
         index = self.indexOf(self.page_for(editor))
-        self.setTabIcon(index, icon("external-link") if self.is_external(new_path) else QIcon())
+        self.refresh_icon(editor)
         self.file_opened.emit(new_path)
         self.file_saved.emit(new_path)
         self.status_changed.emit()
@@ -316,6 +399,11 @@ class EditorTabs(QTabWidget):
     # ---- Darstellung -------------------------------------------------------
     def _refresh_title(self, editor: Editor) -> None:
         page = self.page_for(editor)
+        if page is None and self.area is not None:
+            owner = self.area.group_of(editor)
+            if owner is not None and owner is not self:
+                owner._refresh_title(editor)
+                return
         index = self.indexOf(page) if page else -1
         if index >= 0:
             self.setTabText(index, editor.path.name)
@@ -334,7 +422,11 @@ class EditorTabs(QTabWidget):
             editor.path = new / rel if editor.path != old else new
             self._refresh_title(editor)
 
-    def set_font_size(self, size: int) -> None:
+    def set_font_size(self, size: int, local: bool = False) -> None:
+        """Zoom gilt für alle Gruppen des geteilten Editors; `local` nur für den Aufruf aus EditorArea."""
+        if self.area is not None and not local:
+            self.area.set_font_size(size)
+            return
         self.font_size = max(MIN_FONT_SIZE, min(MAX_FONT_SIZE, size))
         for page in self.pages():
             page.editor.set_font_size(self.font_size)
@@ -342,7 +434,163 @@ class EditorTabs(QTabWidget):
         self.font_size_changed.emit(self.font_size)
 
     def zoom(self, direction: int) -> None:
-        self.set_font_size(self.font_size + direction)
+        if self.area is not None:
+            self.area.zoom(direction)
+        else:
+            self.set_font_size(self.font_size + direction)
+
+    def refresh_icon(self, editor: Editor) -> None:
+        page = self.page_for(editor)
+        if page is None:
+            return
+        if editor.encrypted:
+            self.setTabIcon(self.indexOf(page), icon("lock" if editor.locked else "lock-open"))
+        else:
+            self.setTabIcon(self.indexOf(page), icon("external-link") if self.is_external(editor.path) else QIcon())
+
+    # ---- Verschlüsselte Notizen (.ntx) --------------------------------------------------------
+    def _save_encrypted(self, editor: Editor, path: Path, emit: bool = True) -> bool:
+        """Text mit dem Sitzungsschlüssel verschlüsseln und atomar schreiben – neue Nonce bei jedem Speichern."""
+        from notex.core import crypto_notes
+        if editor.locked or editor.key is None:
+            QMessageBox.warning(self, "Speichern", f"„{editor.path.name}“ ist gesperrt – erst entsperren.")
+            return False
+        try:
+            fileops.atomic_write_bytes(path, crypto_notes.seal(editor.toPlainText(), editor.key))
+        except OSError as error:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
+            return False
+        if emit:
+            editor.document().setModified(False)
+            self.file_saved.emit(path)
+            self.status_changed.emit()
+        return True
+
+    def _show_locked(self, page: EditorPage, message: str = "") -> None:
+        from notex.core import crypto_notes
+        editor = page.editor
+        info = ""
+        try:
+            data = editor.path.read_bytes()
+        except OSError as error:
+            data, message = b"", message or str(error)
+        mode = "set" if not data else "unlock"
+        if data:
+            try:
+                info = crypto_notes.describe(crypto_notes.parse_header(data))
+            except crypto_notes.NtxError as error:
+                message = message or str(error)
+        page.show_lock(mode, message, info)
+        overlay = page.lock_overlay
+        if overlay is not None and not getattr(overlay, "_wired", False):
+            # Die Seite kann beim Verschieben in die andere Gruppe den Besitzer wechseln – immer die aktuelle Gruppe fragen
+            overlay.submitted.connect(lambda password, pg=page: self._unlock_via_owner(pg, password))
+            overlay._wired = True
+
+    def _unlock_via_owner(self, page: EditorPage, password: str) -> None:
+        owner = self.area.group_of(page.editor) if self.area is not None else self
+        (owner or self).unlock(page, password)
+
+    def unlock(self, page: EditorPage, password: str) -> bool:
+        """Passwort prüfen, entschlüsseln, Text in den Editor. Bei leerer Datei: Passwort festlegen."""
+        from PySide6.QtWidgets import QApplication
+        from notex.core import crypto_notes
+        from notex.core.encoding import TextFile
+        editor = page.editor
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)   # Argon2id braucht einen Moment
+        try:
+            data = editor.path.read_bytes()
+            if not data:
+                key, text = crypto_notes.new_key(password), ""
+                fileops.atomic_write_bytes(editor.path, crypto_notes.seal(text, key))
+            else:
+                text, key = crypto_notes.open_note(data, password)
+        except crypto_notes.NtxError as error:
+            QApplication.restoreOverrideCursor()
+            page.lock_overlay.show_error(str(error))
+            return False
+        except (OSError, ValueError) as error:
+            QApplication.restoreOverrideCursor()
+            page.lock_overlay.show_error(str(error))
+            return False
+        finally:
+            password = ""   # noqa: F841 – Referenz so früh wie möglich loslassen
+        QApplication.restoreOverrideCursor()
+        self.unlock_with_key(editor, text, key)
+        return True
+
+    def unlock_with_key(self, editor: Editor, text: str, key) -> None:
+        from notex.core.encoding import TextFile
+        page = self.page_for(editor)
+        editor.key = key
+        editor.locked = False
+        editor.load(TextFile(text, "utf-8", "\n"))
+        editor.setReadOnly(False)
+        if page is not None:
+            page.hide_lock()
+        self.refresh_icon(editor)
+        editor.setFocus()
+        self.status_changed.emit()
+
+    def lock(self, editor: Editor, message: str = "") -> bool:
+        """Sperren: ungespeicherte Änderungen verschlüsselt sichern, dann Klartext und Schlüssel verwerfen."""
+        from notex.core.encoding import TextFile
+        if not editor.encrypted or editor.locked:
+            return True
+        if editor.is_dirty and not self._save_encrypted(editor, editor.path):
+            return False
+        editor.key = None
+        editor.locked = True
+        editor.set_search_highlight("", False)
+        editor.load(TextFile("", "utf-8", "\n"))   # leert Text und Undo-Stack
+        editor.setReadOnly(True)
+        page = self.page_for(editor)
+        if page is not None:
+            self._show_locked(page, message)
+        self.refresh_icon(editor)
+        self.status_changed.emit()
+        return True
+
+    def change_password(self, editor: Editor, current: str, new: str) -> str | None:
+        """Passwort wechseln: aktuelles prüfen, neues Salt, neu verschlüsseln. Gibt Fehlertext oder None zurück."""
+        from notex.core import crypto_notes
+        if editor.locked or editor.key is None:
+            return "Die Notiz ist gesperrt."
+        try:
+            check = crypto_notes.derive_key(current, editor.key.kdf, editor.key.params, editor.key.salt)
+        except (crypto_notes.NtxError, ValueError) as error:
+            return str(error)
+        if check.key != editor.key.key:
+            return "Das aktuelle Passwort stimmt nicht."
+        editor.key = crypto_notes.new_key(new)
+        return None if self._save_encrypted(editor, editor.path) else "Speichern fehlgeschlagen."
+
+    # ---- Tabs per Drag zwischen Gruppen -------------------------------------------------------
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasFormat(EditorTabBar.TAB_MIME):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event) -> None:
+        if event.mimeData().hasFormat(EditorTabBar.TAB_MIME):
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event) -> None:
+        if not event.mimeData().hasFormat(EditorTabBar.TAB_MIME):
+            super().dropEvent(event)
+            return
+        try:
+            group_key, index = (int(x) for x in bytes(event.mimeData().data(EditorTabBar.TAB_MIME)).decode().split(":"))
+        except ValueError:
+            return
+        # Ohne Teilung: Ablegen im rechten/unteren Viertel legt eine neue Gruppe an
+        pos = event.position().toPoint()
+        wants_split = pos.x() > self.width() * 0.75 or pos.y() > self.height() * 0.75
+        event.acceptProposedAction()
+        self.tab_drop.emit(group_key, index, self, wants_split)
 
     # ---- Textschrift (Ansichts-Einstellung, gilt für alle Dateien) --------------
     def font_family_for(self, path: Path) -> str:
@@ -386,6 +634,8 @@ class EditorTabs(QTabWidget):
         return bool(cfg.get("enabled", True)) and path.suffix.lower() in cfg.get("extensions", [])
 
     def grammar_enabled_for(self, path: Path) -> bool:
+        if fileops.is_encrypted_path(path):
+            return False   # LanguageTool bekäme den Klartext übers Netz
         cfg = self.config.get("grammar", {})
         return bool(cfg.get("enabled", False)) and path.suffix.lower() in self.config.get("spellcheck", {}).get("extensions", [])
 
@@ -408,13 +658,18 @@ class EditorTabs(QTabWidget):
             self._apply_spell_to(editor)
 
     # ---- Bearbeitungsleiste ---------------------------------------------------------
-    def _on_toolbar_toggled(self, expanded: bool) -> None:
+    def _on_toolbar_toggled(self, expanded: bool, local: bool = False) -> None:
+        """Leiste auf- oder zuklappen – in allen Gruppen des geteilten Editors gleich."""
+        if self.area is not None and not local:
+            for group in self.area.groups:
+                group._on_toolbar_toggled(expanded, local=True)
+            return
         if expanded != self.toolbar_visible:
             self.toolbar_visible = expanded
             self.config["toolbar_visible"] = expanded
-            for page in self.pages():
-                if page.toolbar is not None and page.toolbar.expanded != expanded:
-                    page.toolbar.set_expanded(expanded)
+        for page in self.pages():
+            if page.toolbar is not None and page.toolbar.expanded != expanded:
+                page.toolbar.set_expanded(expanded)
 
     def toggle_toolbar(self) -> None:
         self._on_toolbar_toggled(not self.toolbar_visible)
@@ -474,11 +729,44 @@ class EditorTabs(QTabWidget):
         c.setPosition(min(position, len(new_text)))
         editor.setTextCursor(c)
 
+    # ---- Markdown-Vorschau ---------------------------------------------------------
+    def current_page(self) -> EditorPage | None:
+        widget = self.currentWidget()
+        return widget if isinstance(widget, EditorPage) else None
+
+    def view_mode(self) -> str:
+        page = self.current_page()
+        return page.view_mode if page is not None else "edit"
+
+    def set_view_mode(self, mode: str) -> bool:
+        """Ansicht des aktuellen Tabs; False, wenn die Datei keine Vorschau hat (kein Markdown)."""
+        page = self.current_page()
+        if page is None or not page.supports_preview:
+            return False
+        page.set_view_mode(mode)
+        self.status_changed.emit()
+        return True
+
+    def cycle_view_mode(self) -> str | None:
+        page = self.current_page()
+        if page is None or not page.supports_preview:
+            return None
+        mode = page.cycle_view_mode()
+        self.status_changed.emit()
+        return mode
+
+    def apply_preview_settings(self) -> None:
+        for page in self.pages():
+            page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
+
     def grammar_note(self) -> str:
         return self.grammar.note if self.config.get("grammar", {}).get("enabled") else ""
 
     def shutdown(self) -> None:
         self.grammar.shutdown()
+        for page in self.pages():
+            if page.preview is not None:
+                page.preview.shutdown()
 
     def open_paths(self) -> list[str]:
         """Für config.json: relativ innerhalb von data/, absolut für externe Dateien."""

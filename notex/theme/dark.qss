@@ -55,6 +55,10 @@ QFrame#SearchField[focused="true"] {
     border: 1px solid @accent;
     background: @surface;
 }
+/* ungültige Regex / Timeout */
+QFrame#SearchField[invalid="true"], QLineEdit[invalid="true"] {
+    border: 1px solid @danger;
+}
 QLineEdit#SearchInput, QLineEdit#SearchInput:hover, QLineEdit#SearchInput:focus {
     background: transparent;
     border: none;
@@ -158,6 +162,20 @@ QTabBar::tab:selected {
 QTabBar::close-button {
     image: none;
 }
+/* Geteilter Editor: die Gruppe ohne Fokus zeigt ihren aktiven Tab gedämpft */
+QTabBar[inactive="true"]::tab:selected {
+    color: @text_muted;
+    border-bottom: 2px solid @text_faint;
+}
+QSplitter#EditorGroups::handle {
+    background: @border;
+}
+QSplitter#EditorGroups::handle:horizontal {
+    width: 1px;
+}
+QSplitter#EditorGroups::handle:vertical {
+    height: 1px;
+}
 
 /* Das Blatt: Hintergrund transparent – die weiße Fläche mit runden Ecken malt PaperFrame */
 QTextEdit#Editor {
@@ -171,6 +189,17 @@ QTextEdit#Editor {
 QFrame#PaperFrame {
     background: @paper;
     border-radius: @r_panelpx;
+}
+/* Markdown-Vorschau: zweites Blatt, gleiche Farben wie der Editor */
+QTextBrowser#Preview {
+    background: transparent;
+    color: @paper_text;
+    border: none;
+    selection-background-color: @paper_selection;
+    selection-color: @paper_text;
+}
+QSplitter#PreviewSplitter::handle {
+    background: transparent;
 }
 QWidget#EditorPage {
     background: @bg;
@@ -347,16 +376,22 @@ QScrollBar::add-page, QScrollBar::sub-page {
     height: 0;
 }
 /* Im weißen Blatt: dunkle Scrollbar-Griffe */
-QTextEdit#Editor QScrollBar::handle:vertical, QTextEdit#Editor QScrollBar::handle:horizontal {
+QTextEdit#Editor QScrollBar::handle:vertical, QTextEdit#Editor QScrollBar::handle:horizontal,
+QTextBrowser#Preview QScrollBar::handle:vertical {
     background: rgba(0, 0, 0, 0.14);
 }
-QTextEdit#Editor QScrollBar::handle:vertical:hover, QTextEdit#Editor QScrollBar::handle:horizontal:hover {
+QTextEdit#Editor QScrollBar::handle:vertical:hover, QTextEdit#Editor QScrollBar::handle:horizontal:hover,
+QTextBrowser#Preview QScrollBar::handle:vertical:hover {
     background: rgba(0, 0, 0, 0.30);
 }
 
 /* ---------- Dialoge ---------- */
 QDialog, QMessageBox, QInputDialog {
     background: @surface;
+}
+/* Texte in Dialogen liegen auf @surface – ohne das malt die globale QWidget-Regel dunkle Kästen dahinter */
+QDialog QLabel, QMessageBox QLabel, QInputDialog QLabel, QDialog QCheckBox {
+    background: transparent;
 }
 QMessageBox QLabel, QInputDialog QLabel {
     color: @text;
@@ -765,4 +800,87 @@ QListWidget#CompletionPopup::item {
 }
 QListWidget#CompletionPopup::item:selected {
     background: @selection;
+}
+
+/* ---------- Verschlüsselte Notizen: Sperrbildschirm ---------- */
+QFrame#LockOverlay {
+    background: @bg;
+}
+QFrame#LockCard {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_panelpx;
+}
+QFrame#LockCard QWidget {
+    background: transparent;
+}
+QFrame#LockCard QLineEdit {
+    background: @bg;
+    border: 1px solid @border;
+    border-radius: @r_controlpx;
+    padding: @sp_smpx @sp_mdpx;
+    color: @text;
+}
+QFrame#LockCard QLineEdit:focus {
+    border: 1px solid @accent;
+}
+QFrame#LockCard QPushButton#Primary {
+    background: @accent;
+    color: @bg;
+    border: none;
+    border-radius: @r_controlpx;
+    padding: @sp_smpx @sp_lgpx;
+    font-weight: 600;
+}
+QFrame#LockCard QPushButton#Primary:hover {
+    background: @text;
+}
+QLabel#LockTitle {
+    color: @text;
+    font-size: @fs_editorpx;
+    font-weight: 600;
+}
+QLabel#LockError {
+    color: @danger;
+}
+
+/* ---------- Nachschlage-Karte ---------- */
+QFrame#LookupCard {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: @r_panelpx;
+}
+QFrame#LookupCard:hover {
+    background: @hover;
+    border: 1px solid @accent;
+}
+QFrame#LookupCard QWidget, QFrame#LookupCard QScrollArea, QScrollArea#LookupScroll > QWidget > QWidget {
+    background: transparent;
+}
+QLabel#LookupSource {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+QLabel#LookupTitle {
+    color: @text;
+    font-size: @fs_editorpx;
+    font-weight: 600;
+}
+QLabel#LookupDescription {
+    color: @text_muted;
+    font-style: italic;
+}
+QLabel#LookupBody {
+    color: @text;
+    font-size: @fs_uipx;
+}
+QLabel#LookupLinks, QLabel#LookupOpen {
+    color: @text_muted;
+    font-size: @fs_smallpx;
+}
+QFrame#LookupSkeleton {
+    background: @selection;
+    border-radius: 4px;
 }

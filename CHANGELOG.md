@@ -2,6 +2,94 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.5.0] – 2026-09-26
+
+### Hinzugefügt
+- Kontextmenü im Editor neu: Vorschläge, Bearbeiten (Ausschneiden, Kopieren, Einfügen, Löschen, Alles markieren),
+  Text (GROSS, klein, Wortanfänge groß, bei .md Fett/Kursiv/Code/Link – die Aktionen der Bearbeitungsleiste) und
+  Nachschlagen; ohne Markierung gilt das Wort unter dem Mauszeiger
+- Nachschlage-Karte für Wikipedia (Ctrl+Alt+W) und Wiktionary (Ctrl+Alt+T): Popover neben der Markierung, ganze
+  Karte öffnet den Browser, Quelle umschaltbar, Begriffsklärung als Liste, unscharfe Suche, Sprach-Fallback
+  Deutsch/Englisch, Skeleton beim Laden, Fehler in der Karte mit Websuche als Ausweg, Sitzungs-Cache,
+  Vorschaubilder optional; Abruf nur auf ausdrückliche Aktion, im Hintergrund, 5 s Timeout, eigener User-Agent
+- Websuche (Ctrl+Alt+G) nur als Browser-Link: Google, DuckDuckGo, Startpage oder eigene URL mit {q}
+- Einstellungen → Nachschlagen (online an/aus, Sprache, Vorschaubilder, Suchmaschine); aus .ntx-Notizen
+  Rückfrage vor jedem Senden
+
+## [1.4.0] – 2026-09-26
+
+### Hinzugefügt
+- Vorlagen in `templates/` neben der App (Woche, Tagesnotiz, Besprechung als Start), Platzhalter {{date}} {{time}}
+  {{weekday}} {{week}} {{year}} {{title}} {{cursor}} plus Formate und Tagesversätze; Neue Datei aus Vorlage
+  (Ctrl+Shift+T), jede Vorlage als Befehl in der Command Palette
+- Neue Woche (Alt+W): Wochenplan der aktuellen ISO-Woche in `data/Wochen/`, vorhandener Plan wird geöffnet;
+  „Nächste Woche anlegen“; Ordner, Dateiname und Vorlage einstellbar
+- Update-Check über die GitHub-Releases-API: höchstens einmal täglich, abschaltbar, nur ein Hinweis –
+  kein Download; Hilfe › Nach Updates suchen mit Versionshinweisen, Release-Seite öffnen, Version überspringen;
+  ignoriert Entwürfe, Vorabversionen und Tags, die keine Version sind
+- Linux: Build als `Notex-vX.Y.Z-linux-x86_64.tar.gz` (Ubuntu 22.04), Desktop-Integration auf Knopfdruck
+  (notex.desktop, MIME-Typ für .ntx mit Magic, Icon – nur in ~/.local/share, Standardprogramm wird nie gesetzt),
+  Rückfrage nach dem Verschieben des Ordners
+- CI: Tests auf Ubuntu und Windows; Build-Check beider Plattformen bei Änderungen am Build, ohne Release
+
+### Behoben
+- Überblendung beim Tabwechsel deckte kurz die Tab-Leiste ab und ließ unten einen Streifen frei (falsche
+  Koordinaten); bleibt die Animation hängen, verschwindet die Blende trotzdem
+
+## [1.3.0] – 2026-09-26
+
+### Hinzugefügt
+- Versionsverlauf (Ctrl+Shift+Y): Schnappschüsse in `history/` bei Speichern, Öffnen, Neuladen, Ersetzen in
+  Dateien und Link-Anpassung; zlib-komprimiert und dedupliziert, folgt Umbenennungen, Ausdünnung nach Alter,
+  Größenlimit (Einstellungen → Editor), Diff zum aktuellen Text, Wiederherstellen als Undo-Schritt
+- Verschlüsselte Notizen (.ntx): AES-256-GCM mit Argon2id-Schlüssel (Fallback scrypt) über `cryptography`,
+  Header als Associated Data, neue Nonce bei jedem Speichern, Sperrbildschirm im Tab, automatisches Sperren
+  nach Inaktivität, Ctrl+Shift+L, Neue verschlüsselte Notiz, Datei verschlüsseln, Passwort ändern, Schloss-Symbole
+  in Baum und Tabs; Klartext nie auf der Platte (kein Verlauf, keine Suche, kein Link-Index, keine Grammatik,
+  kein Wörterbuch-Eintrag). Format und Grenzen: docs/ENCRYPTION.md
+- `.ntx` wird bestehenden Configs einmalig als Baum-Endung hinzugefügt
+
+### Geändert
+- Ein fehlendes Icon bricht keine Aktion mehr ab (Ersatzsymbol statt Fehler)
+- Umbenennen im Baum kann die Endung .ntx weder setzen noch entfernen
+
+### Abhängigkeiten
+- cryptography (Apache-2.0/BSD, bringt cffi und pycparser mit); Lizenztexte in `licenses/`
+
+## [1.2.0] – 2026-09-26
+
+### Hinzugefügt
+- Markdown-Vorschau (Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt): markdown-it-py rendert
+  CommonMark plus Tabellen/Durchstreichen in ein zweites Blatt (QTextBrowser, kein JavaScript). Rohes HTML
+  wird nie durchgereicht, Links nur http(s)/mailto/#Anker/relativ im Notizordner, externe Bilder erst nach
+  Klick auf „Bild laden“, externe Links öffnen den Browser nur auf Klick. Aufgaben-Checkboxen sind in der
+  Vorschau klickbar, [[Wiki-Links]] und relative .md-Links öffnen die Zieldatei, Codeblöcke in den
+  Syntax-Farben des Themes, Scrollen in der geteilten Ansicht synchron (abschaltbar)
+- Split View (Ctrl+\): zweite Tab-Gruppe nebeneinander oder untereinander (Ctrl+Alt+\), Tabs per Drag
+  zwischen den Gruppen (Ablegen am rechten/unteren Rand teilt), dieselbe Datei in beiden Gruppen als ein
+  Dokument mit gemeinsamem Undo, Zustand der Gruppen wird in config.json gesichert
+- Erweiterte Suche: mehrere Begriffe (AND), `"Phrase"`, Filter `ext:`, `path:`, `-path:`; Chips „.*“
+  (Regex, ungültig = roter Rahmen, 0,25 s Timeout pro Zeile gegen katastrophales Backtracking) und
+  „Wort“ (nur ganze Wörter); alle Treffer einer Zeile werden hervorgehoben
+- Ersetzen in Dateien (Ctrl+Shift+H): Vorschau vorher → nachher je Zeile mit Häkchen, Regex-Gruppen
+  im Ersatz, offene Dateien werden im Editor ersetzt (rückgängig machbar)
+
+### Abhängigkeiten
+- markdown-it-py (MIT) für die Vorschau, regex (Apache-2.0) für das Regex-Timeout; beide mit Lizenztext in `licenses/`
+
+## [1.1.1] – 2026-09-26
+
+### Behoben
+- `build.py` bricht mit klarer Meldung ab, wenn PySide6 oder andere Pakete im Build-Python fehlen; vorher
+  entstand stumm eine Exe, die mit „No module named 'PySide6'“ startete
+- Ordner verschoben: Notex fragt beim Start, ob die Dateizuordnung auf den neuen Pfad gesetzt werden soll
+  (vorher nur ein Hinweis); die System-Seite zeigt, ob die registrierte Exe noch existiert
+- Warnung beim Start direkt aus der ZIP (Temp-Ordner): Notizen und Einstellungen würden dort verloren gehen
+
+### Geändert
+- README: Update-Anleitung mit „Pfad aktualisieren“, `build.bat` für den lokalen Build
+- PROGRESS.md hält Arbeitsstand, Entscheidungen und nächste Schritte fest
+
 ## [1.1.0] – 2026-09-26
 
 ### Hinzugefügt
