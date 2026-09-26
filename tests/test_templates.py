@@ -56,8 +56,8 @@ def test_default_files_and_listing(tmp_path: Path) -> None:
     (folder / "Eigene.txt").write_text("x", encoding="utf-8")
     (folder / ".versteckt.md").write_text("x", encoding="utf-8")
     (folder / "bild.png").write_bytes(b"x")
-    assert [p.name for p in list_templates(folder)] == ["Besprechung.md", "Eigene.txt", "Tagesnotiz.md", "Woche.md",
-                                                        "YARA-Regel.yar"]
+    assert [p.name for p in list_templates(folder)] == ["Besprechung.md", "Beweismittel.md", "Eigene.txt",
+                                                        "Tagesnotiz.md", "Woche.md", "YARA-Regel.yar", "Zeitleiste.md"]
     # zweiter Aufruf legt nichts neu an, auch nicht, wenn der Nutzer Vorlagen gelöscht hat
     (folder / "Woche.md").unlink()
     assert ensure_defaults(folder) == [] and not (folder / "Woche.md").exists()
