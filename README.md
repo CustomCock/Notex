@@ -15,8 +15,8 @@ Mehr ist nicht nötig. SmartScreen warnt beim ersten Start, weil die EXE nicht s
 Notizen würden dort landen (Notex warnt in dem Fall beim Start).
 
 **Update:** Notex schließen, im bestehenden Ordner `Notex.exe` und `_internal/` durch die aus der
-neuen ZIP ersetzen (`licenses/`, `LICENSE`, `CHANGELOG.md` gleich mit). `data/`, `config.json`,
-`themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
+neuen ZIP ersetzen (`licenses/`, `docs/`, `LICENSE`, `CHANGELOG.md` gleich mit). `data/`, `history/`,
+`config.json`, `themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
 neu entpackt, bekommt beim nächsten Start die Frage, ob die Windows-Dateizuordnung auf den neuen
 Pfad gesetzt werden soll (auch später möglich unter Einstellungen → System → „Pfad aktualisieren“).
 
@@ -388,11 +388,14 @@ Notex/
   Notex.exe
   _internal/      <- Python + Qt, nicht anfassen
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
-  config.json     <- Einstellungen und Zustand (wird beim Beenden geschrieben)
+  history/        <- Versionsverlauf (entsteht beim ersten Speichern, darf gelöscht werden)
+  config.json     <- Einstellungen und Zustand (wird jede Sekunde bei Änderung gesichert)
+  themes/, fonts/user/, user_dictionary.txt   <- eigene Themes, Schriften, Wörterbuch (optional)
+  licenses/, docs/ENCRYPTION.md, LICENSE, THIRD_PARTY_LICENSES.md, CHANGELOG.md
 ```
 
 Welche Dateiendungen im Baum erscheinen, steht in `config.json` unter `extensions`
-(Default: `.txt .md .log .csv .json .py .ini .sh .ps1 .bat .yaml .yml .xml .html .css .js .sql`). `fulltext_max_mb` begrenzt die Dateigröße
+(Default: `.txt .md .log .csv .json .py .ini .sh .ps1 .bat .yaml .yml .xml .html .css .js .sql .ntx`). `fulltext_max_mb` begrenzt die Dateigröße
 für die Volltextsuche (Default 5 MB).
 
 ## Bekannte Einschränkungen
@@ -410,6 +413,12 @@ für die Volltextsuche (Default 5 MB).
 - Der geteilte Editor hat höchstens zwei Gruppen.
 - Regex-Timeout gilt pro Zeile; eine Suche über viele Dateien mit einem gerade noch schnellen
   Muster kann trotzdem einige Sekunden dauern (sie läuft im Hintergrund und ist abbrechbar).
+- Verschlüsselte Notizen schützen den Inhalt, nicht Dateinamen, Ordner, Größe oder Änderungszeit.
+  Entsperrter Text steht im Arbeitsspeicher und kann vom Betriebssystem ausgelagert werden; wer das
+  ausschließen will, braucht zusätzlich BitLocker o. Ä. Details in [docs/ENCRYPTION.md](docs/ENCRYPTION.md).
+- Der Versionsverlauf liegt unverschlüsselt in `history/` (für normale Dateien gewollt). Wer eine Datei
+  später verschlüsselt, sollte „Datei verschlüsseln“ benutzen – das löscht ihren Verlauf.
+- Die Schlüsselableitung (Argon2id, 64 MiB) braucht beim Entsperren je nach Rechner 0,2–1 s.
 
 ## Entwicklung
 
@@ -440,8 +449,9 @@ python -m pytest
 Die Tests decken die Qt-freie Kernlogik in `notex/core/` ab: Suche (Abfragesprache, Regex,
 Timeout, Ersetzen), Encoding-Erkennung, atomares Speichern, Config und Theme-Dateien (auch
 kaputte), Rechtschreibregeln und -Backends, den LanguageTool-Client gegen einen Fake-Server,
-Fuzzy-Suche, Wiki-Links, Syntax-Lexing, Markdown-Renderer mit Sanitizer und den Zustand des
-geteilten Editors.
+Fuzzy-Suche, Wiki-Links, Syntax-Lexing, Markdown-Renderer mit Sanitizer, den Zustand des
+geteilten Editors, den Versionsverlauf und das Format der verschlüsselten Notizen (Roundtrip,
+falsches Passwort, Manipulation, Nonce, Formatversion).
 
 ### Design-System
 
@@ -461,15 +471,17 @@ notex/
   app.py                QApplication, Theme, Hauptfenster
   core/                 Qt-frei: config, encoding, fileops, search, theme_model, theme_store,
                         spell, spell_rules, grammar, text_ops, fuzzy, actions, file_index,
-                        wikilinks, syntax, markdown, split_state, recent, ipc, winreg_assoc
+                        wikilinks, syntax, markdown, split_state, history, crypto_notes,
+                        recent, ipc, winreg_assoc
   ui/                   Fenster und Widgets (Baum, Tabs, Editorgruppen, Blatt, Vorschau, Suche,
-                        Ersetzen in Dateien, Palette, Backlinks, Statusleiste, Toast,
+                        Ersetzen in Dateien, Versionsverlauf, Sperrbildschirm, Palette,
+                        Backlinks, Statusleiste, Toast,
                         Einstellungen, Highlighter, Grammatik-Service)
   dictionaries/         Hunspell-Wörterbücher de_DE, en_US (mit Lizenzen)
   theme/                tokens.py, dark.qss, Fonts- und Icon-Lader
   assets/               App-Icon, Fonts, Lucide-Icons (mit Lizenzen)
 tools/                  make_icon.py, screenshot.py
-docs/                   Screenshots
+docs/                   Screenshots, ENCRYPTION.md
 tests/                  pytest
 build.py / build.bat    PyInstaller-Build
 .github/workflows/      Tests bei jedem Push, Release-Build bei Tag v*

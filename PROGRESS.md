@@ -20,7 +20,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.1.0 | Block A: Lizenzen, Config-Autosave, Quick Open / Command Palette, Wiki-Links + Backlinks, Syntax-Highlighting | released |
 | 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
 | 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), kein Release (Besitzer) |
-| 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | in Arbeit |
+| 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | offen |
 
 ## Erledigt
@@ -62,7 +62,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   PyInstaller-Build geprüft (neue Module im Archiv, Build +2 MB), 127 Tests grün.
 - CI-Fix: Test-Workflow installiert markdown-it-py, regex und Pygments ausdrücklich (war beim ersten Push rot).
 
-### 1.3.0 – Block C (in Arbeit)
+### 1.3.0 – Block C
 - C1 Versionsverlauf: `core/history.py` (Objekte `history/objects/xx/<sha256>.z` mit zlib, `index.json` mit IDs statt
   Pfaden, Dedup, `thin()` nach RETENTION, `enforce_limit()` + Garbage Collection, `rename()` für Dateien/Ordner,
   `.ntx` ausgeschlossen, Prüfsumme beim Lesen), `ui/history_dialog.py` (Liste + Diff-HTML, Wiederherstellen als
@@ -121,6 +121,8 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 
 ## Nächster Schritt
 
-1. Auf „weiter“ des Besitzers warten (Block B ist abgeschlossen, Release 1.2.0 per Merge + Tag durch den Besitzer).
-2. Block C beginnen mit der Versionshistorie (`notex/core/history.py`: Snapshot-Speicher in `history/`, zlib,
-   Dedup per SHA-256, Ausdünnung, Größenlimit, Umbenennungen), dann verschlüsselte Notizen `.ntx`.
+1. Auf „weiter“ des Besitzers warten (Block C ist abgeschlossen, kein Release).
+2. Block D beginnen mit Vorlagen (`templates/` neben der App, `core/templates.py` für die Platzhalter
+   {{date}} {{time}} {{weekday}} {{week}} {{year}} {{title}} {{cursor}}, Befehl „Neue Woche“), dann Update-Check
+   (GitHub-Releases-API, höchstens 1×/Tag, kein Auto-Download), dann Linux-Support (Plattform-Guards,
+   .desktop/MIME auf Knopfdruck, CI Windows + Ubuntu, tar.gz-Build). Danach Abschlusszusammenfassung.
