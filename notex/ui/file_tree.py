@@ -58,6 +58,7 @@ class FileTree(QTreeView):
     def __init__(self, root: Path, extensions: list[str]) -> None:
         super().__init__()
         self.menu_providers: list = []    # Callable[[QMenu, Path], None] – Module hängen Einträge ein
+        self.folder_menu_providers: list = []   # dasselbe für Ordner (z. B. YARA über einen Ordner)
         self.root = Path(root)
         self._expanded: set[str] = set()
         self._hover_row = QModelIndex()
@@ -345,6 +346,10 @@ class FileTree(QTreeView):
                 if not fileops.is_encrypted_path(path):
                     menu.addAction(icon("activity"), "Live verfolgen", lambda: self.follow_requested.emit(path))
                 for provider in self.menu_providers:      # Module (z. B. Hex & Dateianalyse) hängen sich hier ein
+                    provider(menu, path)
+                menu.addSeparator()
+            elif self.folder_menu_providers:
+                for provider in self.folder_menu_providers:
                     provider(menu, path)
                 menu.addSeparator()
             menu.addAction(icon("pencil"), "Umbenennen\tF2", self.rename_selected)

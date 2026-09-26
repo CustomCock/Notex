@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-TEMPLATE_SUFFIXES = (".md", ".txt")
+TEMPLATE_SUFFIXES = (".md", ".txt", ".yar", ".yara")
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-zA-Z]+)\s*([+-]\s*\d+)?\s*(?::([^}]*))?\}\}")
 
 DEFAULT_TEMPLATES: dict[str, str] = {
@@ -42,6 +42,18 @@ DEFAULT_TEMPLATES: dict[str, str] = {
         "## Themen\n\n1. {{cursor}}\n\n## Entscheidungen\n\n## Aufgaben\n\n- [ ] \n"
     ),
 }
+
+# Später hinzugekommene Standardvorlagen: landen genau einmal auch in bestehenden Vorlagen-Ordnern
+# (gemerkt in config["templates"]["installed"] – vom Nutzer gelöschte Vorlagen kommen nicht zurück)
+LATER_TEMPLATES: dict[str, str] = {
+    "YARA-Regel.yar": (
+        "rule Neue_Regel\n{\n    meta:\n        author = \"\"\n        description = \"{{cursor}}\"\n"
+        "        date = \"{{date}}\"\n\n    strings:\n        $text = \"evil.example.com\" ascii wide nocase\n"
+        "        $hex  = { 4D 5A 90 00 }\n        $re   = /https?:\\/\\/[a-z0-9.-]+\\/gate\\.php/\n\n"
+        "    condition:\n        any of them\n}\n"
+    ),
+}
+DEFAULT_TEMPLATES.update(LATER_TEMPLATES)
 
 
 @dataclass(frozen=True)
@@ -115,18 +127,31 @@ def list_templates(folder: Path) -> list[Path]:
         return []
 
 
-def ensure_defaults(folder: Path) -> list[Path]:
+def ensure_defaults(folder: Path, installed: list[str] | None = None) -> list[Path]:
     """Beim ersten Mal die Standardvorlagen anlegen. Vorhandene Dateien werden nie überschrieben;
-    ist der Ordner schon da (auch leer, weil der Nutzer alles gelöscht hat), passiert nichts."""
+    ist der Ordner schon da (auch leer, weil der Nutzer alles gelöscht hat), passiert nichts – außer für
+    LATER_TEMPLATES, die noch nicht in `installed` stehen (die Liste wird ergänzt)."""
     folder = Path(folder)
-    if folder.exists():
-        return []
-    folder.mkdir(parents=True, exist_ok=True)
     created = []
-    for name, text in DEFAULT_TEMPLATES.items():
+    if not folder.exists():
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, text in DEFAULT_TEMPLATES.items():
+            path = folder / name
+            path.write_text(text, encoding="utf-8")
+            created.append(path)
+        if installed is not None:
+            installed.extend(n for n in LATER_TEMPLATES if n not in installed)
+        return created
+    if installed is None:
+        return []
+    for name, text in LATER_TEMPLATES.items():
+        if name in installed:
+            continue
         path = folder / name
-        path.write_text(text, encoding="utf-8")
-        created.append(path)
+        if not path.exists():
+            path.write_text(text, encoding="utf-8")
+            created.append(path)
+        installed.append(name)
     return created
 
 

@@ -19,7 +19,7 @@ from pygments.util import ClassNotFound
 LEXERS: dict[str, str] = {
     ".py": "python", ".json": "json", ".ini": "ini", ".sh": "bash", ".ps1": "powershell", ".bat": "batch",
     ".yaml": "yaml", ".yml": "yaml", ".xml": "xml", ".html": "html", ".css": "css", ".js": "javascript",
-    ".sql": "sql", ".md": "markdown", ".log": "log",
+    ".sql": "sql", ".md": "markdown", ".log": "log", ".yar": "yara", ".yara": "yara",
 }
 DEFAULT_EXTENSIONS = [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
                       ".xml", ".html", ".css", ".js", ".sql"]
@@ -35,11 +35,11 @@ STATE_TRIPLE_SQ = 2     # Python ''' ... '''
 STATE_BLOCK_COMMENT = 3  # /* ... */
 STATE_FENCE = 4          # Markdown ``` ...
 STATE_FENCE_LANG_BASE = 100   # 100 + Index der Sprache im Fence (siehe FENCE_LANGS)
-FENCE_LANGS = ["", "python", "json", "bash", "yaml", "javascript", "html", "css", "sql", "xml", "ini", "powershell", "batch"]
+FENCE_LANGS = ["", "python", "json", "bash", "yaml", "javascript", "html", "css", "sql", "xml", "ini", "powershell", "batch", "yara"]
 
 _OPENERS = {STATE_TRIPLE_DQ: '"""', STATE_TRIPLE_SQ: "'''", STATE_BLOCK_COMMENT: "/*"}
 _FENCE_RE = re.compile(r"^\s*(```|~~~)\s*([\w+-]*)")
-_C_LIKE = {"javascript", "css", "sql", "java", "c", "cpp"}
+_C_LIKE = {"javascript", "css", "sql", "java", "c", "cpp", "yara"}
 
 
 @dataclass(frozen=True)

@@ -18,5 +18,5 @@ jobs:
         with:
           python-version: "3.12"
       # Die Tests decken nur core/ ab und brauchen kein Qt – aber alle Qt-freien Laufzeitpakete aus requirements.txt
-      - run: pip install pytest send2trash "Pygments>=2.17,<3" "markdown-it-py>=3.0,<5" "regex>=2024.5.15" "cryptography>=44,<52" "PyYAML==6.0.3" "pypdf==6.19.0"
+      - run: pip install pytest send2trash "Pygments>=2.17,<3" "markdown-it-py>=3.0,<5" "regex>=2024.5.15" "cryptography>=44,<52" "PyYAML==6.0.3" "pypdf==6.19.0" "yara-python==4.5.4"
       - run: python -m pytest -q

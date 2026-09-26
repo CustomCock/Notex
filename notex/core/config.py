@@ -93,6 +93,7 @@ DEFAULTS: dict[str, Any] = {
         "week_folder": "Wochen",            # Ordner in data/ für „Neue Woche“
         "week_name": "KW{{week}} {{year}}",  # Dateiname (ohne .md) mit Platzhaltern
         "week_template": "Woche.md",
+        "installed": [],                     # später ergänzte Standardvorlagen, die schon angelegt wurden
     },
     "encryption": {           # verschlüsselte Notizen (.ntx)
         "auto_lock_minutes": 5,   # nach so vielen Minuten ohne Eingabe sperren (0 = nie)
@@ -108,6 +109,11 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
         "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
     },
+    "yara": {                 # Modul YARA: zuletzt benutzte Regel und Ziel
+        "last_rule": "",
+        "last_target": "",
+        "recursive": True,
+    },
     "strings": {              # Modul Strings: letzte Einstellungen des Dialogs
         "min_len": 4,
         "encodings": ["ascii", "utf16le"],
@@ -121,11 +127,11 @@ DEFAULTS: dict[str, Any] = {
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
                    ".xml", ".html", ".css", ".js", ".sql", ".ntx", ".tsv",
-                   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".pdf"],
-    "extensions_version": 4,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
+                   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".pdf", ".yar", ".yara"],
+    "extensions_version": 5,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
     "syntax_highlighting": True,
     "syntax_extensions": [".py", ".json", ".ini", ".log", ".sh", ".ps1", ".bat", ".yaml", ".yml", ".xml",
-                          ".html", ".css", ".js", ".sql", ".md"],
+                          ".html", ".css", ".js", ".sql", ".md", ".yar", ".yara"],
     # Textschrift je Dateiendung ("" = Standardschrift des Themes). Offene Zuordnung: eigene Endungen erlaubt.
     "font_by_extension": {".py": "JetBrains Mono", ".json": "JetBrains Mono", ".csv": "JetBrains Mono",
                           ".log": "JetBrains Mono", ".ini": "JetBrains Mono", ".sh": "JetBrains Mono",
@@ -208,6 +214,11 @@ def migrate(config: dict[str, Any], raw: Any) -> dict[str, Any]:
         added = ([".ntx"] if raw_version < 3 else []) + [".tsv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
                                                          ".svg", ".pdf"]
         config["extensions"] = list(config["extensions"]) + [e for e in added if e not in config["extensions"]]
+    if isinstance(raw, dict) and isinstance(raw_version, int) and 2 <= raw_version < 5:
+        # v1.9: YARA-Regeln im Baum und mit Syntax-Highlighting
+        for key in ("extensions", "syntax_extensions"):
+            if key in raw:
+                config[key] = list(config[key]) + [e for e in (".yar", ".yara") if e not in config[key]]
     config["extensions_version"] = DEFAULTS["extensions_version"]
     return config
 

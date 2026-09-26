@@ -230,7 +230,7 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 | Hex & Dateianalyse (Hex-Ansicht, Dateityp, Prüfsummen) | an | – |
 | Strings, Eingebettete Dateien, Entropie | aus | – |
 | Metadaten | aus | pypdf (gebündelt) |
-| YARA | aus | yara-python |
+| YARA | aus | yara-python (gebündelt) |
 | Zeitleiste & Beweismittel | aus | – |
 | IOC entschärfen | an | – |
 | Port-Infos | an | – |
@@ -422,6 +422,24 @@ Modul „Metadaten“ (Standard aus). Rechtsklick auf eine Datei im Baum → **M
   werden neu geschrieben (ohne Info, XMP und ältere Speicherstände). TIFF und verschlüsselte PDFs werden nur angezeigt.
 
 Grau = bleibt beim Entfernen (Formatangabe oder Teil des Inhalts), gelb = GPS.
+
+
+## YARA
+
+Modul „YARA“ (Standard aus, bringt yara-python mit). `.yar`/`.yara`-Dateien erscheinen im Baum und werden hervorgehoben;
+„Neue Datei aus Vorlage“ (`Ctrl+Shift+T`) bietet die Vorlage **YARA-Regel.yar**.
+
+- **Regel testen** (`Ctrl+Alt+Y`, Menü Datei, Palette „YARA-Regel testen“): nimmt die Regeln aus dem aktuellen Editor –
+  auch ungespeichert – und prüft eine Datei oder einen Ordner (Unterordner abschaltbar). Ohne offene Regel wird die
+  zuletzt benutzte Regeldatei genommen oder erfragt.
+- Rechtsklick im Baum: auf eine `.yar` → „YARA-Regel testen …“; auf jede andere Datei oder einen Ordner → „Mit
+  YARA-Regel prüfen …“.
+- Trefferliste: Regel, Datei, Offset, String-Bezeichner, Treffer (Text oder Hex); Tags und `meta` im Tooltip.
+  Doppelklick öffnet die Hex-Ansicht an der Stelle (Treffer markiert).
+- Syntaxfehler stehen mit Zeilennummer in der Statuszeile; im Editor springt der Cursor hin und die Zeile wird rot
+  unterwellt, bis du weitertippst. `include "x.yar"` wird relativ zum Ordner der Regeldatei aufgelöst.
+- Dateien werden nur gelesen (libyara mappt sie selbst, auch große), Zeitlimit 60 s je Datei, Symlinks werden nicht
+  verfolgt, höchstens 20 000 Trefferstellen.
 
 
 ## IOCs entschärfen
@@ -770,6 +788,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
 | Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
 | Ctrl+Alt+M | Metadaten anzeigen / entfernen (Modul Metadaten) |
+| Ctrl+Alt+Y | YARA-Regel testen (Modul YARA) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |

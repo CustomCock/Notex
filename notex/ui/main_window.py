@@ -909,6 +909,7 @@ class MainWindow(QMainWindow):
             "metadata", "Metadaten anzeigen …", "Ctrl+Alt+M", "scan-eye", self.show_metadata,
             "metadaten exif gps kamera autor pdf office docx entfernen bereinigen xmp iptc"))
         self.modules.contribute("ioc", self._activate_ioc)
+        self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -1097,6 +1098,92 @@ class MainWindow(QMainWindow):
         dialog = VariableEditDialog(self, variable, [v.name for v in service.variables], service.prefix)
         if dialog.exec():
             service.upsert(dialog.result_variable(), old_name=name)
+
+    # ---- Modul: YARA ----------------------------------------------------------------------------
+    def _activate_yara(self):
+        """Regel testen: aktuelle .yar-Datei (auch ungespeichert) gegen Datei/Ordner; Baum: Regel oder Ziel."""
+        action = self._module_action("YARA-Regel testen …", "Ctrl+Alt+Y", lambda: self.test_yara(), self.file_menu)
+        self.registry.add("yara:test", "YARA-Regel testen", lambda: self.test_yara(), category="Dateianalyse",
+                          shortcut="Ctrl+Alt+Y", keywords="yara regel rule malware signatur prüfen scan")
+
+        def file_entry(menu, path: Path) -> None:
+            if path.suffix.lower() in (".yar", ".yara"):
+                menu.addAction(icon("bug-play"), "YARA-Regel testen …", lambda: self.test_yara(rule=path))
+            else:
+                menu.addAction(icon("bug-play"), "Mit YARA-Regel prüfen …", lambda: self.test_yara(target=path))
+
+        def folder_entry(menu, path: Path) -> None:
+            menu.addAction(icon("bug-play"), "Mit YARA-Regel prüfen …", lambda: self.test_yara(target=path))
+        tree = self.sidebar.tree
+        tree.menu_providers.append(file_entry)
+        tree.folder_menu_providers.append(folder_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault("yara", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("yara:test")
+            for providers, entry in ((tree.menu_providers, file_entry), (tree.folder_menu_providers, folder_entry)):
+                if entry in providers:
+                    providers.remove(entry)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def test_yara(self, rule: Path | None = None, target: Path | None = None) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        from notex.core import yara_rules
+        from notex.paths import data_dir
+        from notex.ui.yara_dialog import RULE_SUFFIXES, YaraDialog
+        if not yara_rules.available():
+            self.toast.show_message("yara-python fehlt in diesem Build – YARA nicht verfügbar", "info")
+            return
+        editor = None
+        if rule is None:
+            current = self.tabs.current_editor()
+            if current is not None and current.path.suffix.lower() in RULE_SUFFIXES:
+                rule, editor = current.path, current
+            else:
+                last = Path(self.config.get("yara", {}).get("last_rule", "") or ".")
+                if not (last.is_file() and last.suffix.lower() in RULE_SUFFIXES):
+                    chosen = QFileDialog.getOpenFileName(self, "YARA-Regeln wählen", str(data_dir()),
+                                                         "YARA-Regeln (*.yar *.yara)")[0]
+                    if not chosen:
+                        return
+                    last = Path(chosen)
+                rule = last
+        if editor is None:
+            editor = self.tabs.editor_for(rule)
+        dialog = YaraDialog(self, rule, target, editor)
+        self._analysis_dialogs.setdefault("yara", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("yara", []).remove(d)
+                                if d in self._analysis_dialogs.get("yara", []) else None)
+        dialog.show()
+
+    def mark_yara_error(self, editor, line: int | None) -> None:
+        """Syntaxfehler der Regel im Editor rot unterwellen und hinspringen; None räumt auf."""
+        if editor is None:
+            return
+        if getattr(editor, "_yara_error_hooked", False):
+            editor.textChanged.disconnect(self._clear_yara_error)
+            editor._yara_error_hooked = False
+        if line is None:
+            editor.set_problem(None)
+            return
+        block = editor.document().findBlockByNumber(max(0, line - 1))
+        if block.isValid():
+            text = block.text()
+            editor.set_problem(block.position() + len(text) - len(text.lstrip()))
+            editor.goto_line(line)
+            editor.textChanged.connect(self._clear_yara_error)
+            editor._yara_error_hooked = True
+
+    def _clear_yara_error(self) -> None:
+        editor = self.sender()
+        if editor is not None and getattr(editor, "_yara_error_hooked", False):
+            editor.set_problem(None)
+            editor.textChanged.disconnect(self._clear_yara_error)
+            editor._yara_error_hooked = False
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
     def _activate_ioc(self):
@@ -1738,7 +1825,8 @@ class MainWindow(QMainWindow):
         from notex.core.templates import ensure_defaults
         folder = app_root() / "templates"
         try:
-            ensure_defaults(folder)
+            installed = self.config.setdefault("templates", {}).setdefault("installed", [])
+            ensure_defaults(folder, installed)
         except OSError:
             pass
         return folder

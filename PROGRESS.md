@@ -247,6 +247,14 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   JPEG: echtes Bildende über SOS-Scan (Füllbytes FF00, RST, Segmente zwischen Scans) → Daten dahinter (MPF, Trailer)
   werden gemeldet und entfernt; APP0/APP2-ICC/APP14 bleiben. Kopie mit open("xb"), danach verify() (liest die Kopie
   neu). Grenzen: TIFF/HEIC nicht bereinigt; Namen im Office-/PDF-Inhalt bleiben (nur gemeldet).
+- H2 YARA: **yara-python 4.5.4** eingebunden – vorab geprüft: Wheels cp312 für win_amd64 und manylinux_2_17 (je
+  ~2–3 MB, Linux bündelt libcrypto 1.1 → Lizenz beigelegt), Apache-2.0/BSD-3 → MIT-verträglich; build.py Hidden
+  Import + check_dependencies. `core/yara_rules.py` (compile mit include_callback relativ zum Regelordner,
+  Fehlerzeile aus „line N“/„(N)“, scan über os.walk ohne Symlinks, Zeitlimit 60 s/Datei, Grenzen 20 000 Stellen,
+  200 je String). Lexer „yara“ aus Pygments (C-artige Blockkommentare), Config-Migration extensions_version 5
+  (.yar/.yara in Baum + Syntax). `ui/yara_dialog.py`, MainWindow._activate_yara/test_yara/mark_yara_error
+  (Editor.set_problem, gelöscht beim nächsten Tippen). FileTree.folder_menu_providers (neu, für Ordner).
+  Vorlagen: `LATER_TEMPLATES` + config templates.installed – neue Standardvorlagen einmalig in alte Ordner.
 
 ## Offen
 

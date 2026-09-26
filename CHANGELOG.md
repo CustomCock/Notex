@@ -9,6 +9,11 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   und Speicherstände; Office-Eigenschaften und Namen aus Kommentaren/Änderungsverfolgung. Kopieren, als Markdown
   einfügen, „Metadaten entfernen“ als geprüfte Kopie (Bilder verlustfrei ohne Neukodierung)
 - Abhängigkeit pypdf 6.19.0 (BSD-3, reines Python) für PDF-Metadaten
+- Modul YARA (`Ctrl+Alt+Y`): Syntax-Highlighting für .yar/.yara, „Regel testen“ gegen Datei oder Ordner (rekursiv)
+  mit Trefferliste (Regel, Datei, Offset, String, Treffer), Doppelklick → Hex-Ansicht, Syntaxfehler mit Zeile im
+  Editor markiert; Baum-Kontextmenü auch für Ordner; Vorlage „YARA-Regel.yar“
+- Vorlagen: später hinzugekommene Standardvorlagen landen einmalig auch in bestehenden `templates/`-Ordnern
+- Abhängigkeit yara-python 4.5.4 (Apache-2.0, libyara BSD-3; Linux-Wheel mit OpenSSL-1.1-libcrypto)
 - Modul IOC entschärfen (Standard an): Rechtsklick → Umwandeln, `Ctrl+Alt+D` / `Ctrl+Shift+Alt+D` – URLs, Domains,
   IPv4/IPv6 und E-Mails in Auswahl oder Datei entschärfen (hxxp, [.], [@], [:]) und wieder scharf machen; Dateinamen,
   Versionen und schon Entschärftes bleiben unverändert, Code-Blöcke optional ausgenommen
