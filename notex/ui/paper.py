@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget
 
 from notex.theme.tokens import LAYOUT, RADIUS, SPACING
 from notex.ui.editor import Editor
+from notex.ui.toolbar import EditorToolbar
 
 SHADOW_BLUR = 28      # wie weit der Schatten nach außen reicht
 SHADOW_OFFSET_Y = 8
@@ -59,19 +60,31 @@ def _shadow_pixmap(width: int, height: int, dpr: float) -> QPixmap:
 
 
 class EditorPage(QWidget):
-    def __init__(self, editor: Editor, paper_mode: bool) -> None:
+    def __init__(self, editor: Editor, paper_mode: bool, toolbar: EditorToolbar | None = None) -> None:
         super().__init__()
         self.setObjectName("EditorPage")
         self.editor = editor
         self.frame = PaperFrame(editor)
+        self.toolbar = toolbar
         self._shadow: QPixmap | None = None
         self._shadow_key: tuple = ()
+
+        # Spalte: Bearbeitungsleiste oben, darunter das Blatt – beide gleich breit
+        self.column = QWidget()
+        column_layout = QVBoxLayout(self.column)
+        column_layout.setContentsMargins(0, 0, 0, 0)
+        column_layout.setSpacing(0)
+        if toolbar is not None:
+            column_layout.addWidget(toolbar)
+            self.frame.setProperty("attached", True)   # oben eckig, weil die Leiste den Radius trägt
+            toolbar.visibility_changed.connect(lambda _v: self.update())
+        column_layout.addWidget(self.frame, 1)
 
         margin = LAYOUT.paper_margin
         layout = QHBoxLayout(self)
         layout.setContentsMargins(margin, margin - SHADOW_OFFSET_Y // 2, margin, margin)
         layout.addStretch(1)
-        layout.addWidget(self.frame, 0)
+        layout.addWidget(self.column, 0)
         layout.addStretch(1)
         self._layout = layout
         self.set_paper_mode(paper_mode)
@@ -82,9 +95,9 @@ class EditorPage(QWidget):
             # Maximale Textbreite in Zeichen + Zeilennummern + rechter Rand + Scrollbar.
             # Das ist ein Maximum: wird das Fenster schmaler, schrumpft das Blatt mit.
             text_width = int(LAYOUT.paper_max_columns * self.editor.char_width())
-            self.frame.setMaximumWidth(text_width + self.editor.gutter_width() + SPACING.xl + LAYOUT.scrollbar + SPACING.sm)
+            self.column.setMaximumWidth(text_width + self.editor.gutter_width() + SPACING.xl + LAYOUT.scrollbar + SPACING.sm)
         else:
-            self.frame.setMaximumWidth(QWIDGETSIZE_MAX)
+            self.column.setMaximumWidth(QWIDGETSIZE_MAX)
         # Das Blatt bekommt (fast) allen Platz bis zu seiner Maximalbreite, der Rest
         # verteilt sich gleichmäßig auf beide Seiten -> zentriert
         self._layout.setStretch(0, 1)
@@ -119,7 +132,7 @@ class EditorPage(QWidget):
 
     def paintEvent(self, event) -> None:
         super().paintEvent(event)
-        geo: QRect = self.frame.geometry()
+        geo: QRect = self.column.geometry()   # Leiste + Blatt werfen einen gemeinsamen Schatten
         if geo.isEmpty() or not LAYOUT.paper_shadow or LAYOUT.paper_shadow_alpha <= 0:
             return
         width, height = geo.width() + 2 * SHADOW_BLUR, geo.height() + 2 * SHADOW_BLUR

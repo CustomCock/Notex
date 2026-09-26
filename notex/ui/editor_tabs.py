@@ -20,6 +20,7 @@ from notex.theme.tokens import COLORS, DURATION, FONT_SIZE
 from notex.ui import anim
 from notex.ui.editor import Editor
 from notex.ui.grammar_service import GrammarService
+from notex.ui.toolbar import EditorToolbar
 from notex.ui.paper import EditorPage
 from notex.ui.widgets import EditorTabBar
 
@@ -77,6 +78,10 @@ class EditorTabs(QTabWidget):
             self.grammar.restart()
         self.font_size = FONT_SIZE.editor
         self.paper_mode = True
+        self.editor_actions: dict = {}          # QActions aus dem Hauptfenster für die Bearbeitungsleiste
+        self.open_font_settings = lambda: None  # setzt das Hauptfenster
+        self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
+        self.line_numbers = bool(self.config.get("line_numbers", True))
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)
         self.tab_bar.close_requested.connect(self.close_tab)
@@ -141,7 +146,11 @@ class EditorTabs(QTabWidget):
             editor.cursorPositionChanged.connect(self.status_changed.emit)
             editor.textChanged.connect(self.status_changed.emit)
             editor.zoom_requested.connect(self.zoom)
-            page = EditorPage(editor, self.paper_mode)
+            toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
+            toolbar.set_expanded(self.toolbar_visible, animate=False)
+            toolbar.visibility_changed.connect(self._on_toolbar_toggled)
+            editor.set_line_numbers(self.line_numbers)
+            page = EditorPage(editor, self.paper_mode, toolbar)
             index = self.addTab(page, path.name)
             self.setTabToolTip(index, self.relative(path))
             self.file_opened.emit(path)
@@ -292,6 +301,8 @@ class EditorTabs(QTabWidget):
         for page in self.pages():
             page.editor.set_text_font(self.font_family_for(page.editor.path))
             page.retheme()
+            if page.toolbar is not None:
+                page.toolbar.retheme()
             if page.editor.highlighter is not None:
                 page.editor.highlighter.reset()   # Wellenlinien in neuen Theme-Farben
         self.tab_bar.update()
@@ -323,6 +334,42 @@ class EditorTabs(QTabWidget):
             if editor.highlighter is not None:
                 editor.highlighter.clear_grammar()
             self._apply_spell_to(editor)
+
+    # ---- Bearbeitungsleiste ---------------------------------------------------------
+    def _on_toolbar_toggled(self, expanded: bool) -> None:
+        if expanded != self.toolbar_visible:
+            self.toolbar_visible = expanded
+            self.config["toolbar_visible"] = expanded
+            for page in self.pages():
+                if page.toolbar is not None and page.toolbar.expanded != expanded:
+                    page.toolbar.set_expanded(expanded)
+
+    def toggle_toolbar(self) -> None:
+        self._on_toolbar_toggled(not self.toolbar_visible)
+
+    def sync_toolbars(self) -> None:
+        page = self.currentWidget()
+        if isinstance(page, EditorPage) and page.toolbar is not None:
+            page.toolbar.sync(page.editor)
+
+    def set_line_numbers(self, visible: bool) -> None:
+        self.line_numbers = visible
+        self.config["line_numbers"] = visible
+        for page in self.pages():
+            page.editor.set_line_numbers(visible)
+            page.refresh_width()
+
+    def set_encoding(self, encoding: str) -> None:
+        editor = self.current_editor()
+        if editor is not None:
+            editor.set_encoding(encoding)
+            self.status_changed.emit()
+
+    def set_eol(self, eol: str) -> None:
+        editor = self.current_editor()
+        if editor is not None:
+            editor.set_eol(eol)
+            self.status_changed.emit()
 
     def grammar_note(self) -> str:
         return self.grammar.note if self.config.get("grammar", {}).get("enabled") else ""

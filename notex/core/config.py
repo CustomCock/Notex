@@ -35,6 +35,8 @@ DEFAULTS: dict[str, Any] = {
     "active_tab": 0,
     "font_size": 14,          # Zoomstufe = Schriftgröße des Editors in Pixeln
     "paper_mode": True,       # Blatt zentriert mit maximaler Textbreite (False = volle Breite)
+    "toolbar_visible": True,  # Bearbeitungsleiste über dem Blatt ausgeklappt
+    "line_numbers": True,
     "theme": default_theme(), # das aktive Theme, komplett (Presets/Dateien sind nur Vorlagen)
     "spellcheck": {
         "enabled": True,

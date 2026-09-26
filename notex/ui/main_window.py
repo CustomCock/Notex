@@ -24,6 +24,7 @@ from notex.ui import anim
 from notex.core.theme_store import ThemeStore
 from notex.paths import app_root
 from notex.theme.manager import theme_manager
+from notex.core import text_ops as ops
 from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
 
@@ -80,6 +81,7 @@ class MainWindow(QMainWindow):
 
         self._connect_signals()
         self._build_menu()
+        self._build_editor_actions()
         self._restore_window_state()
         theme_manager().changed.connect(self.retheme)
 
@@ -266,6 +268,8 @@ class MainWindow(QMainWindow):
     def retheme(self) -> None:
         """Nach einem Theme-Wechsel: alles nachziehen, was Farben/Icons/Abstände selbst hält."""
         self.sidebar_button.setIcon(icon("panel-left"))
+        for action in self.tabs.editor_actions.values():
+            action.setIcon(icon(action.data()))
         self.sidebar.retheme()
         self.tabs.retheme()
         self.find_bar.retheme()
@@ -279,6 +283,7 @@ class MainWindow(QMainWindow):
         self.tabs.set_paper_mode(enabled)
         self.paper_action.setChecked(enabled)
         self.config["paper_mode"] = enabled
+        self._sync_editor_actions()
 
 
     def focus_search(self) -> None:
@@ -379,6 +384,77 @@ class MainWindow(QMainWindow):
         self.status.showMessage(f"„{self.tabs.relative(path)}“ wurde extern gelöscht oder verschoben.", 8000)
         self._update_status()
 
+    # ---- Aktionen der Bearbeitungsleiste -----------------------------------------
+    def _editor_action(self, key: str, icon_name: str, text: str, shortcut: str | None, slot, checkable: bool = False) -> QAction:
+        action = QAction(icon(icon_name), text, self)
+        action.setData(icon_name)   # für den Icon-Refresh beim Theme-Wechsel
+        if shortcut:
+            action.setShortcut(QKeySequence(shortcut))
+            action.setToolTip(f"{text}  {shortcut}")
+        else:
+            action.setToolTip(text)
+        action.setCheckable(checkable)
+        action.triggered.connect(slot)
+        self.addAction(action)
+        self.tabs.editor_actions[key] = action
+        return action
+
+    def _with_editor(self, func) -> None:
+        editor = self.tabs.current_editor()
+        if editor is not None:
+            func(editor)
+
+    def _build_editor_actions(self) -> None:
+        a, ed = self._editor_action, self._with_editor
+        a("undo", "undo-2", "Rückgängig", None, lambda: ed(lambda e: e.undo())).setToolTip("Rückgängig  Ctrl+Z")
+        a("redo", "redo-2", "Wiederholen", None, lambda: ed(lambda e: e.redo())).setToolTip("Wiederholen  Ctrl+Y")
+        a("find", "search", "Suchen", None, lambda: self.find_bar.open(with_replace=False)).setToolTip("Suchen  Ctrl+F")
+        a("replace", "replace", "Ersetzen", None, lambda: self.find_bar.open(with_replace=True)).setToolTip("Ersetzen  Ctrl+H")
+        a("font_smaller", "minus", "Textgröße verkleinern (Ansicht, ändert nichts an der Datei)", None, lambda: self.tabs.zoom(-1))
+        a("font_larger", "plus", "Textgröße vergrößern (Ansicht, ändert nichts an der Datei)", None, lambda: self.tabs.zoom(+1))
+        a("zoom_reset", "rotate-ccw", "Zoom zurücksetzen", None, lambda: self.tabs.set_font_size(FONT_SIZE.editor)).setToolTip("Zoom zurücksetzen  Ctrl+0")
+        self.paper_toolbar_action = a("paper_mode", "minimize-2", "Blatt-Modus / volle Breite", None, self.toggle_paper_mode, checkable=True)
+        self.paper_toolbar_action.setToolTip("Blatt zentrieren / volle Breite  Alt+P")
+        self.line_numbers_action = a("line_numbers", "hash", "Zeilennummern", "Ctrl+Alt+N",
+                                     lambda: self.tabs.set_line_numbers(not self.tabs.line_numbers), checkable=True)
+        a("dup_line", "copy-plus", "Zeile duplizieren", "Ctrl+D", lambda: ed(lambda e: e.apply_line_op(ops.duplicate_lines)))
+        a("move_up", "arrow-up", "Zeile(n) nach oben", "Alt+Up", lambda: ed(lambda e: e.move_lines(-1)))
+        a("move_down", "arrow-down", "Zeile(n) nach unten", "Alt+Down", lambda: ed(lambda e: e.move_lines(+1)))
+        a("sort_lines", "arrow-down-a-z", "Zeilen sortieren", "F9", lambda: ed(lambda e: e.apply_line_op(ops.sort_lines)))
+        a("unique_lines", "list-minus", "Doppelte Zeilen entfernen", "Ctrl+Shift+D", lambda: ed(lambda e: e.apply_line_op(ops.unique_lines)))
+        a("strip_ws", "eraser", "Leerzeichen am Zeilenende entfernen", None, lambda: ed(lambda e: e.apply_line_op(ops.strip_trailing_whitespace)))
+        a("upper", "case-upper", "GROSSBUCHSTABEN", "Ctrl+Shift+U", lambda: ed(lambda e: e.apply_text_op(ops.to_upper)))
+        a("lower", "case-lower", "kleinbuchstaben", "Ctrl+U", lambda: ed(lambda e: e.apply_text_op(ops.to_lower)))
+        a("title", "case-sensitive", "Wortanfänge Groß", "Ctrl+Alt+U", lambda: ed(lambda e: e.apply_text_op(ops.to_title)))
+        a("datetime", "calendar-clock", "Datum/Uhrzeit einfügen", "F5", lambda: ed(lambda e: e.insert_text(ops.date_time_stamp())))
+        a("md_bold", "bold", "Fett", "Ctrl+Alt+B", lambda: ed(lambda e: e.apply_text_op(ops.toggle_bold)))
+        a("md_italic", "italic", "Kursiv", "Ctrl+Alt+I", lambda: ed(lambda e: e.apply_text_op(ops.toggle_italic)))
+        a("md_heading", "heading", "Überschrift", "Ctrl+Alt+H",
+          lambda: ed(lambda e: e.apply_line_op(lambda ls: [ops.toggle_heading(l) for l in ls])))
+        a("md_list", "list", "Liste", "Ctrl+Alt+L", lambda: ed(lambda e: e.apply_line_op(ops.toggle_list)))
+        a("md_checkbox", "square-check", "Checkbox", "Ctrl+Alt+X", lambda: ed(lambda e: e.apply_line_op(ops.toggle_checkbox)))
+        a("md_code", "code", "Code", "Ctrl+Alt+C", lambda: ed(lambda e: e.apply_text_op(ops.toggle_code)))
+        a("md_link", "link", "Link", "Ctrl+K", lambda: ed(lambda e: e.apply_text_op(ops.toggle_link)))
+        self.spell_toolbar_action = a("spell", "spell-check", "Rechtschreibung", None, self.toggle_spellcheck, checkable=True)
+        self.spell_toolbar_action.setToolTip("Rechtschreibung prüfen  F7")
+        self.grammar_toolbar_action = a("grammar", "languages", "Grammatik (LanguageTool)", None, self.toggle_grammar, checkable=True)
+        self.grammar_toolbar_action.setToolTip("Grammatik prüfen  Shift+F7")
+        self.toolbar_action = self._action("Bearbeitungsleiste", "Ctrl+Shift+E", self.tabs.toggle_toolbar, checkable=True)
+        self.toolbar_action.setChecked(self.tabs.toolbar_visible)
+        self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
+        self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
+
+    def _sync_editor_actions(self) -> None:
+        """Checkbare Toolbar-Aktionen an den aktuellen Zustand angleichen."""
+        editor = self.tabs.current_editor()
+        self.paper_toolbar_action.setChecked(self.tabs.paper_mode)
+        self.line_numbers_action.setChecked(self.tabs.line_numbers)
+        self.toolbar_action.setChecked(self.tabs.toolbar_visible)
+        if editor is not None:
+            self.spell_toolbar_action.setChecked(self.tabs.spell_enabled_for(editor.path))
+            self.grammar_toolbar_action.setChecked(self.tabs.grammar_enabled_for(editor.path))
+        self.tabs.sync_toolbars()
+
     def _update_status(self) -> None:
         self.editor_stack.setCurrentWidget(self.tabs if self.tabs.count() else self.empty_state)
         if not self.tabs.count():
@@ -390,6 +466,7 @@ class MainWindow(QMainWindow):
             return
         relative = self.tabs.relative(editor.path)
         self.status.update_for(editor, relative)
+        self._sync_editor_actions()
         self.status.set_spell_state(
             self.tabs.spell_enabled_for(editor.path), self.tabs.grammar_enabled_for(editor.path),
             editor.language or self.config["spellcheck"]["language"], editor.language is not None,

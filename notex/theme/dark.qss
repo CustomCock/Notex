@@ -581,3 +581,69 @@ QStatusBar QToolButton#IconButton {
 QStatusBar QToolButton#IconButton:checked {
     background: @selection;
 }
+
+/* ---------- Bearbeitungsleiste über dem Blatt ---------- */
+QFrame#EditorToolbar {
+    background: @surface;
+    border-top-left-radius: @r_panelpx;
+    border-top-right-radius: @r_panelpx;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+QFrame#EditorToolbar QWidget#ToolbarStrip, QFrame#EditorToolbar QWidget#ToolbarGroup {
+    background: transparent;
+}
+QFrame#PaperFrame[attached="true"] {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+QToolButton#ToolbarHandle {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    min-height: 0;
+}
+QToolButton#ToolbarHandle:hover {
+    background: @hover;
+}
+QToolButton#ToolbarMenuButton {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: @r_controlpx;
+    color: @text_muted;
+    padding: 2px @sp_smpx;
+    min-height: 0;
+    font-size: @fs_smallpx;
+}
+QToolButton#ToolbarMenuButton:hover {
+    background: @hover;
+    color: @text;
+}
+QToolButton#ToolbarMenuButton::menu-indicator {
+    image: none;
+    width: 0;
+}
+QComboBox#ToolbarCombo {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 2px @sp_smpx;
+    min-height: 0;
+    color: @text_muted;
+    font-size: @fs_smallpx;
+}
+QComboBox#ToolbarCombo:hover {
+    background: @hover;
+    color: @text;
+}
+QLineEdit#ToolbarSize {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 2px 0;
+    color: @text_muted;
+    font-size: @fs_smallpx;
+}
+QLineEdit#ToolbarSize:hover, QLineEdit#ToolbarSize:focus {
+    background: @hover;
+    color: @text;
+}

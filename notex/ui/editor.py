@@ -16,6 +16,7 @@ from PySide6.QtGui import QAction, QColor, QPainter, QTextBlockFormat, QTextChar
 from PySide6.QtWidgets import QFrame, QMenu, QTextEdit, QWidget
 
 from notex.core.encoding import TextFile
+from notex.core import text_ops as ops
 from notex.core.text_ops import hanging_prefix
 from notex.core.spell import SpellChecker, LANGUAGE_LABELS
 from notex.theme.icons import icon
@@ -67,6 +68,7 @@ class Editor(QTextEdit):
         self.document().setDocumentMargin(SPACING.xs)
         self.setCursorWidth(2)
         self._padding = LAYOUT.paper_padding   # aktueller Innenabstand (schrumpft bei schmalem Blatt)
+        self._show_numbers = True
         self._indent_pending: set[int] = set()
         self._indent_timer = QTimer(self)
         self._indent_timer.setSingleShot(True)
@@ -329,6 +331,8 @@ class Editor(QTextEdit):
 
     # ---- Zeilennummern --------------------------------------------------------
     def gutter_width(self) -> int:
+        if not self._show_numbers:
+            return self._padding
         digits = max(2, len(str(max(1, self.document().blockCount()))))
         from PySide6.QtGui import QFontMetrics
         return self._padding + QFontMetrics(self._number_font()).horizontalAdvance("9") * digits + GUTTER_GAP
@@ -385,6 +389,89 @@ class Editor(QTextEdit):
                 painter.drawText(0, top, right, height, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
                                  str(block.blockNumber() + 1))
             block = block.next()
+
+    # ---- Werkzeuge der Bearbeitungsleiste ---------------------------------------
+    def set_line_numbers(self, visible: bool) -> None:
+        self.line_numbers.setVisible(visible)
+        self._show_numbers = visible
+        self._update_margins()
+
+    def set_encoding(self, encoding: str) -> None:
+        if encoding != self.encoding:
+            self.encoding = encoding
+            self.document().setModified(True)   # wirkt erst beim Speichern, ist aber eine Änderung
+
+    def set_eol(self, eol: str) -> None:
+        if eol != self.eol:
+            self.eol = eol
+            self.document().setModified(True)
+
+    def _block_range(self) -> tuple[int, int]:
+        """Erste und letzte Blocknummer der Auswahl (ohne Auswahl: der Cursor-Block)."""
+        cursor = self.textCursor()
+        start = self.document().findBlock(cursor.selectionStart()).blockNumber()
+        end_pos = cursor.selectionEnd()
+        if cursor.hasSelection() and end_pos > cursor.selectionStart():
+            end_pos -= 1   # eine Auswahl, die genau am Zeilenanfang endet, gehört nicht zur nächsten Zeile
+        end = self.document().findBlock(end_pos).blockNumber()
+        return start, end
+
+    def _replace_blocks(self, first: int, last: int, lines: list[str], select: tuple[int, int] | None = None) -> None:
+        """Ersetzt die Blöcke first..last durch `lines` und markiert danach select=(erste, letzte) Blöcke."""
+        doc = self.document()
+        cursor = QTextCursor(doc)
+        cursor.setPosition(doc.findBlockByNumber(first).position())
+        last_block = doc.findBlockByNumber(last)
+        cursor.setPosition(last_block.position() + last_block.length() - 1, QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText("\n".join(lines))
+        if select is not None:
+            a, b = select
+            sel = QTextCursor(doc)
+            sel.setPosition(doc.findBlockByNumber(a).position())
+            end_block = doc.findBlockByNumber(b)
+            sel.setPosition(end_block.position() + end_block.length() - 1, QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(sel)
+
+    def apply_line_op(self, func) -> None:
+        """Wendet eine Funktion auf die ausgewählten Zeilen an (Liste rein, Liste raus)."""
+        first, last = self._block_range()
+        lines = [self.document().findBlockByNumber(n).text() for n in range(first, last + 1)]
+        new_lines = func(lines)
+        if new_lines == lines:
+            return
+        self._grouped(lambda: self._replace_blocks(first, last, new_lines, (first, first + len(new_lines) - 1)))
+
+    def move_lines(self, direction: int) -> None:
+        first, last = self._block_range()
+        count = self.document().blockCount()
+        if direction < 0 and first == 0 or direction > 0 and last >= count - 1:
+            return
+        lo, hi = (first - 1, last) if direction < 0 else (first, last + 1)
+        lines = [self.document().findBlockByNumber(n).text() for n in range(lo, hi + 1)]
+        moved, start, end = ops.move_lines(lines, first - lo, last - lo + 1, direction)
+        self._grouped(lambda: self._replace_blocks(lo, hi, moved, (lo + start, lo + end - 1)))
+
+    def apply_text_op(self, func) -> None:
+        """Wendet eine Funktion auf die Auswahl an (ohne Auswahl: das Wort unter dem Cursor)."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+        text = cursor.selectedText().replace("\u2029", "\n")
+        new_text = func(text)
+        if new_text == text:
+            return
+        start = cursor.selectionStart()
+
+        def do() -> None:
+            cursor.insertText(new_text)
+            cursor.setPosition(start)
+            cursor.setPosition(start + len(new_text), QTextCursor.MoveMode.KeepAnchor)
+            self.setTextCursor(cursor)
+
+        self._grouped(do)
+
+    def insert_text(self, text: str) -> None:
+        self._grouped(lambda: self.textCursor().insertText(text))
 
     # ---- Rechtschreibung -----------------------------------------------------
     def set_spellcheck(self, spelling: bool, grammar: bool) -> None:

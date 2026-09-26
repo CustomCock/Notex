@@ -82,6 +82,14 @@ class FakeLanguageTool(BaseHTTPRequestHandler):
 
 SAMPLE = {
     "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
+    "Projekte/Notex/links.txt": (
+        "Lange Zeilen brechen um, nichts scrollt seitlich:\n\n"
+        "https://github.com/CustomCock/Notex/blob/main/notex/ui/editor.py#L120-L180?utm_source=readme&utm_campaign=portable_editor_2026\n\n"
+        "SHA-256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n\n"
+        "- Listenpunkte behalten beim Umbruch ihre Einrückung, auch wenn der Text so lang ist, dass er über mehrere Zeilen läuft und weiterläuft.\n"
+        "  - Verschachtelte Punkte ebenso, hier mit einem Windows-Pfad: C:\\Users\\Philipp\\Documents\\Notex\\data\\Projekte\\Notex\\links.txt\n"
+        "1. Nummerierte Listen genauso, damit die Struktur beim Lesen erkennbar bleibt, egal wie schmal das Fenster gerade ist.\n"
+    ),
     "Projekte/Notex/README.md": "# Notex\n\nPortabler Explorer + Editor für Textdateien.\n\n## Ziele\n\n- portabel\n- schnell\n- ruhig im Design\n",
     "Projekte/Notex/todo.txt": "[ ] Suche testen\n[x] Encoding-Erkennung\n[ ] Release v0.1.0 taggen\n[ ] Screenshot für README\n",
     "Projekte/Python/notizen.md": "# Python-Notizen\n\n## Dataclasses\n\nEin `@dataclass` erzeugt __init__, __repr__ und __eq__ automatisch.\nFrozen dataclasses sind unveränderlich – gut für Design-Tokens.\n\n## Pathlib\n\n`Path(__file__).resolve().parent` liefert den Ordner der Datei.\nDas ist die Grundlage für portable Apps: Root relativ zur EXE ermitteln.\n\n## Threads\n\nEin `threading.Event` ist die einfachste Art, einen Worker sauber abzubrechen.\nDie Suche in Notex prüft das Event einmal pro Datei.\n",
@@ -214,6 +222,19 @@ def main() -> int:
         later(1400, s_spelling)
 
     def s_spelling():
+        # Bearbeitungsleiste: Markdown-Gruppe, eingeklappt, schmales Fenster mit Überlauf, lange URLs
+        window.sidebar.tree.select_path(data / "Projekte/Python/notizen.md")
+        window.tabs.open_file(data / "Projekte/Python/notizen.md")
+        later(200, lambda: save(window, "16-toolbar-markdown"))
+        later(300, lambda: window.tabs.toggle_toolbar())
+        later(700, lambda: save(window, "17-toolbar-collapsed"))
+        later(800, lambda: (window.tabs.toggle_toolbar(), window.resize(820, 700)))
+        later(1300, lambda: save(window, "18-toolbar-overflow"))
+        later(1400, lambda: (window.resize(1280, 800), window.tabs.open_file(data / "Projekte/Notex/links.txt")))
+        later(1900, lambda: save(window, "19-wrap-long-lines"))
+        later(2000, s_spelling_open)
+
+    def s_spelling_open():
         editor = window.tabs.open_file(data / "Projekte/Notex/rechtschreibung.md")
         window.sidebar.tree.select_path(data / "Projekte/Notex/rechtschreibung.md")
         editor.goto_line(3, 0, 0)
@@ -242,7 +263,7 @@ def main() -> int:
         app.quit()
 
     later(500, s_empty)
-    later(25000, app.quit)
+    later(40000, app.quit)
     code = app.exec()
     httpd.shutdown()
     httpd.server_close()
