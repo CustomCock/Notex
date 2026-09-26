@@ -23,6 +23,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
+| 1.6.0 | Block F: Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün (Tests + Builds Win/Linux), lokal getaggt, kein Release (Besitzer) |
 
 ## Erledigt
 
@@ -110,6 +111,59 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
   wiktionary.org); Parser auf die dokumentierten Wikitext-Formate gebaut und mit realistischen Auszügen getestet.
 - Screenshot-Skript: virtueller Full-HD-Bildschirm (offscreen war 800×600 und kürzte Menüs).
 
+### 1.6.0 – Block F
+- Build-Größen (Build-Check-Artefakte): vorher Windows-ZIP ≈ 96,2 MB, Linux-tar.gz ≈ 91,4 MB; nach F6
+  Windows ≈ 96,7 MB, Linux ≈ 92,6 MB (Qt6Pdf lag über das PDF-Bildformat-Plugin schon großteils im Build).
+- F6 vorab gemessen: QtPdf+QtPdfWidgets Windows 5,0 MB entpackt / ≈ 2,7 MB in der ZIP, Linux ≈ 5 MB entpackt
+  (QtNetwork ist wegen der Einzelinstanz ohnehin dabei) → unter 25 MB, wird umgesetzt.
+- F1 Bilder: `core/images.py` (asset_name, assets_dir, relative/encodierte Links, image_links inkl. <…>-Links und <img>,
+  plan_assets_move mit Verschieben/Kopieren, find_unused_images, can_embed_images = nie in .ntx), `ui/viewer_page.py`
+  (Basis für Nicht-Editor-Tabs), `ui/image_view.py`, `ui/unused_images_dialog.py`; EditorTabs mit Viewer-Registry,
+  viewer_kind_for (Bild/PDF/Hex nach Endung + Magic), Viewer in open_paths/Umbenennen/Schließen/Split-Verschieben;
+  Editor.image_hook für Ctrl+V/Drop; Config images.assets_folder, extensions_version 4.
+- `core/filetype.py` (aus F4 vorgezogen, weil die Tab-Wahl ihn braucht).
+- F2 CSV: `core/csvdata.py` (sniff mit Sniffer + Zähl-Fallback, Quoting-Stil „minimal“/„all“, parse/serialize,
+  to_number deutsch/englisch, Sortier-/Filter-Indizes), `ui/csv_view.py` (CsvModel = QAbstractTableModel über
+  Zeilenlisten, Ansicht per Indexliste; CsvView mit Leiste). EditorPage kennt jetzt Datenmodi (`DATA_MODES` =
+  table/tree, `view_modes` je Datei, `flush_data_view()` schreibt als EIN Undo-Schritt zurück – vor Speichern,
+  Speichern unter und beim Zurückschalten). Der Editortext bleibt Quelle der Wahrheit; externe Änderungen/Neu lesen
+  laden die Tabelle nach. Encoding-Override über `encoding.decode_as` (liest die Datei neu, fragt bei ungespeicherten
+  Änderungen). Text-Befehle (Ctrl+D, Groß/klein …) sind in der Datenansicht gesperrt, Ctrl+F springt ins Filterfeld.
+  Config `data_view.csv_as_table`, `data_view.json_indent` (für F3).
+- F3 JSON/YAML: `core/structured.py` (kind_for, validate/parse mit ParseError Zeile/Spalte/Position, format_json
+  token-basiert – Literale bleiben exakt, minify, YAML nur safe_load_all/safe_dump(_all) mit sort_keys=False,
+  yaml_has_comments, path_string `$.a[3]["x y"]`, preview/type_name/children), `ui/tree_view.py` (DataTreeView,
+  lazy Kinder, max. 5000 je Knoten, Werte Python-seitig in `_nodes` statt QVariant), `ui/structured_commands.py`
+  (Befehle + Live-Prüfung: Timer 600 ms, nicht neu gestartet → beim Tippen höchstens alle 0,6 s; Cache nach Pfad,
+  weil PySide für `document()` jedes Mal neue Wrapper liefert → `id()` taugt nicht). Editor.set_problem (rote
+  Welle), StatusBar.problem_button (auch für Dateityp-Warnungen in F4). Entscheidung: PyYAML==6.0.3 exakt gepinnt.
+- F4 Hex/Typ/Hashes: `core/hexdata.py` (PagedFile: 64-KB-Seiten, LRU 32, Datei nur je Lesevorgang offen –
+  Entscheidung gegen mmap, weil Windows gemappte Dateien nicht umbenennen/löschen lässt; parse_offset,
+  parse_hex_pattern, search_file blockweise mit Überlappung + Umlauf + Abbruch), `core/hashing.py` (ein
+  Lesedurchgang für alle vier, normalize/match_digest), `ui/hex_view.py` (_HexArea selbst gezeichnet,
+  Scrollbalken skaliert ab 1 Mrd. Zeilen, Suche in QThread), `ui/hash_dialog.py`. Baum-Kontextmenü „Als Hex
+  öffnen“/„Prüfsummen …“, Dateityp-Warnung über StatusBar.problem_button, Token `success`. Watcher:
+  `fileops.file_signature` (> 16 MB Größe+mtime+Rand-Hash). 3 GB: Öffnen 0,06 s, Suche bis Ende ~3–17 s im Hintergrund.
+- F5 Live: `core/tail.py` (Tailer mit Datei-ID (st_dev, st_ino) für Rotation, Größe < Position = Kürzung,
+  inkrementeller Decoder, CRLF über Blockgrenzen, angefangene Zeile zurückgehalten, max. 2 MB pro poll, Start mit den
+  letzten 8 MB; classify ERROR/WARN; LogFilter mit Timeout-Regex aus core.search; can_follow = nie .ntx),
+  `ui/log_view.py` (QPlainTextEdit mit maximumBlockCount 200k, Poll 500 ms im UI-Thread – liest nur Zuwachs;
+  Level-Highlighter). EditorPage-Modus „live“ (in DATA_MODES, aber nicht im Ctrl+Shift+V-Zyklus); Watcher-Rückfragen
+  (geändert/entfernt) für live-Pfade unterdrückt, beim Beenden neu beobachten und Editor von der Platte laden.
+  Token `warning`.
+- F6 PDF: `core/pdfdoc.py` (PageLayout, fit-Skalen, snap_to_lines, clean_selection inkl. PDFium-Trennmarker
+  U+FFFE, quote_markdown), `ui/pdf_view.py` – eigene Seitenansicht statt QPdfView (Entscheidung: QPdfView kann
+  keine Textauswahl); QPdfPageRenderer MultiThreaded + Bild-Cache 24, Auswahl über getSelection mit Einrasten auf
+  Zeilenboxen aus getAllText().bounds() (PDFium trifft nur exakt auf Glyphen; Zeichenboxen einzeln wären ~0,2 ms/Zeichen),
+  QPdfSearchModel, QPdfBookmarkModel. Laden über QBuffer (≤ 256 MB) → keine Dateisperre. Nur QtPdf, kein
+  QtPdfWidgets. build.py: QtPdf nicht mehr ausgeschlossen, Hidden-Import. Zitat: EditorArea.pdf_quote →
+  MainWindow._insert_pdf_quote (Notiz im anderen Teil, sonst Zwischenablage). Split auch aus Viewer-Tabs.
+- CI-Fix: Grammatik-Rate-Limit schläft bis der Mindestabstand wirklich erreicht ist (Windows-Uhr ≈16 ms).
+- Screenshots 38–45 (Bild, CSV, JSON-Baum/-Fehler, Hex, Prüfsummen, Live-Log, PDF-Zitat) in README eingebunden.
+- Nebenbei: großes Öffnen beschleunigt (Highlighter während `load()` ausgesetzt, `schedule_reset` fasst Laden +
+  Resolver zu einem Durchlauf zusammen, hängende Einrückung nur bei geänderter Schriftmetrik). 100k Zeilen:
+  Öffnen ~2 s + ~1 s Einfärben (vorher ~12 s), Tabelle 0,5 s, Sortieren 0,2 s, Filtern 0,05 s.
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -157,9 +211,13 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 
 ## Nächster Schritt
 
-Alle vier Blöcke (A–D) sind umgesetzt. Offen ist nur, was der Besitzer entscheidet:
-1. Release: Branch nach `main` mergen und `v1.4.0` taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
-   (Tags v1.2.0–v1.4.0 existieren nur lokal in der Arbeitsumgebung.)
+Blöcke A–F sind umgesetzt (1.6.0 lokal getaggt, kein Release). **Gestoppt nach Block F** – weiter mit Block G
+(1.7.0: Umwandeln-Menü, Snippets, ▶ Python-Blöcke, Regex-Tester), sobald der Besitzer „weiter“ schreibt.
+Danach H (1.8.0: Karteikarten, Aufgaben, Gliederung, Fokus/Pomodoro) und I (1.9.0: Git-Backup, Export).
+
+Offen beim Besitzer:
+1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
+   (Tags ab v1.2.0 existieren nur lokal in der Arbeitsumgebung.)
 2. Aufräumen auf GitHub: Release/Tag „main“ löschen, Repo-Beschreibung „Textdateien“.
 3. Ideen für später (nicht beauftragt): Kürzel für Split View auf deutscher Tastatur prüfen (Ctrl+\ = Ctrl+AltGr+ß),
    Tab-Überlauf der Bearbeitungsleiste im Blatt-Modus, Mermaid/Fußnoten in der Vorschau.

@@ -2,6 +2,44 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.6.0] – 2026-09-26
+
+### Hinzugefügt
+- Bilder: Ctrl+V mit Bild bzw. Bilddateien auf eine .md ziehen legt das Bild in assets/ neben der Notiz ab und
+  verlinkt es (Ordner einstellbar, nie in .ntx); Bild-Tab mit Einpassen/100 %, Mausrad-Zoom, Verschieben, Maße und
+  Größe in der Statusleiste; Bilder und PDFs im Baum (Config-Migration); beim Verschieben einer Notiz Rückfrage,
+  ob ihre Bilder mitkommen; „Unbenutzte Bilder finden“ mit Vorschau statt automatischem Löschen
+- Dateityp-Erkennung über Magic Bytes (eigene Signaturtabelle) als Grundlage für Viewer-Tabs; Symbole im Baum
+  nach Dateityp
+- CSV/TSV als Tabelle (Ctrl+Shift+V, pro Tab): Trennzeichen, Quoting und Encoding automatisch erkannt und
+  überschreibbar, Kopfzeile umschaltbar, Sortieren per Spaltenklick (numerisch erkannt), Filter über alle Spalten,
+  Zellen/Zeilen/Spalten bearbeiten, Blöcke kopieren/einfügen; Speichern erhält Trennzeichen, Quoting-Stil, Encoding
+  und Zeilenenden; 100 000 Zeilen ohne Einfrieren; Einstellung „CSV/TSV direkt als Tabelle öffnen“
+- JSON/YAML: Formatieren (Shift+Alt+F, Einrückung einstellbar), Minimieren (Shift+Alt+M), Prüfen (Shift+Alt+V und
+  beim Tippen) mit Zeile/Spalte in der Statusleiste und Markierung im Text; JSON token-basiert (Zahlen und Escapes
+  bleiben exakt); Baumansicht mit Pfad (`$.users[3].name`) und „Pfad kopieren“; YAML nur safe_load/safe_dump,
+  Warnung vor dem Formatieren, wenn Kommentare verloren gingen
+- Hex-Ansicht (nur lesen, automatisch für unbekannte Binärdateien, „Als Hex öffnen“ im Baum): Offset/Hex/ASCII
+  mit synchroner Auswahl, Gehe zu Offset (dezimal/hex), Suche nach Hex-Bytes oder Text im Hintergrund, seitenweises
+  Lesen ohne offenes Handle – mehrere GB öffnen sofort
+- Dateityp per Magic Bytes in der Statusleiste mit Warnung, wenn die Endung nicht passt
+- Prüfsummen (MD5, SHA-1, SHA-256, SHA-512) im Hintergrund mit Fortschritt, kopierbar, „Vergleichen mit …“ grün/rot
+- Live verfolgen (Ctrl+Shift+Alt+F) für .log und jede Textdatei: neue Zeilen mit Autoscroll, Pause beim
+  Hochscrollen („Pausiert – Ende anspringen“), Rotation/Kürzung erkannt, Filter ERROR / WARN+ / Text / Regex nur für
+  die Anzeige, ERROR/WARN farbig, nur lesend, keine „Neu laden?“-Rückfragen während live; optional für .log automatisch
+- PDF-Tab (QtPdf, nur lesen): Scrollen, Zoom, Seitensprung, Textsuche, Lesezeichen, Text markieren und kopieren,
+  „Als Zitat in Notiz einfügen“ (Markdown-Zitat mit Dateiname und Seite in die Notiz im anderen Teil der Ansicht);
+  keine Formulare/Skripte; Datei bleibt nicht gesperrt; Passwort-PDFs fragen nach dem Passwort
+- Teilen (Ctrl+\\) geht auch aus einem Bild-/PDF-/Hex-Tab heraus
+- Neue Abhängigkeit PyYAML 6.0.3 (MIT, exakt gepinnt)
+- UTF-16-Dateien mit BOM werden erkannt (z. B. „Unicode-Text“-Export aus Excel)
+
+### Verbessert
+- Externe Änderungen werden bei Dateien über 16 MB über Größe, Änderungszeit und Anfang/Ende erkannt statt über einen
+  Hash des ganzen Inhalts (vorher las schon das Öffnen einer 3-GB-Datei alles einmal komplett)
+- Große Dateien öffnen deutlich schneller (100 000 Zeilen: ~12 s → ~2 s): kein Hervorheben während des Ladens,
+  ein statt drei Durchläufe danach, Einrückungen nur bei echter Schriftänderung neu berechnet
+
 ## [1.5.0] – 2026-09-26
 
 ### Hinzugefügt

@@ -105,4 +105,15 @@ class LucideIconProvider(QFileIconProvider):
             is_dir = info_or_type in (QFileIconProvider.IconType.Folder, QFileIconProvider.IconType.Drive)
         else:
             is_dir = info_or_type.isDir()
+            if not is_dir:
+                return icon(FILE_ICONS.get("." + info_or_type.suffix().lower(), "file-text"))
         return icon("folder" if is_dir else "file-text")
+
+
+FILE_ICONS = {
+    **{ext: "image" for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".ico")},
+    ".csv": "file-spreadsheet", ".tsv": "file-spreadsheet",
+    ".json": "file-braces", ".yaml": "file-braces", ".yml": "file-braces",
+    ".pdf": "file-type", ".log": "scroll-text",
+    **{ext: "binary" for ext in (".bin", ".exe", ".dll", ".so", ".zip", ".gz", ".7z", ".rar", ".db", ".sqlite")},
+}

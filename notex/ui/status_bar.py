@@ -12,7 +12,8 @@ from PySide6.QtWidgets import QMenu
 
 from notex.ui.editor import Editor
 
-ENCODING_LABELS = {"utf-8": "UTF-8", "utf-8-sig": "UTF-8 BOM", "cp1252": "cp1252"}
+ENCODING_LABELS = {"utf-8": "UTF-8", "utf-8-sig": "UTF-8 BOM", "cp1252": "cp1252", "latin-1": "ISO-8859-1",
+                   "utf-16": "UTF-16"}
 
 
 LANGUAGE_SHORT = {"de": "DE", "en": "EN", "both": "DE+EN"}
@@ -22,6 +23,7 @@ class StatusBar(QStatusBar):
     spell_toggled = Signal()
     grammar_toggled = Signal()
     language_chosen = Signal(object)     # "de" | "en" | "both" | None (= global)
+    problem_clicked = Signal()           # JSON/YAML-Fehler bzw. Dateityp-Warnung angeklickt
 
     def __init__(self) -> None:
         super().__init__()
@@ -44,6 +46,10 @@ class StatusBar(QStatusBar):
         self.language_button.setMenu(self.language_menu)
         self.grammar_state_label = QLabel()
         self.grammar_state_label.setObjectName("StatusDot")
+        self.problem_button = QToolButton()
+        self.problem_button.setObjectName("StatusProblem")
+        self.problem_button.clicked.connect(self.problem_clicked)
+        self.problem_button.setVisible(False)
         self.readonly_label = QLabel("Schreibgeschützt")
         self.readonly_label.setObjectName("StatusWarn")
         self.readonly_label.setToolTip("Die Datei kann nicht überschrieben werden – Speichern bietet „Speichern unter …“ an")
@@ -58,6 +64,7 @@ class StatusBar(QStatusBar):
         self.addPermanentWidget(self.grammar_button)
         self.addPermanentWidget(self.language_button)
         self.addPermanentWidget(self.grammar_state_label)
+        self.addPermanentWidget(self.problem_button)
         self.addPermanentWidget(self.readonly_label)
         for i, label in enumerate((self.position_label, self.encoding_label, self.chars_label, self.dirty_label)):
             if i:
@@ -79,11 +86,34 @@ class StatusBar(QStatusBar):
         self.spell_button.setIcon(icon("spell-check"))
         self.grammar_button.setIcon(icon("languages"))
 
+    def set_problem(self, text: str, level: str = "error", tooltip: str = "") -> None:
+        """Rechts in der Leiste: „JSON gültig“ (level "ok"), Fehler mit Zeile/Spalte oder Warnung; "" blendet aus."""
+        self.problem_button.setText(text if len(text) <= 90 else text[:89] + "…")
+        self.problem_button.setToolTip(tooltip or text)
+        self.problem_button.setProperty("level", level)
+        self.problem_button.style().unpolish(self.problem_button)
+        self.problem_button.style().polish(self.problem_button)
+        self.problem_button.setVisible(bool(text))
+
+    def update_for_viewer(self, relative_path: str, parts: list[str]) -> None:
+        """Bild-/Hex-/PDF-Tab: Pfad links, rechts bis zu vier Angaben (Maße, Größe, Typ, Zoom …)."""
+        for widget in (self.spell_button, self.grammar_button, self.language_button, self.readonly_label,
+                       self.problem_button):
+            widget.setVisible(False)
+        self.path_label.setText(relative_path)
+        labels = (self.position_label, self.encoding_label, self.chars_label, self.dirty_label)
+        parts = list(parts)[:4] + [""] * (4 - min(4, len(parts)))
+        for label, text in zip(labels, parts):
+            label.setText(text)
+        for dot, text in zip(self._separators, parts[1:]):
+            dot.setVisible(bool(text))
+
     def update_for(self, editor: Editor | None, relative_path: str) -> None:
         labels = (self.position_label, self.encoding_label, self.chars_label, self.dirty_label)
         for widget in (self.spell_button, self.grammar_button, self.language_button):
             widget.setVisible(editor is not None)
         self.readonly_label.setVisible(editor is not None and getattr(editor, "read_only", False))
+        self.problem_button.setVisible(False)       # setzt das Hauptfenster danach passend zur Datei
         if editor is None:
             self.path_label.setText("")
             for label in labels:

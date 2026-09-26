@@ -2,8 +2,9 @@
 
 Erkennung (in dieser Reihenfolge):
 1. UTF-8 mit BOM  (die 3 Bytes EF BB BF am Anfang)     -> "utf-8-sig"
-2. UTF-8 ohne BOM (Bytes lassen sich strikt dekodieren) -> "utf-8"
-3. Fallback cp1252 (Windows-Westeuropa, kann jedes Byte dekodieren) -> "cp1252"
+2. UTF-16 mit BOM (FF FE / FE FF)                     -> "utf-16"
+3. UTF-8 ohne BOM (Bytes lassen sich strikt dekodieren) -> "utf-8"
+4. Fallback cp1252 (Windows-Westeuropa, kann jedes Byte dekodieren) -> "cp1252"
 
 Intern arbeitet der Editor immer mit "\n". Beim Speichern werden die
 Zeilenenden wieder in das Original-Format (CRLF oder LF) gewandelt.
@@ -28,6 +29,8 @@ class TextFile:
 def detect_encoding(data: bytes) -> str:
     if data.startswith(codecs.BOM_UTF8):
         return "utf-8-sig"
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return "utf-16"      # z. B. CSV-Export aus Excel („Unicode-Text“)
     try:
         data.decode("utf-8")
         return "utf-8"
@@ -49,6 +52,19 @@ def decode_bytes(data: bytes) -> TextFile:
     return TextFile(text=text, encoding=encoding, eol=eol)
 
 
+def decode_as(data: bytes, encoding: str) -> TextFile:
+    """Bytes mit einem vom Nutzer gewählten Encoding lesen (Erkennung überschreiben).
+
+    Nicht dekodierbare Bytes werden zu U+FFFD statt eines Fehlers – der Nutzer sieht dann, dass die Wahl
+    nicht passt, und kann eine andere probieren. utf-8-sig entfernt ein vorhandenes BOM.
+    """
+    if encoding == "utf-8" and data.startswith(codecs.BOM_UTF8):
+        encoding = "utf-8-sig"
+    raw_text = data.decode(encoding, errors="replace")
+    eol = detect_eol(raw_text)
+    return TextFile(text=raw_text.replace(CRLF, LF).replace("\r", LF), encoding=encoding, eol=eol)
+
+
 def read_text_file(path: Path) -> TextFile:
     return decode_bytes(Path(path).read_bytes())
 
@@ -61,5 +77,5 @@ def encode_text(text: str, encoding: str, eol: str) -> bytes:
     (&#128512;) geschrieben statt durch "?" ersetzt.
     """
     with_eol = text.replace(LF, eol) if eol != LF else text
-    errors = "xmlcharrefreplace" if encoding == "cp1252" else "strict"
+    errors = "xmlcharrefreplace" if encoding in ("cp1252", "latin-1") else "strict"
     return with_eol.encode(encoding, errors=errors)

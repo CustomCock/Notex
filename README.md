@@ -201,6 +201,135 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 
 ![Neue Woche](docs/31-new-week.png)
 
+## Bilder
+
+- **Einfügen:** Ctrl+V mit einem Bild in der Zwischenablage (z. B. Screenshot) oder Bilddateien auf eine
+  `.md` ziehen: Notex legt das Bild als Datei in `assets/` neben der Notiz ab (Name aus Notizname und
+  Zeitstempel, Ordnername in Einstellungen → Editor) und fügt `![](assets/…png)` am Cursor ein. In
+  verschlüsselte Notizen (`.ntx`) werden keine Bilder eingefügt – das Bild läge sonst unverschlüsselt daneben.
+- **Anzeigen:** `.png .jpg .jpeg .gif .webp .bmp .svg` erscheinen im Baum und öffnen in einem Bild-Tab:
+  Einpassen oder 100 %, Zoom mit dem Mausrad, Verschieben mit gedrückter Maus, dunkler neutraler Hintergrund.
+  Maße, Dateigröße, Format und Zoom stehen in der Statusleiste.
+- **Verschieben:** Wandert eine Notiz in einen anderen Ordner, fragt Notex, ob ihre Bilder aus `assets/`
+  mitkommen; Links werden angepasst, Bilder, die andere Notizen im alten Ordner auch nutzen, werden kopiert.
+- **Aufräumen:** „Unbenutzte Bilder finden …“ (Menü Datei, Command Palette) listet Bilder ohne Verweis mit
+  Vorschau; nur Angekreuztes kommt in den Papierkorb. Gelöscht wird nie automatisch.
+
+![Bild-Tab](docs/38-image-tab.png)
+
+
+## CSV als Tabelle
+
+`.csv`- und `.tsv`-Dateien lassen sich mit `Ctrl+Shift+V` (oder „CSV/TSV: Als Tabelle anzeigen“ in der Command
+Palette) zwischen **Text** und **Tabelle** umschalten – der Zustand gilt pro Tab. Einstellungen → Editor →
+Datenformate öffnet CSV/TSV auf Wunsch direkt als Tabelle.
+
+- **Erkennung:** Trennzeichen (Komma, Semikolon, Tab, senkrechter Strich), Anführungszeichen-Stil und Encoding
+  werden automatisch erkannt; alles lässt sich in der Leiste über der Tabelle überschreiben. Ein anderes Encoding
+  liest die Datei neu (UTF-8, UTF-8 BOM, cp1252, ISO-8859-1, UTF-16).
+- **Ansicht:** Kopfzeile ein/aus, Klick auf eine Spalte sortiert (Zahlen numerisch, auch `1.234,56`), Filterfeld
+  (`Ctrl+F`) sucht in allen Spalten, Spaltenbreiten ziehbar, Zeilennummern links zeigen die Zeile in der Datei.
+  Sortieren und Filtern ändern nur die Ansicht, nie die Reihenfolge in der Datei.
+- **Bearbeiten:** Doppelklick/F2 bearbeitet eine Zelle, Zeilen und Spalten einfügen/löschen über die Leiste,
+  `Ctrl+C`/`Ctrl+V` kopieren/fügen Tab-getrennte Blöcke (wie aus einer Tabellenkalkulation), `Entf` leert Zellen.
+- **Speichern** schreibt die Tabelle im erkannten Stil zurück: gleiches Trennzeichen, gleicher Quoting-Stil,
+  gleiches Encoding, gleiche Zeilenenden (CRLF/LF). Solange nichts geändert wurde, bleibt die Datei unangetastet.
+- Große Dateien (100 000 Zeilen) laufen über ein Tabellenmodell, das nur sichtbare Zellen zeichnet.
+- Verschlüsselte Notizen (`.ntx`) bekommen keine Tabellenansicht.
+
+![CSV als Tabelle](docs/39-csv-table.png)
+
+
+## JSON und YAML
+
+Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Palette):
+
+- **Formatieren** (`Shift+Alt+F`) rückt neu ein (Einrückung in Einstellungen → Editor → Datenformate).
+  JSON wird token-basiert formatiert: Zahlen (`1.10`, `1e5`), Escapes und die Reihenfolge der Schlüssel bleiben
+  exakt erhalten, nur der Leerraum ändert sich. **Minimieren** (`Shift+Alt+M`) schreibt alles in eine Zeile.
+  Beides ist ein einziger Rückgängig-Schritt.
+- **Prüfen** (`Shift+Alt+V`) – und automatisch beim Tippen (bis 2 MB): Fehler erscheinen mit Zeile und Spalte rechts
+  in der Statusleiste (Klick springt hin) und als rote Wellenlinie im Text.
+- **Baumansicht** (`Ctrl+Shift+V` schaltet Text ↔ Baum): Schlüssel, Wert, Typ; der Pfad der Auswahl steht oben
+  (z. B. `$.users[3].name`) und lässt sich mit „Pfad kopieren“ übernehmen. Kinder werden erst beim Aufklappen
+  erzeugt, große Dateien bleiben flüssig. Bei ungültigem Inhalt zeigt der Baum den Fehler mit „Zur Stelle springen“.
+- **YAML** wird ausschließlich sicher gelesen und geschrieben (`safe_load`/`safe_dump` – keine Python-Objekte, kein
+  Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
+- Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
+
+| Baum | Fehler |
+|---|---|
+| ![JSON-Baum](docs/40-json-tree.png) | ![JSON-Fehler](docs/41-json-error.png) |
+
+
+## PDF
+
+PDFs öffnen als eigener Tab (nur lesen):
+
+- Scrollen, Zoom (Seitenbreite, ganze Seite, 50–300 %, `Ctrl+Mausrad`, `Ctrl+Plus/Minus`), Seite springen
+  (`Ctrl+G`, auch Seitenbezeichnungen wie „iv“), Textsuche mit Trefferzähler (`Ctrl+F`, `F3`/`Shift+F3`),
+  Lesezeichen-Leiste (erscheint automatisch, wenn das PDF welche hat).
+- **Text markieren** mit der Maus (rastet auf Textzeilen ein, Doppelklick = Wort, `Ctrl+A` = ganze Seite), `Ctrl+C`
+  kopiert. **„Als Zitat in Notiz einfügen“** (Knopf oder Rechtsklick) schreibt den Text als Markdown-Zitat mit
+  Quelle in die Notiz, die im **anderen Teil der geteilten Ansicht** aktiv ist:
+
+  ```markdown
+  > Der markierte Text …
+  >
+  > — *Bericht.pdf*, S. 3
+  ```
+
+  Ohne Teilung landet das Zitat in der Zwischenablage. Teilen geht jetzt auch aus einem PDF-Tab heraus (`Ctrl+\`).
+- Keine Formulare, keine Skripte, keine Link-Aktionen: Notex zeigt nur an und liest Text aus. Die Datei wird in den
+  Speicher gelesen und gleich wieder geschlossen – umbenennen/verschieben geht auch, während der Tab offen ist.
+  Passwortgeschützte PDFs fragen nach dem Passwort (es wird nirgends gespeichert).
+- Technik: QtPdf (PDFium), ohne QtWebEngine; der Build wächst dadurch um wenige MB.
+
+![PDF mit Zitat](docs/45-pdf-quote.png)
+
+
+## Live verfolgen (Logs)
+
+„Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
+Textdatei:
+
+- Neue Zeilen erscheinen unten, die Ansicht scrollt mit. Scrollst du nach oben, pausiert das Mitscrollen – oben
+  erscheint „Pausiert – Ende anspringen“.
+- Rotation (Datei umbenannt und neu angelegt) und Kürzung (`> app.log`) werden erkannt, die Ansicht liest neu.
+  Große Dateien starten mit den letzten 8 MB.
+- Filterleiste: Alle / WARN und schlimmer / nur ERROR, dazu Text oder Regex (`Ctrl+F`). Filter ändern nur die
+  Anzeige, nie die Datei. ERROR-Zeilen sind rot, WARN-Zeilen gelblich.
+- Solange live läuft, ist der Tab nur lesend und fragt nicht bei jeder Änderung „Neu laden?“. Beim Beenden zeigt
+  der Editor den aktuellen Stand der Datei. Start nur bei gespeichertem Tab.
+- Einstellungen → Editor → Datenformate: „.log-Dateien direkt live verfolgen“.
+- Nicht für verschlüsselte Notizen (`.ntx`).
+
+![Live verfolgen](docs/44-live-log.png)
+
+
+## Hex-Ansicht, Dateityp und Prüfsummen
+
+- **Als Hex öffnen** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+H`): Offset | 16 Bytes hex | ASCII,
+  nur lesend. Unbekannte Binärdateien öffnen automatisch so. Auswahl ist in beiden Spalten synchron (Klick, Ziehen,
+  Shift+Pfeile), `Tab` wechselt die Spalte, `Ctrl+C` kopiert als Hex (in der ASCII-Spalte als Text).
+- **Gehe zu Offset** (`Ctrl+G`): dezimal (`1234`) oder hex (`0x4D2`, `4D2h`, `$4D2`).
+- **Suchen** (`Ctrl+F`, `F3` weiter, `Esc` bricht ab): Hex-Bytes (`DE AD BE EF`) oder Text, wahlweise ohne
+  Groß/klein. Die Suche läuft im Hintergrund mit Fortschritt; auch über mehrere GB bleibt die Oberfläche bedienbar.
+- Gelesen wird seitenweise (64 KB, kleiner Cache), die Datei bleibt nicht geöffnet – mehrere GB öffnen sofort, und
+  Umbenennen/Verschieben/Löschen funktioniert auch unter Windows, während der Tab offen ist.
+- **Dateityp** über Magic Bytes (eigene Tabelle: PNG, JPEG, GIF, PDF, ZIP inkl. docx/xlsx/jar/apk, RAR, 7z, GZIP,
+  ELF, PE/EXE, Mach-O, SQLite, .ntx u. a.) steht in der Statusleiste; passt die Endung nicht zum Inhalt (z. B. eine
+  „rechnung.pdf“, die ein Windows-Programm ist), erscheint rechts eine Warnung.
+- **Prüfsummen …** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+C`): MD5, SHA-1, SHA-256, SHA-512 in einem
+  Lesedurchgang im Hintergrund, jede mit Kopierknopf. „Vergleichen mit …“ nimmt auch `SHA256: …`, Doppelpunkt-
+  Schreibweise oder eine `sha256sum`-Zeile an und zeigt grün (stimmt) oder rot (weicht ab).
+- Bei `.ntx` zeigen Hex-Ansicht und Prüfsummen nur den verschlüsselten Inhalt der Datei – nie Klartext.
+
+| Hex + Typwarnung | Prüfsummen |
+|---|---|
+| ![Hex](docs/42-hex-view.png) | ![Prüfsummen](docs/43-checksums.png) |
+
+
 ## Nachschlagen
 
 Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
@@ -454,6 +583,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
 | Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
+| Ctrl+V (Bild in der Zwischenablage, .md) | Bild in `assets/` ablegen und verlinken |
 | Ctrl+Alt+W | Wikipedia zur Markierung (Karte) |
 | Ctrl+Alt+T | Wiktionary zur Markierung (Karte) |
 | Ctrl+Alt+G | Websuche zur Markierung (nur Browser) |
@@ -465,7 +595,17 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
 | Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
 | Ctrl+Shift+K | Backlinks-Panel |
-| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt |
+| Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle; JSON/YAML: Text ↔ Baum |
+| Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
+| Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
+| Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
+| Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen |
+| Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei |
+| Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
+| Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
+| Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |
+| Ctrl+Shift+Alt+Q | PDF-Markierung als Zitat in die Notiz im anderen Teil einfügen |
+| Ctrl+C / Ctrl+V / Entf (in der Tabelle) | Zellen als Tab-getrennten Block kopieren / einfügen / leeren |
 | Ctrl+\ | Editor teilen / Teilung aufheben |
 | Ctrl+Alt+\ | Gruppen nebeneinander / untereinander |
 | Ctrl+Alt+→ | Tab in andere Gruppe verschieben |

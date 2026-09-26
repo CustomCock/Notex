@@ -52,3 +52,25 @@ def test_cp1252_unencodable_char_does_not_raise() -> None:
     data = encode_text("Smiley 😀", "cp1252", "\n")
     assert data.startswith(b"Smiley ")
     assert b"&#128512;" in data
+
+
+def test_decode_as_overrides_detection() -> None:
+    from notex.core.encoding import decode_as
+    data = "Größe;Preis\r\nÄpfel;3,5\r\n".encode("cp1252")
+    wrong = decode_as(data, "utf-8")                      # Erkennung überschrieben: Ersatzzeichen statt Fehler
+    assert "�" in wrong.text and wrong.eol == "\r\n"
+    right = decode_as(data, "cp1252")
+    assert right.text == "Größe;Preis\nÄpfel;3,5\n" and right.encoding == "cp1252"
+    bom = decode_as(b"\xef\xbb\xbfa;b\n", "utf-8")
+    assert bom.text == "a;b\n" and bom.encoding == "utf-8-sig"
+
+
+def test_utf16_with_bom_is_detected_and_roundtrips(tmp_path: Path) -> None:
+    from notex.core.fileops import save_text_file
+    data = "a;b\r\nÄ;1\r\n".encode("utf-16")
+    tf = decode_bytes(data)
+    assert tf.encoding == "utf-16" and tf.text == "a;b\nÄ;1\n" and tf.eol == "\r\n"
+    path = tmp_path / "x.csv"
+    save_text_file(path, tf.text, tf.encoding, tf.eol)
+    assert path.read_bytes() == data
+    assert encode_text("€ 😀", "latin-1", "\n") == b"&#8364; &#128512;"

@@ -22,6 +22,9 @@ from notex.ui.preview import MarkdownPreview
 from notex.ui.toolbar import EditorToolbar
 
 VIEW_MODES = ("edit", "preview", "split")
+DATA_MODES = ("table", "tree", "live")   # Datenansicht statt Vorschau: CSV/TSV → Tabelle, JSON/YAML → Baum,
+                                          # „live“ = Datei verfolgen (jede Textdatei, nicht im Ctrl+Shift+V-Zyklus)
+ALL_MODES = VIEW_MODES + DATA_MODES
 PREVIEW_DEBOUNCE_MS = 300
 
 SHADOW_BLUR = 28      # wie weit der Schatten nach außen reicht
@@ -78,9 +81,23 @@ class PreviewFrame(QFrame):
         layout.addWidget(preview)
 
 
+class DataFrame(QFrame):
+    """Blatt für die Datenansicht (Tabelle/Baum) – eigene Werkzeugzeile oben, deshalb ohne Editor-Leiste."""
+
+    def __init__(self, view: QWidget) -> None:
+        super().__init__()
+        self.setObjectName("DataFrame")
+        self.view = view
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(view)
+
+
 class EditorPage(QWidget):
     link_requested = Signal(str)       # Ziel aus der Vorschau: "rel/pfad#Überschrift" oder Wiki-Name
     view_mode_changed = Signal(str)
+    data_status_changed = Signal()     # Datenansicht: Auswahl/Filter geändert → Statusleiste
+    reencode_requested = Signal(str)   # Datenansicht: Datei mit anderem Encoding neu lesen
 
     def __init__(self, editor: Editor, paper_mode: bool, toolbar: EditorToolbar | None = None,
                  root: Path | None = None) -> None:
@@ -92,6 +109,14 @@ class EditorPage(QWidget):
         self.root = root or editor.path.parent
         self.preview: MarkdownPreview | None = None
         self.preview_frame: PreviewFrame | None = None
+        self.data_view = None              # CsvView / DataTreeView, erst beim ersten Umschalten gebaut
+        self.data_frame: DataFrame | None = None
+        self._flushing = False
+        self._data_hooked = False
+        self._data_reload = QTimer(self)
+        self._data_reload.setSingleShot(True)
+        self._data_reload.setInterval(PREVIEW_DEBOUNCE_MS)
+        self._data_reload.timeout.connect(self._reload_data_view)
         self.view_mode = "edit"
         self.sync_scroll = True
         self._shadow: QPixmap | None = None
@@ -137,7 +162,7 @@ class EditorPage(QWidget):
             width = text_width + self.editor.gutter_width() + SPACING.xl + LAYOUT.scrollbar + SPACING.sm
             if self.view_mode == "split":
                 width = 2 * width + self.body.handleWidth()
-            self.column.setMaximumWidth(width)
+            self.column.setMaximumWidth(width if self.view_mode not in DATA_MODES else QWIDGETSIZE_MAX)
         else:
             self.column.setMaximumWidth(QWIDGETSIZE_MAX)
         # Das Blatt bekommt (fast) allen Platz bis zu seiner Maximalbreite, der Rest
@@ -162,29 +187,183 @@ class EditorPage(QWidget):
     def supports_preview(self) -> bool:
         return self.editor.path.suffix.lower() in (".md", ".markdown")
 
+    @property
+    def data_kind(self) -> str | None:
+        """"table" (CSV/TSV), "tree" (JSON/YAML) oder None. Nie für .ntx."""
+        from notex.core import csvdata, structured
+        if getattr(self.editor, "encrypted", False):
+            return None
+        if csvdata.table_supported(self.editor.path):
+            return "table"
+        if structured.kind_for(self.editor.path):
+            return "tree"
+        return None
+
+    @property
+    def view_modes(self) -> tuple[str, ...]:
+        if self.supports_preview:
+            return VIEW_MODES
+        kind = self.data_kind
+        return ("edit", kind) if kind else ("edit",)
+
+    @property
+    def supports_live(self) -> bool:
+        """„Live verfolgen“ für jede Textdatei auf der Platte – nie für .ntx (Klartext nur im Editor)."""
+        from notex.core.tail import can_follow
+        return not getattr(self.editor, "encrypted", False) and can_follow(self.editor.path)
+
+    @property
+    def supports_alt_view(self) -> bool:
+        return len(self.view_modes) > 1
+
     def set_view_mode(self, mode: str) -> None:
-        """"edit" (nur Blatt), "preview" (nur Vorschau) oder "split" (beides nebeneinander)."""
-        if mode not in VIEW_MODES or not self.supports_preview and mode != "edit":
+        """"edit" (nur Blatt), "preview" (nur Vorschau), "split" (beides nebeneinander) – bei CSV/TSV "table",
+        bei JSON/YAML "tree". Nicht passende Modi fallen auf "edit" zurück."""
+        if mode not in self.view_modes and not (mode == "live" and self.supports_live):
             mode = "edit"
-        if mode != "edit" and self.preview is None:
+        if self.view_mode in DATA_MODES and mode != self.view_mode:
+            self.flush_data_view()
+        if self.view_mode == "live" and mode != "live":
+            self._stop_live()
+        if mode in ("preview", "split") and self.preview is None:
             self._create_preview()
+        if mode in DATA_MODES:
+            self._show_data_view(mode)
         self.view_mode = mode
-        self.frame.setVisible(mode != "preview")
+        self.frame.setVisible(mode not in ("preview",) + DATA_MODES)
         if self.preview_frame is not None:
-            self.preview_frame.setVisible(mode != "edit")
-        if mode != "edit":
+            self.preview_frame.setVisible(mode in ("preview", "split"))
+        if self.data_frame is not None:
+            self.data_frame.setVisible(mode in DATA_MODES)
+        if self.toolbar is not None:
+            self.toolbar.setVisible(mode not in DATA_MODES)
+        if mode in ("preview", "split"):
             self._preview_timer.stop()
             self._refresh_preview()
             if mode == "split":
                 self.body.setSizes([1, 1])
         self.refresh_width()
-        (self.preview if mode == "preview" and self.preview is not None else self.editor).setFocus()
+        if mode in DATA_MODES:
+            self.data_view.setFocus()
+        else:
+            (self.preview if mode == "preview" and self.preview is not None else self.editor).setFocus()
         self.view_mode_changed.emit(mode)
 
     def cycle_view_mode(self) -> str:
-        index = VIEW_MODES.index(self.view_mode) if self.view_mode in VIEW_MODES else 0
-        self.set_view_mode(VIEW_MODES[(index + 1) % len(VIEW_MODES)])
+        modes = self.view_modes
+        index = modes.index(self.view_mode) if self.view_mode in modes else 0
+        self.set_view_mode(modes[(index + 1) % len(modes)])
         return self.view_mode
+
+    # ---- Datenansicht (Tabelle/Baum) -------------------------------------------------
+    def _show_data_view(self, mode: str) -> None:
+        if self.data_view is None or getattr(self.data_view, "kind", None) != mode:
+            self._create_data_view(mode)
+        self._load_data_view()
+
+    def _create_data_view(self, mode: str) -> None:
+        if self.data_frame is not None:
+            self.data_frame.setParent(None)
+            self.data_frame.deleteLater()
+        if mode == "tree":
+            from notex.ui.tree_view import DataTreeView
+            view = DataTreeView()
+            view.jump_requested.connect(self._jump_to_error)
+        elif mode == "live":
+            from notex.ui.log_view import LogView
+            view = LogView()
+            view.set_font(self.editor.font())
+            view.stop_requested.connect(lambda: self.set_view_mode("edit"))
+        else:
+            from notex.ui.csv_view import CsvView
+            view = CsvView()
+        view._reparse = self._reparse_table
+        view._reencode = self.reencode_requested.emit
+        view.changed.connect(self._on_data_edited)
+        view.status_changed.connect(self.data_status_changed)
+        self.data_view = view
+        self.data_frame = DataFrame(view)
+        self.body.addWidget(self.data_frame)
+        if not self._data_hooked:
+            self._data_hooked = True
+            self.editor.document().contentsChanged.connect(self._on_text_changed_for_data)
+            self.editor.document().modificationChanged.connect(self._on_modification_for_data)
+
+    def _load_data_view(self, dialect=None) -> None:
+        view = self.data_view
+        if view.kind == "live":
+            view.load_text("", self.editor.path.name, None, self.editor.encoding, path=self.editor.path)
+            return
+        keep = dialect or (view.dialect if view.overridden else None)
+        view.load_text(self.editor.toPlainText(), self.editor.path.name, keep, self.editor.encoding)
+
+    def _stop_live(self) -> None:
+        """Live beendet: Tailer anhalten, Editor zeigt den aktuellen Stand der Datei (ungespeicherte Änderungen
+        gibt es nicht – live startet nur bei gespeichertem Tab)."""
+        if self.data_view is not None and self.data_view.kind == "live":
+            self.data_view.stop()
+        if not self.editor.is_dirty:
+            from notex.core.encoding import read_text_file
+            try:
+                self.editor.replace_content(read_text_file(self.editor.path))
+            except OSError:
+                pass
+
+    def _jump_to_error(self, position: int) -> None:
+        self.set_view_mode("edit")
+        cursor = self.editor.textCursor()
+        cursor.setPosition(min(position, self.editor.document().characterCount() - 1))
+        self.editor.setTextCursor(cursor)
+        self.editor.ensureCursorVisible()
+        self.editor.setFocus()
+
+    def _reparse_table(self, dialect) -> None:
+        """Anderes Trennzeichen gewählt: ungespeicherte Tabellenänderungen erst in den Text, dann neu lesen."""
+        self.flush_data_view()
+        self._load_data_view(dialect)
+
+    def _on_data_edited(self) -> None:
+        self.editor.document().setModified(True)
+
+    def _on_text_changed_for_data(self) -> None:
+        """Text wurde anderswo geändert (zweite Ansicht, Neu laden): Tabelle nachziehen – außer sie hat eigene
+        ungespeicherte Änderungen, dann gewinnt die Tabelle beim nächsten Zurückschreiben."""
+        if self._flushing or self.view_mode not in DATA_MODES or self.data_view is None or self.data_view.dirty:
+            return
+        if self.view_mode == "live":
+            return                       # liest selbst von der Platte
+        self._data_reload.start()
+
+    def _on_modification_for_data(self, modified: bool) -> None:
+        """Dokument wieder „unverändert“, obwohl die Tabelle noch Änderungen hat → es wurde neu geladen
+        (extern geändert, anderes Encoding). Gespeichert kann es nicht sein, das schreibt vorher zurück."""
+        if not modified and not self._flushing and self.data_view is not None and self.data_view.dirty:
+            self.data_view.dirty = False
+            self._data_reload.start()
+
+    def _reload_data_view(self) -> None:
+        if self.view_mode in DATA_MODES and self.data_view is not None and not self.data_view.dirty:
+            self._load_data_view()
+
+    def flush_data_view(self) -> bool:
+        """Änderungen aus der Tabelle als EIN Undo-Schritt in den Editor schreiben (vor Speichern/Umschalten).
+        True, wenn etwas geschrieben wurde."""
+        view = self.data_view
+        if view is None or not view.dirty:
+            return False
+        from PySide6.QtGui import QTextCursor
+        new_text = view.text()
+        view.dirty = False
+        if new_text == self.editor.toPlainText():
+            return False
+        self._flushing = True
+        try:
+            cursor = QTextCursor(self.editor.document())
+            cursor.select(QTextCursor.SelectionType.Document)
+            self.editor._grouped(lambda: cursor.insertText(new_text))
+        finally:
+            self._flushing = False
+        return True
 
     def _create_preview(self) -> None:
         self.preview = MarkdownPreview(self.root)

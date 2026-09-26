@@ -50,9 +50,24 @@ from notex.ui.recent_dialog import RecentDialog
 from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 
 
+def _register_viewers() -> None:
+    """Viewer-Tabs (Bild, später Hex/PDF) bei den Tab-Gruppen anmelden."""
+    from notex.ui.editor_tabs import EditorTabs
+    from notex.ui.hex_view import HexPage
+    from notex.ui.image_view import ImagePage
+    EditorTabs.register_viewer("image", ImagePage)
+    EditorTabs.register_viewer("hex", HexPage)
+    try:
+        from notex.ui.pdf_view import PdfPage
+    except ImportError:              # PySide6 ohne QtPdf: PDFs öffnen dann als Hex
+        return
+    EditorTabs.register_viewer("pdf", PdfPage)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, root: Path, config: dict[str, Any], on_save_config) -> None:
         super().__init__()
+        _register_viewers()
         self.root = root
         self.config = config
         self._save_config = on_save_config
@@ -144,6 +159,8 @@ class MainWindow(QMainWindow):
         self.palette.goto_line.connect(lambda line: self._with_editor(lambda e: e.goto_line(line)))
         self.palette.run_command.connect(self._run_command)
         self._connect_signals()
+        from notex.ui.structured_commands import StructuredCommands
+        self.structured = StructuredCommands(self)
         self._build_menu()
         self._build_editor_actions()
         self._build_registry()
@@ -164,6 +181,11 @@ class MainWindow(QMainWindow):
         self.sidebar.settings_requested.connect(self.open_settings)
         tree.path_renamed.connect(self._on_path_renamed)
         tree.path_deleted.connect(self.tabs.close_paths_under)
+        tree.open_hex_requested.connect(self.open_as_hex)
+        tree.checksums_requested.connect(self.show_checksums)
+        tree.follow_requested.connect(self.toggle_live)
+        self.tabs.view_mode_changed.connect(self._on_view_mode_changed)
+        self.tabs.pdf_quote.connect(self._insert_pdf_quote)
         tree.path_deleted.connect(lambda p: (self.links.remove(self.tabs.relative(p)), self.file_index.request_rescan()))
 
         self.tabs.status_changed.connect(self._update_status)
@@ -224,11 +246,16 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Neue Woche", "Alt+W", lambda: self.new_week()))
         file_menu.addAction(self._action("Nächste Woche anlegen", None, lambda: self.new_week(next_week=True)))
         file_menu.addAction(self._action("Vorlagen-Ordner öffnen", None, self.open_templates_folder))
+        file_menu.addAction(self._action("Unbenutzte Bilder finden …", None, self.find_unused_images))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Neue verschlüsselte Notiz …", "Ctrl+Shift+Alt+N", self.new_encrypted_note))
         file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
         file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
         file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
+        file_menu.addAction(self._action("Live verfolgen ein/aus", "Ctrl+Shift+Alt+F", lambda: self.toggle_live()))
+        file_menu.addAction(self._action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()))
+        self._action("PDF: Markierung als Zitat einfügen", "Ctrl+Shift+Alt+Q", self.quote_from_pdf)
+        file_menu.addAction(self._action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums()))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
@@ -240,8 +267,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Beenden", "Ctrl+Q", self.close))
 
         edit_menu = self.menuBar().addMenu("&Bearbeiten")
-        edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.find_bar.open(with_replace=False)))
-        edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.find_bar.open(with_replace=True)))
+        edit_menu.addAction(self._action("Suchen", QKeySequence.StandardKey.Find, lambda: self.open_find(False)))
+        edit_menu.addAction(self._action("Ersetzen", "Ctrl+H", lambda: self.open_find(True)))
         edit_menu.addAction(self._action("Ersetzen in Dateien …", "Ctrl+Shift+H", self.open_replace_in_files))
         lookup_menu = edit_menu.addMenu("Nachschlagen")
         self.lookup_wikipedia_action = self._action("Wikipedia nachschlagen", "Ctrl+Alt+W", lambda: self.lookup_current("wikipedia"))
@@ -249,6 +276,12 @@ class MainWindow(QMainWindow):
         self.lookup_web_action = self._action("Im Web suchen (Browser)", "Ctrl+Alt+G", lambda: self.lookup_current("web"))
         for action in (self.lookup_wikipedia_action, self.lookup_wiktionary_action, self.lookup_web_action):
             lookup_menu.addAction(action)
+        data_menu = edit_menu.addMenu("JSON/YAML")
+        data_menu.addAction(self._action("Formatieren", "Shift+Alt+F", self.structured.format))
+        data_menu.addAction(self._action("Minimieren", "Shift+Alt+M", self.structured.minify))
+        data_menu.addAction(self._action("Prüfen", "Shift+Alt+V", self.structured.validate))
+        data_menu.addSeparator()
+        data_menu.addAction(self._action("Pfad kopieren (Baumansicht)", None, self.structured.copy_path))
         edit_menu.addSeparator()
         self.spell_action = self._action("Rechtschreibung prüfen", "F7", self.toggle_spellcheck, checkable=True)
         self.spell_action.setChecked(self.config["spellcheck"]["enabled"])
@@ -736,6 +769,8 @@ class MainWindow(QMainWindow):
     # ---- Reaktionen auf Baum / Watcher -----------------------------------------
     def _on_path_renamed(self, old: Path, new: Path) -> None:
         self.tabs.rename_open_file(old, new)
+        if old.parent != new.parent and new.suffix.lower() in (".md", ".markdown") and new.is_file():
+            QTimer.singleShot(0, lambda: self._move_note_assets(old, new))
         if not self.tabs.is_external(new):
             try:
                 self.history.rename(self.tabs.relative(old), self.tabs.relative(new))   # Verlauf zieht mit
@@ -750,8 +785,14 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _on_external_change(self, path: Path) -> None:
+        if any(page.view_mode == "live" and page.editor.path == path for page in self.tabs.pages()):
+            return                                   # „Live verfolgen“ liest die Änderungen selbst – keine Rückfrage
         editor = self.tabs.editor_for(path)
         if editor is None:
+            for viewer in self.tabs.viewers():       # Viewer (Hex, Bild …) lesen nur – still neu laden
+                if viewer.path == path and hasattr(viewer, "reload"):
+                    viewer.reload()
+            self._update_status()
             return
         if editor.encrypted:
             self._on_external_change_encrypted(editor)
@@ -799,6 +840,8 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _on_external_remove(self, path: Path) -> None:
+        if any(page.view_mode == "live" and page.editor.path == path for page in self.tabs.pages()):
+            return                                   # Rotation: die Live-Ansicht wartet auf die neue Datei
         editor = self.tabs.editor_for(path)
         if editor is None:
             return
@@ -823,15 +866,138 @@ class MainWindow(QMainWindow):
 
     def _with_editor(self, func) -> None:
         editor = self.tabs.current_editor()
-        if editor is not None:
+        if editor is not None and not self._in_data_view():
             func(editor)
+
+    def _in_data_view(self) -> bool:
+        """Tabelle/Baum sichtbar: Text-Befehle (Zeile duplizieren, Groß/klein …) würden den verdeckten Text ändern."""
+        from notex.ui.paper import DATA_MODES
+        page = self.tabs.current_page()
+        return page is not None and page.view_mode in DATA_MODES
+
+    def _current_file(self) -> Path | None:
+        editor = self.tabs.current_editor()
+        if editor is not None:
+            return editor.path
+        viewer = self.tabs.current_viewer()
+        return viewer.path if viewer is not None else None
+
+    def open_as_hex(self, path: Path | None = None) -> None:
+        """Beliebige Datei als Hex (nur lesen) – bei .ntx sieht man nur den Geheimtext von der Platte."""
+        path = path or self._current_file()
+        if path is None or not Path(path).is_file():
+            self.toast.show_message("Keine Datei zum Anzeigen", "info")
+            return
+        self.tabs.open_viewer(Path(path), "hex")
+
+    def _current_pdf(self):
+        viewer = self.tabs.current_viewer() if self.tabs.current_editor() is None else None
+        if viewer is None or getattr(viewer, "kind", "") != "pdf":
+            for group in getattr(self.tabs, "groups", []):     # im Split: der PDF-Tab der anderen Gruppe
+                candidate = group.current_viewer()
+                if candidate is not None and getattr(candidate, "kind", "") == "pdf":
+                    return candidate
+            return None
+        return viewer
+
+    def quote_from_pdf(self) -> None:
+        viewer = self._current_pdf()
+        if viewer is None:
+            self.toast.show_message("Kein PDF offen", "info")
+        elif not viewer.canvas.selected_text():
+            self.toast.show_message("Erst im PDF Text markieren", "info")
+        else:
+            viewer.quote()
+
+    def toggle_pdf_outline(self) -> None:
+        viewer = self._current_pdf()
+        if viewer is not None and viewer.outline_button.isEnabled():
+            viewer.outline_button.toggle()
+        elif viewer is not None:
+            self.toast.show_message("Dieses PDF hat keine Lesezeichen", "info")
+
+    def _insert_pdf_quote(self, viewer, markdown: str) -> None:
+        """Zitat aus dem PDF in die Notiz, die im ANDEREN Teil der geteilten Ansicht aktiv ist. Ohne Teilung:
+        Zwischenablage (mit Hinweis) – nie irgendwo ungefragt hineinschreiben."""
+        from PySide6.QtWidgets import QApplication
+        target = None
+        for group in getattr(self.tabs, "groups", []):
+            if viewer not in group.viewers():
+                target = group.current_editor() or target
+        if target is None:
+            QApplication.clipboard().setText(markdown)
+            self.toast.show_message("Zitat in der Zwischenablage – zum direkten Einfügen die Ansicht teilen (Ctrl+\\) "
+                                    "und im anderen Teil eine Notiz öffnen", "clipboard")
+            return
+        if target.locked or target.read_only or self.tabs.is_read_only(target.path):
+            QApplication.clipboard().setText(markdown)
+            self.toast.show_message("Notiz ist gesperrt oder schreibgeschützt – Zitat in der Zwischenablage", "lock")
+            return
+        cursor = target.textCursor()
+        cursor.clearSelection()
+        before = target.toPlainText()[:cursor.position()]
+        prefix = "" if not before or before.endswith("\n\n") else ("\n" if before.endswith("\n") else "\n\n")
+        target._grouped(lambda: cursor.insertText(prefix + markdown + "\n"))
+        target.setTextCursor(cursor)
+        target.ensureCursorVisible()
+        self.toast.show_message(f"Zitat eingefügt in „{target.path.name}“", "quote")
+
+    def _on_view_mode_changed(self, mode: str) -> None:
+        """Nach „Live verfolgen“: Datei neu beobachten – nach einer Rotation ist es eine andere Datei."""
+        editor = self.tabs.current_editor()
+        if mode != "live" and editor is not None and editor.path.is_file() and not editor.encrypted:
+            self.watcher.watch(editor.path)
+
+    def toggle_live(self, path: Path | None = None) -> None:
+        """„Live verfolgen“ ein/aus: neue Zeilen unten anhängen, nur lesend, Filter nur in der Anzeige."""
+        if path is not None:
+            if fileops.is_encrypted_path(path):
+                self.toast.show_message("Verschlüsselte Notizen lassen sich nicht live verfolgen", "lock")
+                return
+            self.tabs.open_file(Path(path))
+        page = self.tabs.current_page()
+        if page is None:
+            self.toast.show_message("Live verfolgen geht für Textdateien im Editor", "info")
+            return
+        if page.view_mode == "live":
+            if path is None:
+                page.set_view_mode("edit")
+                self.toast.show_message("Live verfolgen beendet", "square")
+            return
+        if not page.supports_live:
+            self.toast.show_message("Nicht für verschlüsselte oder ungespeicherte Dateien", "info")
+            return
+        if page.editor.is_dirty:
+            self.toast.show_message("Erst speichern – live verfolgen zeigt die Datei auf der Platte", "info")
+            return
+        page.set_view_mode("live")
+        self.toast.show_message("Live verfolgen – nur lesend", "activity")
+
+    def show_checksums(self, path: Path | None = None) -> None:
+        from notex.ui.hash_dialog import HashDialog
+        path = path or self._current_file()
+        if path is None or not Path(path).is_file():
+            self.toast.show_message("Keine Datei für Prüfsummen", "info")
+            return
+        HashDialog(self, Path(path)).exec()
+
+    def open_find(self, with_replace: bool) -> None:
+        """Ctrl+F/Ctrl+H – in der Tabellen-/Baumansicht springt der Fokus in deren Filterfeld, im Hex-Tab ins Suchfeld."""
+        viewer = self.tabs.current_viewer() if self.tabs.current_editor() is None else None
+        if viewer is not None and hasattr(viewer, "focus_search"):
+            viewer.focus_search()
+            return
+        if self._in_data_view():
+            self.tabs.current_page().data_view.focus_filter()
+            return
+        self.find_bar.open(with_replace=with_replace)
 
     def _build_editor_actions(self) -> None:
         a, ed = self._editor_action, self._with_editor
         a("undo", "undo-2", "Rückgängig", None, lambda: ed(lambda e: e.undo())).setToolTip("Rückgängig  Ctrl+Z")
         a("redo", "redo-2", "Wiederholen", None, lambda: ed(lambda e: e.redo())).setToolTip("Wiederholen  Ctrl+Y")
-        a("find", "search", "Suchen", None, lambda: self.find_bar.open(with_replace=False)).setToolTip("Suchen  Ctrl+F")
-        a("replace", "replace", "Ersetzen", None, lambda: self.find_bar.open(with_replace=True)).setToolTip("Ersetzen  Ctrl+H")
+        a("find", "search", "Suchen", None, lambda: self.open_find(False)).setToolTip("Suchen  Ctrl+F")
+        a("replace", "replace", "Ersetzen", None, lambda: self.open_find(True)).setToolTip("Ersetzen  Ctrl+H")
         a("font_smaller", "minus", "Textgröße verkleinern (Ansicht, ändert nichts an der Datei)", None, lambda: self.tabs.zoom(-1))
         a("font_larger", "plus", "Textgröße vergrößern (Ansicht, ändert nichts an der Datei)", None, lambda: self.tabs.zoom(+1))
         a("zoom_reset", "rotate-ccw", "Zoom zurücksetzen", None, lambda: self.tabs.set_font_size(FONT_SIZE.editor)).setToolTip("Zoom zurücksetzen  Ctrl+0")
@@ -860,8 +1026,8 @@ class MainWindow(QMainWindow):
         a("md_checkbox", "square-check", "Checkbox", "Ctrl+Alt+X", lambda: ed(lambda e: e.apply_line_op(ops.toggle_checkbox)))
         a("md_code", "code", "Code", "Ctrl+Alt+C", lambda: ed(lambda e: e.apply_text_op(ops.toggle_code)))
         a("md_link", "link", "Link", "Ctrl+K", lambda: ed(lambda e: e.apply_text_op(ops.toggle_link)))
-        self.preview_action = a("preview", "eye", "Markdown-Vorschau (Bearbeiten → Vorschau → Geteilt)", "Ctrl+Shift+V",
-                                self.cycle_preview)
+        self.preview_action = a("preview", "eye", "Ansicht umschalten (Markdown: Vorschau · CSV: Tabelle · JSON/YAML: Baum)",
+                                "Ctrl+Shift+V", self.cycle_preview)
         self.preview_action.setToolTip("Markdown-Vorschau umschalten  Ctrl+Shift+V")
         self.spell_toolbar_action = a("spell", "spell-check", "Rechtschreibung", None, self.toggle_spellcheck, checkable=True)
         self.spell_toolbar_action.setToolTip("Rechtschreibung prüfen  F7")
@@ -872,6 +1038,7 @@ class MainWindow(QMainWindow):
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
         self.tabs.context_menu_hook = self._extend_context_menu
+        self.tabs.image_hook = self._insert_images
 
     # ---- Linux-Desktop-Integration ----------------------------------------------------------
     def _linux_integration(self):
@@ -945,6 +1112,123 @@ class MainWindow(QMainWindow):
         register.clicked.connect(do_register)
         remove.clicked.connect(do_remove)
         refresh()
+
+    # ---- Bilder in Notizen ---------------------------------------------------------------------
+    def _assets_folder_name(self) -> str:
+        return str(self.config.get("images", {}).get("assets_folder", "assets"))
+
+    def _insert_images(self, editor, image, paths: list[str]) -> bool:
+        """Ctrl+V mit Bild bzw. Bilddateien auf eine .md ziehen: als Datei in assets/ ablegen und verlinken.
+        True = erledigt (auch wenn abgelehnt), False = normal weiter (z. B. Dateien öffnen)."""
+        import shutil
+        from datetime import datetime
+        from notex.core.images import asset_name, assets_dir, can_embed_images, markdown_image
+        if not can_embed_images(editor.path):
+            if getattr(editor, "encrypted", False):
+                self.toast.show_message("Keine Bilder in verschlüsselten Notizen – das Bild läge unverschlüsselt daneben", "lock")
+                return True
+            if image is not None:
+                self.toast.show_message("Bilder einfügen geht nur in Markdown-Notizen (.md)", "info")
+                return True
+            return False     # Bilddateien auf eine .txt gezogen: wie bisher öffnen
+        if editor.isReadOnly():
+            return True
+        folder = assets_dir(editor.path, self._assets_folder_name())
+        links = []
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            existing = {p.name.lower() for p in folder.iterdir()}
+            if image is not None:
+                name = asset_name(editor.path, datetime.now(), ".png", existing)
+                target = folder / name
+                tmp = folder / f".{name}.tmp"
+                if not image.save(str(tmp), "PNG"):
+                    raise OSError("Bild konnte nicht gespeichert werden")
+                import os
+                os.replace(tmp, target)
+                links.append(markdown_image(editor.path, target, "Bild"))
+            for source in map(Path, paths):
+                target = folder / source.name
+                if target.exists() and target.resolve() != source.resolve():
+                    target = fileops.unique_path(folder, source.stem, source.suffix)
+                if target.resolve() != source.resolve():
+                    shutil.copy2(source, target)
+                links.append(markdown_image(editor.path, target, source.stem))
+        except OSError as error:
+            dialogs.warn(self, "Bild einfügen", str(error))
+            return True
+        editor.insert_text("\n".join(links))
+        self.file_index.request_rescan()
+        self.toast.show_message(f"{len(links)} Bild(er) in {folder.name}/ abgelegt", "image")
+        return True
+
+    def _move_note_assets(self, old: Path, new: Path) -> None:
+        """Notiz in einen anderen Ordner verschoben: ihre Bilder aus assets/ mitnehmen und Links anpassen?"""
+        import shutil
+        from notex.core.images import plan_assets_move
+        editor = self.tabs.editor_for(new)
+        try:
+            text = editor.toPlainText() if editor is not None else _read_text_file(new).text
+        except (OSError, UnicodeDecodeError):
+            return
+        others: dict[Path, str] = {}
+        for sibling in old.parent.glob("*.md"):
+            try:
+                others[sibling] = _read_text_file(sibling).text
+            except (OSError, UnicodeDecodeError):
+                continue
+        plan = plan_assets_move(old, new, text, others, self._assets_folder_name())
+        if plan.empty:
+            return
+        detail = (f"{len(plan.moves)} Bild(er) verschieben" + (f", {len(plan.copies)} kopieren (andere Notizen nutzen sie auch)"
+                                                                if plan.copies else ""))
+        if not dialogs.confirm(self, "Bilder mitnehmen?", f"„{new.name}“ verlinkt Bilder aus dem alten assets-Ordner.",
+                               yes="Mitnehmen", no="Nicht mitnehmen",
+                               informative=f"{detail} und die Links in der Notiz anpassen?"):
+            return
+        try:
+            for source, target in plan.moves + plan.copies:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    continue
+                if (source, target) in plan.moves:
+                    shutil.move(str(source), str(target))
+                else:
+                    shutil.copy2(source, target)
+        except OSError as error:
+            dialogs.warn(self, "Bilder mitnehmen", str(error))
+            return
+        if plan.new_text != text:
+            if editor is not None:
+                was_clean = not editor.is_dirty
+                self.tabs.replace_text_keep_cursor(editor, plan.new_text)
+                if was_clean:
+                    self.tabs.group_of(editor).save_editor(editor)
+            else:
+                self._write_tracked(new, _read_text_file(new), plan.new_text, "vor Bilder-Umzug")
+        self.file_index.request_rescan()
+        self.toast.show_message("Bilder mitgenommen", "image")
+
+    def find_unused_images(self) -> None:
+        from notex.core.images import NOTE_SUFFIXES, find_unused_images
+        from notex.ui.unused_images_dialog import UnusedImagesDialog
+        texts: dict[Path, str] = {}
+        skipped_ntx = 0
+        for rel in self.file_index.index.files:
+            path = self.root / rel
+            if fileops.is_encrypted_path(path):
+                skipped_ntx += 1        # Inhalt unbekannt – nie entschlüsseln, nur zählen
+                continue
+            if path.suffix.lower() in NOTE_SUFFIXES:
+                editor = self.tabs.editor_for(path)
+                try:
+                    texts[path] = editor.toPlainText() if editor is not None else _read_text_file(path).text
+                except (OSError, UnicodeDecodeError):
+                    continue
+        unused = find_unused_images(self.root, texts)
+        dialog = UnusedImagesDialog(self, self.root, unused, skipped_ntx)
+        dialog.trashed.connect(lambda _paths: self.file_index.request_rescan())
+        dialog.exec()
 
     # ---- Nachschlagen ------------------------------------------------------------------------
     def _lookup_cfg(self) -> dict:
@@ -1440,12 +1724,16 @@ class MainWindow(QMainWindow):
 
     # ---- Geteilter Editor ----------------------------------------------------------------
     def toggle_split(self) -> None:
-        if self.tabs.current_editor() is None and not self.tabs.is_split:
+        if self.tabs.current_editor() is None and self.tabs.current_viewer() is None and not self.tabs.is_split:
             self.toast.show_message("Erst eine Datei öffnen, dann teilen", "info")
             self.split_action.setChecked(False)
             return
+        from_viewer = self.tabs.current_editor() is None
         split = self.tabs.toggle_split()
         self.split_action.setChecked(split)
+        if split and from_viewer:    # z. B. PDF links, Notiz rechts – für „Als Zitat in Notiz einfügen“
+            self.toast.show_message("Geteilt – im neuen Teil eine Notiz öffnen (Ctrl+P)", "square-split-horizontal")
+            return
         self.toast.show_message("Editor geteilt – Tabs lassen sich zwischen den Gruppen ziehen" if split else "Teilung aufgehoben",
                                 "square-split-horizontal")
 
@@ -1455,16 +1743,22 @@ class MainWindow(QMainWindow):
                                 "square-split-vertical" if orientation == "vertical" else "square-split-horizontal")
 
     # ---- Markdown-Vorschau -------------------------------------------------------------
+    VIEW_MODE_NAMES = {"edit": "Bearbeiten", "preview": "Vorschau", "split": "Geteilte Ansicht", "table": "Tabelle",
+                       "tree": "Baum"}
+    VIEW_MODE_HINT = "Vorschau gibt es für Markdown (.md), die Tabelle für CSV/TSV, den Baum für JSON/YAML"
+
     def cycle_preview(self) -> None:
         mode = self.tabs.cycle_view_mode()
         if mode is None:
-            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+            self.toast.show_message(self.VIEW_MODE_HINT, "info")
             return
-        self.toast.show_message({"edit": "Bearbeiten", "preview": "Vorschau", "split": "Geteilte Ansicht"}[mode], "eye")
+        page = self.tabs.current_page()
+        name = "Text" if mode == "edit" and page is not None and not page.supports_preview else self.VIEW_MODE_NAMES[mode]
+        self.toast.show_message(name, {"table": "table", "tree": "list-tree"}.get(mode, "eye"))
 
     def set_preview_mode(self, mode: str) -> None:
         if not self.tabs.set_view_mode(mode):
-            self.toast.show_message("Vorschau gibt es nur für Markdown-Dateien (.md)", "info")
+            self.toast.show_message(self.VIEW_MODE_HINT, "info")
 
     def _on_preview_link(self, editor, target: str) -> None:
         """Link aus der Vorschau: relativer Pfad (a/b.md#Ziel) oder Wiki-Name (Plan#Ziel)."""
@@ -1722,6 +2016,30 @@ class MainWindow(QMainWindow):
         for mode, title in (("edit", "Markdown: Bearbeiten"), ("preview", "Markdown: Vorschau"), ("split", "Markdown: Geteilte Ansicht")):
             self.registry.add(f"preview:{mode}", title, lambda m=mode: self.set_preview_mode(m), category="Ansicht",
                               keywords="markdown vorschau preview rendern")
+        self.registry.add("view:table", "CSV/TSV: Als Tabelle anzeigen", lambda: self.set_preview_mode("table"),
+                          category="Ansicht", shortcut="Ctrl+Shift+V", keywords="csv tsv tabelle spalten excel")
+        self.registry.add("view:tree", "JSON/YAML: Als Baum anzeigen", lambda: self.set_preview_mode("tree"),
+                          category="Ansicht", shortcut="Ctrl+Shift+V", keywords="json yaml baum tree struktur pfad")
+        self.registry.add("data:format", "JSON/YAML: Formatieren", self.structured.format, category="Bearbeiten",
+                          shortcut="Shift+Alt+F", keywords="json yaml einrücken pretty print beautify")
+        self.registry.add("data:minify", "JSON/YAML: Minimieren", self.structured.minify, category="Bearbeiten",
+                          shortcut="Shift+Alt+M", keywords="json yaml kompakt minify eine zeile")
+        self.registry.add("data:validate", "JSON/YAML: Prüfen", self.structured.validate, category="Bearbeiten",
+                          shortcut="Shift+Alt+V", keywords="json yaml validieren syntax fehler lint")
+        self.registry.add("data:path", "JSON/YAML: Pfad kopieren", self.structured.copy_path, category="Bearbeiten",
+                          keywords="json yaml jsonpath pfad kopieren baum")
+        self.registry.add("file:live", "Live verfolgen (Log) ein/aus", lambda: self.toggle_live(), category="Datei",
+                          shortcut="Ctrl+Shift+Alt+F", keywords="tail follow log live mitlesen logdatei")
+        self.registry.add("pdf:quote", "PDF: Markierung als Zitat in Notiz einfügen", self.quote_from_pdf, category="PDF",
+                          shortcut="Ctrl+Shift+Alt+Q", keywords="pdf zitat quote markierung notiz quelle")
+        self.registry.add("pdf:outline", "PDF: Lesezeichen ein/aus", self.toggle_pdf_outline, category="PDF",
+                          keywords="pdf lesezeichen inhaltsverzeichnis outline bookmarks")
+        self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
+                          shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
+        self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),
+                          category="Datei", shortcut="Ctrl+Shift+Alt+C", keywords="hash prüfsumme checksum sha256 md5 vergleichen")
+        self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
+                          category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
@@ -1780,12 +2098,27 @@ class MainWindow(QMainWindow):
         if not self.tabs.count():
             self.find_bar.hide()
         editor = self.tabs.current_editor()
+        viewer = self.tabs.current_viewer() if editor is None else None
+        if viewer is not None:
+            relative = self.tabs.relative(viewer.path)
+            self.status.update_for_viewer(relative, viewer.status_parts())
+            if getattr(viewer, "warning", ""):
+                self.status.set_problem("⚠ " + viewer.warning, "error",
+                                        tooltip=f"Dateityp laut Inhalt: {viewer.ftype.name}\n{viewer.warning}")
+            self.setWindowTitle(f"{relative} – {APP_NAME}")
+            return
         if editor is None:
             self.status.update_for(None, "")
             self.setWindowTitle(APP_NAME)
             return
         relative = self.tabs.relative(editor.path)
         self.status.update_for(editor, relative)
+        page = self.tabs.current_page()
+        if page is not None and self._in_data_view():
+            parts = [part for part in page.data_view.status_parts()[:2] if part]
+            self.status.position_label.setText(page.data_view.position_text())
+            self.status.chars_label.setText(" · ".join(parts))
+        self.structured.refresh_status()
         self._sync_editor_actions()
         self.status.set_spell_state(
             self.tabs.spell_enabled_for(editor.path), self.tabs.grammar_enabled_for(editor.path),

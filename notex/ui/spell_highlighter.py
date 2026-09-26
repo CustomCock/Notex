@@ -83,6 +83,10 @@ class SpellHighlighter(QSyntaxHighlighter):
         self._typing_timer.timeout.connect(self._recheck_cursor_block)
         self._typing = False
         # Beim Scrollen die neu sichtbaren Blöcke nachprüfen
+        self._reset_timer = QTimer(self)          # Laden + Resolver setzen → nur EIN Durchlauf
+        self._reset_timer.setSingleShot(True)
+        self._reset_timer.setInterval(0)
+        self._reset_timer.timeout.connect(self.reset)
         self._scroll_timer = QTimer(self)
         self._scroll_timer.setSingleShot(True)
         self._scroll_timer.setInterval(SCROLL_CHECK_MS)
@@ -116,8 +120,13 @@ class SpellHighlighter(QSyntaxHighlighter):
         self.language = language
         self.reset()
 
+    def schedule_reset(self) -> None:
+        """reset() im nächsten Durchlauf der Ereignisschleife – mehrere Aufrufe ergeben einen Durchlauf."""
+        self._reset_timer.start()
+
     def reset(self) -> None:
         """Alle Markierungen verwerfen und den sichtbaren Bereich neu prüfen."""
+        self._reset_timer.stop()
         block = self.document().firstBlock()
         while block.isValid():
             data = block.userData()
@@ -139,7 +148,7 @@ class SpellHighlighter(QSyntaxHighlighter):
         self._typing_timer.stop()
         self._typing = False
         self._grammar.clear()
-        self.reset()
+        self.schedule_reset()     # beim Öffnen folgen Resolver/Lexer noch – zusammen ein Durchlauf
 
     def set_grammar_issues(self, block_number: int, issues: list[Issue]) -> None:
         self._grammar[block_number] = issues
@@ -216,7 +225,11 @@ class SpellHighlighter(QSyntaxHighlighter):
         state = block.userState()
         return self.markdown and (state == STATE_IN_FENCE or state >= syntax.STATE_FENCE or is_code_fence(block.text()))
 
+    suspended = False      # während Editor.load(): der Durchlauf nach dem Laden (reset) färbt alles
+
     def highlightBlock(self, text: str) -> None:
+        if self.suspended:
+            return
         block = self.currentBlock()
         previous_state = max(0, self.previousBlockState())
         if self.lexer is not None:

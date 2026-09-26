@@ -56,6 +56,7 @@ class Editor(QTextEdit):
         self.encoding = text_file.encoding
         self.eol = text_file.eol
         self._search_selections: list[QTextEdit.ExtraSelection] = []
+        self._problem_selections: list[QTextEdit.ExtraSelection] = []   # JSON/YAML-Fehler
         self._font_size = font_size
         self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
@@ -86,6 +87,7 @@ class Editor(QTextEdit):
         self._padding = LAYOUT.paper_padding   # aktueller Innenabstand (schrumpft bei schmalem Blatt)
         self._show_numbers = True
         self._indent_pending: set[int] = set()
+        self._indent_font_key: tuple = ()
         self._indent_timer = QTimer(self)
         self._indent_timer.setSingleShot(True)
         self._indent_timer.setInterval(0)
@@ -111,9 +113,15 @@ class Editor(QTextEdit):
             self._refresh_extra_selections()
             return
         self._loaded_once = True
-        self.setPlainText(text_file.text)
-        self._apply_line_height()
-        self._apply_hanging_indents()
+        if self.highlighter is not None:
+            self.highlighter.suspended = True     # setPlainText + Formate lösen sonst je einen vollen Durchlauf aus
+        try:
+            self.setPlainText(text_file.text)
+            self._apply_line_height()
+            self._apply_hanging_indents()
+        finally:
+            if self.highlighter is not None:
+                self.highlighter.suspended = False
         self._indent_timer.stop()          # das Laden selbst ist keine Tipp-Änderung
         self._indent_pending.clear()
         self.document().clearUndoRedoStacks()
@@ -182,6 +190,8 @@ class Editor(QTextEdit):
         ohne die Datei als geändert zu markieren (bei ungeänderter Datei bleibt auch Undo leer)."""
         if not self.document().blockCount() or not self.document().firstBlock().isValid():
             return
+        if self._indent_font_key == self._font_key():
+            return      # QSS-Polish setzt die Schrift mehrfach neu – gleiche Metrik, nichts zu tun
         modified = self.document().isModified()
         self._indent_timer.stop()
         self._indent_pending.clear()
@@ -226,12 +236,22 @@ class Editor(QTextEdit):
     def _apply_hanging_indents(self) -> None:
         """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen).
         Nur Blöcke mit Präfix bekommen ein Format – bei 40 000 Zeilen spart das die meiste Zeit."""
+        widths: dict[str, int] = {}
+        metrics = self.fontMetrics()
         block = self.document().firstBlock()
         while block.isValid():
             text = block.text()
             if text[:1] in (" ", "\t", "-", "*", "+") or text[:1].isdigit():
-                self._set_hanging_indent(block, self._indent_for(text))
+                prefix = hanging_prefix(text).replace("\t", "    ")
+                if prefix not in widths:
+                    widths[prefix] = metrics.horizontalAdvance(prefix) if prefix else 0
+                if widths[prefix] or block.blockFormat().leftMargin():   # „123,4“ (CSV) hat kein Präfix
+                    self._set_hanging_indent(block, widths[prefix])
             block = block.next()
+        self._indent_font_key = self._font_key()
+
+    def _font_key(self) -> tuple:
+        return self.font().key(), self.fontMetrics().horizontalAdvance("    ")
 
     def _on_block_changed(self, position: int, removed: int, added: int) -> None:
         block = self.document().findBlock(position)
@@ -318,14 +338,24 @@ class Editor(QTextEdit):
             over_link = self.highlighter.link_at(cursor.block(), cursor.positionInBlock()) is not None
         self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.IBeamCursor)
 
+    image_hook = None   # (editor, QImage | None, [Pfade]) -> bool; setzt das Hauptfenster (Bilder → assets/)
+
     def insertFromMimeData(self, source) -> None:
+        from notex.core.images import is_image
         if source.hasUrls() and any(u.isLocalFile() for u in source.urls()):
-            self.files_dropped.emit([u.toLocalFile() for u in source.urls() if u.isLocalFile()])
+            paths = [u.toLocalFile() for u in source.urls() if u.isLocalFile()]
+            if self.image_hook is not None and paths and all(is_image(p) for p in paths):
+                if self.image_hook(self, None, paths):
+                    return
+            self.files_dropped.emit(paths)
             return
+        if source.hasImage() and not source.hasText() and self.image_hook is not None:
+            if self.image_hook(self, source.imageData(), []):
+                return
         self._grouped(lambda: super(Editor, self).insertFromMimeData(source))
 
     def canInsertFromMimeData(self, source) -> bool:
-        return source.hasUrls() or super().canInsertFromMimeData(source)
+        return source.hasUrls() or source.hasImage() or super().canInsertFromMimeData(source)
 
     def cursor_line_col(self) -> tuple[int, int]:
         cursor = self.textCursor()
@@ -410,13 +440,30 @@ class Editor(QTextEdit):
         self._refresh_extra_selections()
 
     # ---- Aktuelle Zeile + Extra-Selections ----------------------------------
+    def set_problem(self, position: int | None) -> None:
+        """Fehlerstelle (JSON/YAML) rot unterwellen – das Zeichen an `position` bzw. das Zeilenende; None löscht."""
+        self._problem_selections = []
+        if position is not None:
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(max(0, min(position, self.document().characterCount() - 1)))
+            if cursor.atBlockEnd() and cursor.position() > cursor.block().position():
+                cursor.movePosition(QTextCursor.MoveOperation.Left)
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = cursor
+            selection.format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+            selection.format.setUnderlineColor(QColor(COLORS.danger))
+            selection.format.setBackground(QColor(COLORS.paper_match))
+            self._problem_selections.append(selection)
+        self._refresh_extra_selections()
+
     def _refresh_extra_selections(self) -> None:
         current_line = QTextEdit.ExtraSelection()
         current_line.format.setBackground(QColor(COLORS.paper_line))
         current_line.format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)
         current_line.cursor = self.textCursor()
         current_line.cursor.clearSelection()
-        selections = [current_line, *self._search_selections]
+        selections = [current_line, *self._problem_selections, *self._search_selections]
         # Der Treffer unter dem Cursor wird etwas kräftiger markiert
         cursor = self.textCursor()
         if cursor.hasSelection():

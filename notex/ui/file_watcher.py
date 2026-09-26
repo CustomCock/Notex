@@ -9,17 +9,14 @@ haben, und melden nur, wenn die Datei davon abweicht.
 """
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 
 from PySide6.QtCore import QFileSystemWatcher, QObject, QTimer, Signal
 
 
 def _digest(path: Path) -> bytes | None:
-    try:
-        return hashlib.sha1(path.read_bytes()).digest()
-    except OSError:
-        return None
+    from notex.core.fileops import file_signature
+    return file_signature(path)
 
 
 class OpenFileWatcher(QObject):
