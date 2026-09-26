@@ -391,6 +391,33 @@ class SettingsDialog(QDialog):
         page.note("Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt. Die Vorschau lädt nie von selbst aus dem "
                   "Internet: externe Bilder erscheinen als „Bild laden“, externe Links öffnen den Browser erst auf Klick.")
 
+        page.section("Versionshistorie")
+        self.history_box = QCheckBox("Bei jedem Speichern einen Schnappschuss in history/ ablegen")
+        self.history_box.toggled.connect(lambda on: self.config.setdefault("history", {}).__setitem__("enabled", on)
+                                         if not self._loading else None)
+        page.row("", self.history_box)
+        self.history_spin = QSpinBox()
+        self.history_spin.setRange(10, 5000)
+        self.history_spin.setSingleStep(50)
+        self.history_spin.setSuffix(" MB")
+        self.history_spin.valueChanged.connect(lambda v: self.config.setdefault("history", {}).__setitem__("max_mb", v)
+                                               if not self._loading else None)
+        page.row("Höchstens", self.history_spin)
+        history_row = QHBoxLayout()
+        history_row.setContentsMargins(0, 0, 0, 0)
+        self.history_size = QLabel()
+        self.history_size.setObjectName("SettingsNote")
+        clear_history = QPushButton("Verlauf leeren …")
+        clear_history.clicked.connect(self._clear_history)
+        history_row.addWidget(self.history_size, 1)
+        history_row.addWidget(clear_history)
+        history_widget = QWidget()
+        history_widget.setLayout(history_row)
+        page.add(history_widget)
+        page.note("Ctrl+Shift+Y zeigt die Versionen der aktuellen Datei mit Unterschieden. Ältere Versionen werden "
+                  "ausgedünnt (24 h alles, dann stündlich, täglich, wöchentlich). Verschlüsselte Notizen (.ntx) "
+                  "bekommen nie einen Verlauf.")
+
         page.section("Geteilter Editor")
         self.split_box = QComboBox()
         self.split_box.addItem("Nebeneinander", "horizontal")
@@ -478,6 +505,10 @@ class SettingsDialog(QDialog):
         self.extensions_edit.setText(" ".join(cfg["extensions"]))
         self.wiki_box.setChecked(bool(cfg.get("wiki_links", True)))
         self.markdown_view_box.setCurrentIndex(max(0, self.markdown_view_box.findData(cfg.get("markdown_view", "edit"))))
+        hist = cfg.get("history", {})
+        self.history_box.setChecked(bool(hist.get("enabled", True)))
+        self.history_spin.setValue(int(hist.get("max_mb", 200)))
+        self._update_history_size()
         self.split_box.setCurrentIndex(max(0, self.split_box.findData(cfg.get("split", {}).get("orientation", "horizontal"))))
         self.sync_scroll_box.setChecked(bool(cfg.get("preview_sync_scroll", True)))
         self.syntax_box.setChecked(bool(cfg.get("syntax_highlighting", True)))
@@ -489,6 +520,23 @@ class SettingsDialog(QDialog):
         self.backlinks_box.setCurrentIndex(max(0, self.backlinks_box.findData(cfg.get("backlinks_position", "bottom"))))
         self._refresh_theme_list()
         self._loading = False
+
+    def _update_history_size(self) -> None:
+        history = getattr(self.window_, "history", None)
+        if history is None:
+            self.history_size.setText("")
+            return
+        size = history.object_bytes()
+        self.history_size.setText(f"Belegt: {size / 1024 / 1024:.1f} MB in {len(history.tracked_paths())} Dateien")
+
+    def _clear_history(self) -> None:
+        from notex.ui import dialogs
+        history = getattr(self.window_, "history", None)
+        if history is not None and dialogs.confirm(self, "Verlauf leeren", "Alle gespeicherten Versionen löschen?",
+                                                   yes="Löschen", danger=True,
+                                                   informative="Die Dateien selbst bleiben unverändert."):
+            history.clear()
+            self._update_history_size()
 
     def _refresh_theme_list(self) -> None:
         self.theme_list.clear()

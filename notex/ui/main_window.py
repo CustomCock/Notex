@@ -39,6 +39,7 @@ from notex.core.wikilinks import find_heading_line, link_name, rewrite_links, un
 from notex.core.encoding import read_text_file as _read_text_file
 from notex.core.fileops import save_text_file
 from notex.core.recent import add_recent, prune_recent
+from notex.core.history import History, history_folder
 from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe, is_temporary_location
 from notex.ui.about_dialog import AboutDialog
 from notex.ui.settings_dialog import SettingsDialog
@@ -114,6 +115,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.splitter)
 
         self.association = build_association()   # None im Dev-Modus oder außerhalb von Windows
+        hist_cfg = config.get("history", {})
+        self.history = History(history_folder(app_root()), max_bytes=int(hist_cfg.get("max_mb", 200)) * 1024 * 1024)
+        self._snapshots_since_limit = 0
+        QTimer.singleShot(5000, self._enforce_history_limit)
         self.registry = ActionRegistry()
         self.registry.recent = list(config.get("recent_commands", []))
         self.file_index = FileIndexService(root, config)
@@ -151,6 +156,8 @@ class MainWindow(QMainWindow):
         self.tabs.preview_link.connect(self._on_preview_link)
         self.tabs.completion_requested.connect(self._on_completion_requested)
         self.tabs.file_saved.connect(self._on_saved_for_links)
+        self.tabs.file_saved.connect(lambda path: self._snapshot(path))
+        self.tabs.file_opened.connect(lambda path: self._snapshot(path, label="geöffnet"))
         self.tabs.currentChanged.connect(lambda _i: self._refresh_backlinks())
         self.file_index.updated.connect(self._on_file_index_updated)
         self.links.updated.connect(lambda: self._relink_timer.start())
@@ -195,6 +202,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self._action("Datei öffnen …", "Ctrl+O", self.open_file_dialog))
         file_menu.addAction(self._action("Zuletzt geöffnet …", "Ctrl+R", self.show_recent))
+        file_menu.addAction(self._action("Versionsverlauf …", "Ctrl+Shift+Y", self.show_history))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
@@ -661,6 +669,11 @@ class MainWindow(QMainWindow):
     # ---- Reaktionen auf Baum / Watcher -----------------------------------------
     def _on_path_renamed(self, old: Path, new: Path) -> None:
         self.tabs.rename_open_file(old, new)
+        if not self.tabs.is_external(new):
+            try:
+                self.history.rename(self.tabs.relative(old), self.tabs.relative(new))   # Verlauf zieht mit
+            except OSError:
+                pass
         QTimer.singleShot(0, lambda: self._update_links_after_rename(old, new))
         # Watcher auf die neuen Pfade umhängen
         for editor in self.tabs.editors():
@@ -682,6 +695,7 @@ class MainWindow(QMainWindow):
         if reload:
             try:
                 editor.replace_content(read_text_file(path))
+                self._snapshot(path, label="extern geändert")
             except OSError as error:
                 dialogs.warn(self, "Neu laden fehlgeschlagen", str(error))
         else:
@@ -762,6 +776,62 @@ class MainWindow(QMainWindow):
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
 
+    # ---- Versionshistorie ----------------------------------------------------------------
+    def _history_enabled(self) -> bool:
+        return bool(self.config.get("history", {}).get("enabled", True))
+
+    def _snapshot(self, path: Path, text: str | None = None, label: str = "") -> None:
+        """Schnappschuss nach Speichern/Öffnen/Neuladen. Nie für externe Dateien oder .ntx (Klartext!)."""
+        if not self._history_enabled() or self.tabs.is_external(path) or path.suffix.lower() == ".ntx":
+            return
+        if text is None:
+            editor = self.tabs.editor_for(path)
+            if editor is None:
+                return
+            text = editor.toPlainText()
+        try:
+            if self.history.snapshot(self.tabs.relative(path), text, label=label) is not None:
+                self._snapshots_since_limit += 1
+                if self._snapshots_since_limit >= 50:
+                    self._enforce_history_limit()
+        except OSError:
+            pass   # Historie darf Speichern nie blockieren
+
+    def _write_tracked(self, path: Path, text_file, new_text: str, label: str) -> None:
+        """Datei außerhalb des Editors neu schreiben – vorher den alten Stand in die Historie."""
+        self._snapshot(path, text_file.text, label=label)
+        save_text_file(path, new_text, text_file.encoding, text_file.eol)
+        self._snapshot(path, new_text)
+
+    def _enforce_history_limit(self) -> None:
+        self._snapshots_since_limit = 0
+        self.history.max_bytes = int(self.config.get("history", {}).get("max_mb", 200)) * 1024 * 1024
+        try:
+            self.history.enforce_limit()
+        except OSError:
+            pass
+
+    def show_history(self) -> None:
+        editor = self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Erst eine Datei öffnen", "info")
+            return
+        if editor.path.suffix.lower() == ".ntx":
+            self.toast.show_message("Verschlüsselte Notizen haben keinen Verlauf (sonst läge Klartext auf der Platte)", "lock")
+            return
+        if self.tabs.is_external(editor.path):
+            self.toast.show_message("Verlauf gibt es nur für Dateien in data/", "info")
+            return
+        from notex.ui.history_dialog import HistoryDialog
+        dialog = HistoryDialog(self, self.history, self.tabs.relative(editor.path), editor.toPlainText())
+        dialog.restore_requested.connect(lambda text, e=editor: self._restore_version(e, text))
+        dialog.exec()
+
+    def _restore_version(self, editor, text: str) -> None:
+        self._snapshot(editor.path, label="vor Wiederherstellen")   # aktuellen Stand sichern, falls ungespeichert
+        self.tabs.replace_text_keep_cursor(editor, text)
+        self.toast.show_message("Version wiederhergestellt – Ctrl+Z nimmt es zurück, Ctrl+S speichert", "timer-reset")
+
     # ---- Ersetzen in Dateien -------------------------------------------------------------
     def open_replace_in_files(self) -> None:
         from notex.ui.replace_dialog import ReplaceInFilesDialog
@@ -798,7 +868,7 @@ class MainWindow(QMainWindow):
                     text_file = _read_text_file(path)
                     new_text, count = apply_replace(text_file.text, query, replacement, line_numbers)
                     if count:
-                        save_text_file(path, new_text, text_file.encoding, text_file.eol)
+                        self._write_tracked(path, text_file, new_text, "vor Ersetzen")
                         if not self.tabs.is_external(path):
                             self.links.update_path(self.tabs.relative(path))
             except (OSError, UnicodeDecodeError) as error:
@@ -942,7 +1012,7 @@ class MainWindow(QMainWindow):
                 lines = tf.text.split("\n")
                 word = lines[line - 1][start:end]
                 lines[line - 1] = lines[line - 1][:start] + (f"[[{target_name}|{word}]]" if word != target_name else f"[[{word}]]") + lines[line - 1][end:]
-                save_text_file(path, "\n".join(lines), tf.encoding, tf.eol)
+                self._write_tracked(path, tf, "\n".join(lines), "vor Verlinken")
                 self.links.update_text(str(rel).replace("\\", "/"), "\n".join(lines))
             except (OSError, IndexError) as error:
                 dialogs.warn(self, "Verlinken", str(error))
@@ -1054,7 +1124,7 @@ class MainWindow(QMainWindow):
                     for o, n in pairs:
                         text, _ = rewrite_links(text, files + [o], o, n)
                     if text != tf.text:
-                        save_text_file(path, text, tf.encoding, tf.eol)
+                        self._write_tracked(path, tf, text, "vor Link-Anpassung")
                     self.links.update_text(source, text)
             except (OSError, UnicodeDecodeError) as error:
                 dialogs.warn(self, "Links anpassen", f"{source}: {error}")

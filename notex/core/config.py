@@ -63,6 +63,10 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "history": {              # lokale Versionshistorie in history/ neben der App
+        "enabled": True,
+        "max_mb": 200,        # Obergrenze für die komprimierten Schnappschüsse
+    },
     "search": {
         "by_name": True,
         "full_text": False,

@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.3.0] – unveröffentlicht
+
+### Hinzugefügt
+- Versionsverlauf (Ctrl+Shift+Y): Schnappschüsse in `history/` bei Speichern, Öffnen, Neuladen, Ersetzen in
+  Dateien und Link-Anpassung; zlib-komprimiert und dedupliziert, folgt Umbenennungen, Ausdünnung nach Alter,
+  Größenlimit (Einstellungen → Editor), Diff zum aktuellen Text, Wiederherstellen als Undo-Schritt
+
+### Geändert
+- Ein fehlendes Icon bricht keine Aktion mehr ab (Ersatzsymbol statt Fehler)
+
 ## [1.2.0] – 2026-09-26
 
 ### Hinzugefügt

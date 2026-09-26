@@ -11,6 +11,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -313,7 +314,24 @@ def main() -> int:
         later(4100, lambda: (window.tabs.unsplit(), window.sidebar.search_field.setText("portabel"),
                              window.open_replace_in_files(), window._replace_dialog.replace_field.setText("portable")))
         later(5000, lambda: save(window._replace_dialog, "28-replace-in-files"))
-        later(5100, lambda: (window._replace_dialog.close(), window.close(), app.quit()))
+        # v1.3: Versionsverlauf
+        def open_history():
+            from notex.ui.history_dialog import HistoryDialog
+            window._replace_dialog.close()
+            target = data / "Projekte/Notex/README.md"
+            editor = window.tabs.open_file(target)
+            rel = window.tabs.relative(target)
+            window.history.snapshot(rel, editor.toPlainText().replace("- schnell", "- schnell\n- klein"), now=time.time() - 3 * 86400)
+            window.history.snapshot(rel, editor.toPlainText().replace("ruhig", "leise"), now=time.time() - 7200)
+            window.history.snapshot(rel, editor.toPlainText(), now=time.time() - 60)
+            editor.insert_text("Neuer Absatz, noch nicht gespeichert.\n\n")
+            window._shot_history = HistoryDialog(window, window.history, rel, editor.toPlainText())
+            window._shot_history.list.setCurrentRow(1)
+            window._shot_history.show()
+        later(5100, open_history)
+        later(5700, lambda: save(window._shot_history, "29-history"))
+        later(5800, lambda: (window._shot_history.close(), window.tabs.current_editor().document().setModified(False),
+                             window.close(), app.quit()))
 
     later(500, s_empty)
     later(60000, app.quit)

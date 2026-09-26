@@ -140,6 +140,23 @@ atomar mit ihrem Encoding und Zeilenende geschrieben.
 
 ![Ersetzen in Dateien](docs/28-replace-in-files.png)
 
+## Versionsverlauf
+
+Jedes Speichern legt einen Schnappschuss in `history/` neben der App ab (komprimiert, gleiche Inhalte
+nur einmal). Auch das Öffnen, Neuladen nach externer Änderung, „Ersetzen in Dateien“ und das
+Anpassen von Links sichern den vorherigen Stand. **Ctrl+Shift+Y** zeigt die Versionen der aktuellen
+Datei mit farbigem Diff zum aktuellen Text; „Wiederherstellen“ ersetzt den Editor-Text als ein
+Undo-Schritt und speichert nicht.
+
+- Umbenennen und Verschieben im Baum nehmen den Verlauf mit.
+- Ausdünnung: 24 h alles, bis 7 Tage stündlich, bis 30 Tage täglich, bis 1 Jahr wöchentlich, danach
+  monatlich; die neueste Version bleibt immer.
+- Obergrenze (Standard 200 MB) und „Verlauf leeren“ unter Einstellungen → Editor.
+- Verschlüsselte Notizen (`.ntx`) bekommen nie einen Verlauf, externe Dateien außerhalb von `data/`
+  ebenfalls nicht.
+
+![Versionsverlauf](docs/29-history.png)
+
 ## Markdown-Vorschau
 
 `Ctrl+Shift+V` wechselt bei `.md`-Dateien zwischen Bearbeiten, Vorschau und geteilter Ansicht (Blatt links,
@@ -321,6 +338,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+F | Suche in Dateien (Esc leert sie) |
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
+| Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
 | Ctrl+Plus / Ctrl+Minus / Ctrl+0 | Zoom |
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |

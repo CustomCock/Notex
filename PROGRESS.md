@@ -8,6 +8,10 @@ Branch für alle Arbeiten: `claude/textbaum-text-editor-it6n6b`. Releases entste
 nach `main` und ein annotiertes Tag `vX.Y.Z` (löst den Windows-Build in Actions aus). Tags kann nur
 der Repo-Besitzer pushen.
 
+**Entscheidung des Besitzers (26.09.2026):** Für 1.2.0 und die folgenden Blöcke vorerst kein eigenes
+Release. Versionen werden weiter hochgezählt, CHANGELOG gepflegt und lokal getaggt; nach jedem Block
+wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, wenn der Besitzer es sagt.
+
 ## Stand
 
 | Version | Inhalt | Status |
@@ -15,8 +19,8 @@ der Repo-Besitzer pushen.
 | 1.0.0 | Explorer + Editor, Design-System, Themes, Rechtschreibung/Grammatik, Toolbar, Dateizuordnung, Einzelinstanz | released |
 | 1.1.0 | Block A: Lizenzen, Config-Autosave, Quick Open / Command Palette, Wiki-Links + Backlinks, Syntax-Highlighting | released |
 | 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
-| 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), Tag `v1.2.0` durch Besitzer |
-| 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | offen |
+| 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), kein Release (Besitzer) |
+| 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | in Arbeit |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | offen |
 
 ## Erledigt
@@ -58,10 +62,16 @@ der Repo-Besitzer pushen.
   PyInstaller-Build geprüft (neue Module im Archiv, Build +2 MB), 127 Tests grün.
 - CI-Fix: Test-Workflow installiert markdown-it-py, regex und Pygments ausdrücklich (war beim ersten Push rot).
 
+### 1.3.0 – Block C (in Arbeit)
+- C1 Versionsverlauf: `core/history.py` (Objekte `history/objects/xx/<sha256>.z` mit zlib, `index.json` mit IDs statt
+  Pfaden, Dedup, `thin()` nach RETENTION, `enforce_limit()` + Garbage Collection, `rename()` für Dateien/Ordner,
+  `.ntx` ausgeschlossen, Prüfsumme beim Lesen), `ui/history_dialog.py` (Liste + Diff-HTML, Wiederherstellen als
+  Undo-Schritt). Schnappschüsse bei Speichern, Öffnen, Neuladen und vor Schreibzugriffen außerhalb des Editors
+  (Ersetzen in Dateien, Link-Anpassung, Verlinken). Ctrl+Shift+Y. Icon-Lader wirft bei fehlendem Icon nicht mehr.
+
 ## Offen
 
 ### Block C – 1.3.0
-- Lokale Versionshistorie in `history/` (komprimiert, dedupliziert, Ausdünnung, Größenlimit, Diff-Panel, Wiederherstellen, folgt Umbenennungen).
 - Verschlüsselte Notizen `.ntx`: keine eigene Kryptografie, `cryptography` AES-256-GCM, Argon2id (Fallback scrypt), Header als AAD, neue Nonce pro Speichern, Klartext nie auf Platte (History/Suche/Index/Grammatik/Config/Logs/Toasts), Auto-Lock, Schloss-Icons, `docs/ENCRYPTION.md`, Tests (Roundtrip, falsches Passwort, Manipulation, Nonce, Formatversion).
 
 ### Block D – 1.4.0
