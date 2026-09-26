@@ -1,0 +1,1 @@
+"""Zentrales Styling: Farben + QSS."""

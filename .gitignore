@@ -1,0 +1,17 @@
+# Virtuelle Umgebungen
+venv/
+.venv/
+
+# Python-Artefakte
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Build-Ausgaben (PyInstaller)
+build/
+dist/
+
+# Laufzeitdaten der portablen App (liegen neben der EXE, nicht im Repo)
+config.json
+data/

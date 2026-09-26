@@ -1,0 +1,239 @@
+/* Textbaum – mattes Dunkelgrau, flach, keine Glanzeffekte.
+   Platzhalter @name werden in theme.py durch Farben ersetzt. */
+
+* {
+    outline: none;
+}
+
+QMainWindow, QWidget {
+    background: @bg;
+    color: @text;
+    font-family: "Segoe UI", "Noto Sans", sans-serif;
+    font-size: 10pt;
+}
+
+QToolTip {
+    background: @surface;
+    color: @text;
+    border: 1px solid @border;
+    padding: 4px;
+}
+
+/* ---------- Seitenleiste ---------- */
+QWidget#Sidebar, QWidget#Sidebar QWidget {
+    background: @sidebar;
+}
+
+QLineEdit {
+    background: @surface;
+    border: 1px solid @border;
+    border-radius: 3px;
+    padding: 5px 7px;
+    selection-background-color: @selection;
+}
+QLineEdit:focus {
+    border: 1px solid @accent;
+}
+
+QCheckBox {
+    spacing: 6px;
+    color: @text_muted;
+}
+QCheckBox::indicator {
+    width: 13px;
+    height: 13px;
+    border: 1px solid @accent;
+    border-radius: 2px;
+    background: @surface;
+}
+QCheckBox::indicator:checked {
+    background: @accent;
+}
+
+/* Baum und Ergebnisliste */
+QTreeView {
+    background: @sidebar;
+    border: none;
+    show-decoration-selected: 1;
+}
+QTreeView::item {
+    padding: 3px 2px;
+    border: none;
+}
+QTreeView::item:hover {
+    background: @surface;
+}
+QTreeView::item:selected {
+    background: @selection;
+    color: @text;
+}
+QTreeView::branch {
+    background: @sidebar;
+}
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+    image: none;
+    border-image: none;
+}
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings {
+    image: none;
+    border-image: none;
+}
+
+QHeaderView::section {
+    background: @sidebar;
+    color: @text_muted;
+    border: none;
+    padding: 3px;
+}
+
+/* ---------- Editor-Tabs ---------- */
+QTabWidget::pane {
+    border: none;
+    background: @bg;
+}
+QTabBar {
+    background: @bg;
+}
+QTabBar::tab {
+    background: @bg;
+    color: @text_muted;
+    border: 1px solid @border;
+    border-bottom: none;
+    padding: 5px 12px;
+    margin-right: 1px;
+}
+QTabBar::tab:selected {
+    background: @surface;
+    color: @text;
+}
+QTabBar::tab:hover:!selected {
+    background: @surface;
+}
+QTabBar::close-button {
+    image: none;
+    subcontrol-position: right;
+}
+
+/* Editorfläche = weißes Blatt. Der Rand außen ist der "Tisch". */
+QPlainTextEdit {
+    background: @paper;
+    color: @paper_text;
+    border: none;
+    selection-background-color: @paper_selection;
+    selection-color: @paper_text;
+}
+
+/* ---------- Statusleiste, Menüs, Buttons ---------- */
+QStatusBar {
+    background: @sidebar;
+    color: @text_muted;
+    border-top: 1px solid @border;
+}
+QStatusBar::item {
+    border: none;
+}
+QStatusBar QLabel {
+    background: transparent;
+    color: @text_muted;
+    padding: 0 6px;
+}
+
+QMenuBar {
+    background: @bg;
+    border-bottom: 1px solid @border;
+}
+QMenuBar::item:selected {
+    background: @surface;
+}
+QMenu {
+    background: @surface;
+    border: 1px solid @border;
+    padding: 4px 0;
+}
+QMenu::item {
+    padding: 5px 24px 5px 12px;
+}
+QMenu::item:selected {
+    background: @selection;
+}
+QMenu::separator {
+    height: 1px;
+    background: @border;
+    margin: 4px 8px;
+}
+
+QToolButton, QPushButton {
+    background: @surface;
+    color: @text;
+    border: 1px solid @border;
+    border-radius: 3px;
+    padding: 4px 10px;
+}
+QToolButton:hover, QPushButton:hover {
+    background: @selection;
+}
+QToolButton:pressed, QPushButton:pressed {
+    background: @accent;
+}
+QToolButton#FlatButton {
+    border: none;
+    background: transparent;
+    padding: 4px 6px;
+}
+QToolButton#FlatButton:hover {
+    background: @surface;
+}
+
+QSplitter::handle {
+    background: @border;
+}
+QSplitter::handle:horizontal {
+    width: 1px;
+}
+
+/* ---------- Scrollbars ---------- */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: @accent;
+    min-height: 24px;
+    border-radius: 3px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical:hover {
+    background: @text_muted;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+    height: 0;
+}
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 0;
+}
+QScrollBar::handle:horizontal {
+    background: @accent;
+    min-width: 24px;
+    border-radius: 3px;
+    margin: 2px;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+    width: 0;
+}
+
+/* Dialoge */
+QMessageBox, QDialog {
+    background: @bg;
+}
+QMessageBox QLabel {
+    color: @text;
+}
