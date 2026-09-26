@@ -218,6 +218,31 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 ![Bild-Tab](docs/38-image-tab.png)
 
 
+## Module
+
+Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der Command Palette) schaltet Funktionen
+einzeln an und aus – sofort, ohne Neustart. Ein ausgeschaltetes Modul hat keine Menüeinträge, Befehle,
+Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken nicht.
+
+| Modul | Standard | Zusätzlich nötig |
+|---|---|---|
+| Variablen | an | – |
+| Hex & Dateianalyse (Hex-Ansicht, Dateityp, Prüfsummen) | an | – |
+| Strings, Eingebettete Dateien, Entropie | aus | – |
+| Metadaten | aus | Pillow, pypdf |
+| YARA | aus | yara-python |
+| Zeitleiste & Beweismittel | aus | – |
+| IOC entschärfen | an | – |
+| Port-Infos | an | – |
+| IP-Konflikte | aus | – |
+| RDAP/ASN | aus | Netzwerk (nur auf Klick) |
+| Netzwerk-Scanner | aus | – |
+| Log-Auswertung | aus | python-evtx |
+| PCAP-Übersicht | aus | dpkt |
+
+Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
+öffnen Binärdateien wieder im Texteditor.
+
 ## CSV als Tabelle
 
 `.csv`- und `.tsv`-Dateien lassen sich mit `Ctrl+Shift+V` (oder „CSV/TSV: Als Tabelle anzeigen“ in der Command
@@ -599,8 +624,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
 | Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
 | Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
-| Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen |
-| Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei |
+| Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen (Modul Hex & Dateianalyse) |
+| Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
 | Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |

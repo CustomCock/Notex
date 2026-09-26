@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.7.0] – unveröffentlicht
+
+### Hinzugefügt
+- Module: Einstellungen → Module schaltet Funktionen einzeln an/aus, sofort und ohne Neustart; ausgeschaltete Module
+  hängen nichts ein (Menü, Palette, Kürzel, Panels) und laden keine Bibliotheken. Hex-Ansicht und Prüfsummen sind
+  jetzt das Modul „Hex & Dateianalyse“ (Standard an)
+
+### Behoben
+- Dateien mit Bytes, die cp1252 nicht kennt (0x81, 0x8D, 0x8F, 0x90, 0x9D), ließen sich im Editor nicht öffnen;
+  jetzt Latin-1 als letzte Stufe (Speichern bleibt byte-identisch)
+
 ## [1.6.0] – 2026-09-26
 
 ### Hinzugefügt

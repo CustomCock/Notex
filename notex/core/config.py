@@ -63,6 +63,11 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "modules": {              # Module an/aus (siehe core/modules.py) – Standard: Variablen, Hex, Ports, IOC an
+        "variables": True, "hex": True, "strings": False, "embedded": False, "entropy": False, "metadata": False,
+        "yara": False, "timeline": False, "ioc": True, "ports": True, "ip_conflicts": False, "rdap": False,
+        "scanner": False, "logs": False, "pcap": False,
+    },
     "images": {               # Bilder in Notizen (Einfügen per Ctrl+V / Drag & Drop in .md)
         "assets_folder": "assets",   # Ordner neben der Notiz
     },

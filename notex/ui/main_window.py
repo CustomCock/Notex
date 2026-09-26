@@ -53,10 +53,8 @@ from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 def _register_viewers() -> None:
     """Viewer-Tabs (Bild, später Hex/PDF) bei den Tab-Gruppen anmelden."""
     from notex.ui.editor_tabs import EditorTabs
-    from notex.ui.hex_view import HexPage
     from notex.ui.image_view import ImagePage
-    EditorTabs.register_viewer("image", ImagePage)
-    EditorTabs.register_viewer("hex", HexPage)
+    EditorTabs.register_viewer("image", ImagePage)      # "hex" meldet das Modul „Hex & Dateianalyse“ an
     try:
         from notex.ui.pdf_view import PdfPage
     except ImportError:              # PySide6 ohne QtPdf: PDFs öffnen dann als Hex
@@ -164,6 +162,9 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self._build_editor_actions()
         self._build_registry()
+        from notex.core.modules import ModuleRegistry
+        self.modules = ModuleRegistry(self.config)
+        self._install_modules()
         self.file_index.request_rescan()
         QTimer.singleShot(1500, self._check_association_path)
         # Zustand regelmäßig sichern: Absturz oder Neustart kostet höchstens die letzte Sekunde
@@ -253,10 +254,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
         file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
         file_menu.addAction(self._action("Live verfolgen ein/aus", "Ctrl+Shift+Alt+F", lambda: self.toggle_live()))
-        file_menu.addAction(self._action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()))
         self._action("PDF: Markierung als Zitat einfügen", "Ctrl+Shift+Alt+Q", self.quote_from_pdf)
-        file_menu.addAction(self._action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums()))
-        file_menu.addSeparator()
+        self._module_anchor = file_menu.addSeparator()      # Module fügen ihre Einträge davor ein
+        self.file_menu = file_menu
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))
@@ -881,6 +881,54 @@ class MainWindow(QMainWindow):
             return editor.path
         viewer = self.tabs.current_viewer()
         return viewer.path if viewer is not None else None
+
+    # ---- Module ---------------------------------------------------------------------------------
+    def _install_modules(self) -> None:
+        """Jedes Modul meldet einen Aktivator an; ausgeschaltete Module hängen nichts ein (siehe core/modules.py)."""
+        self.modules.contribute("hex", self._activate_hex)
+
+    def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
+        """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
+        action = self._action(text, shortcut, slot)
+        if menu is not None:
+            menu.insertAction(self._module_anchor, action)
+        return action
+
+    def _drop_actions(self, actions: list[QAction]) -> None:
+        for action in actions:
+            self.file_menu.removeAction(action)
+            self.removeAction(action)
+            action.deleteLater()
+
+    def _activate_hex(self):
+        from notex.ui.editor_tabs import EditorTabs
+        from notex.ui.hex_view import HexPage
+        EditorTabs.register_viewer("hex", HexPage)
+        actions = [self._module_action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex(), self.file_menu),
+                   self._module_action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums(), self.file_menu)]
+        self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
+                          shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
+        self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),
+                          category="Datei", shortcut="Ctrl+Shift+Alt+C", keywords="hash prüfsumme checksum sha256 md5 vergleichen")
+
+        def tree_entries(menu, path: Path) -> None:
+            menu.addAction(icon("binary"), "Als Hex öffnen", lambda: self.open_as_hex(path))
+            menu.addAction(icon("hash"), "Prüfsummen …", lambda: self.show_checksums(path))
+        self.sidebar.tree.menu_providers.append(tree_entries)
+
+        def undo() -> None:
+            EditorTabs.VIEWERS.pop("hex", None)          # Binärdateien öffnen wieder im Texteditor
+            for group in getattr(self.tabs, "groups", [self.tabs]):
+                for viewer in list(group.viewers()):
+                    if viewer.kind == "hex":
+                        group._remove_viewer(viewer)
+            self._drop_actions(actions)
+            self.registry.remove("file:hex")
+            self.registry.remove("file:checksums")
+            if tree_entries in self.sidebar.tree.menu_providers:
+                self.sidebar.tree.menu_providers.remove(tree_entries)
+            self._update_status()
+        return undo
 
     def open_as_hex(self, path: Path | None = None) -> None:
         """Beliebige Datei als Hex (nur lesen) – bei .ntx sieht man nur den Geheimtext von der Platte."""
@@ -2034,10 +2082,6 @@ class MainWindow(QMainWindow):
                           shortcut="Ctrl+Shift+Alt+Q", keywords="pdf zitat quote markierung notiz quelle")
         self.registry.add("pdf:outline", "PDF: Lesezeichen ein/aus", self.toggle_pdf_outline, category="PDF",
                           keywords="pdf lesezeichen inhaltsverzeichnis outline bookmarks")
-        self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
-                          shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
-        self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),
-                          category="Datei", shortcut="Ctrl+Shift+Alt+C", keywords="hash prüfsumme checksum sha256 md5 vergleichen")
         self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
                           category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")

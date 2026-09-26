@@ -80,9 +80,10 @@ class SettingsPage(QWidget):
 
 
 class SettingsDialog(QDialog):
-    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "System", "Tastenkürzel"]
-    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "book-open", "sliders-horizontal",
-                      "keyboard"]
+    CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "Module", "System",
+                  "Tastenkürzel"]
+    CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "book-open", "blocks",
+                      "sliders-horizontal", "keyboard"]
 
     def __init__(self, window, store: ThemeStore) -> None:
         super().__init__(window)
@@ -112,7 +113,8 @@ class SettingsDialog(QDialog):
             self.categories.addItem(QListWidgetItem(icon(icon_name), name))
         self.pages = QStackedWidget()
         for builder in (self._build_appearance, self._build_paper, self._build_font, self._build_editor,
-                        self._build_spelling, self._build_lookup, self._build_system, self._build_shortcuts):
+                        self._build_spelling, self._build_lookup, self._build_modules, self._build_system,
+                        self._build_shortcuts):
             page = builder()
             page.finish()
             scroll = QScrollArea()
@@ -559,6 +561,30 @@ class SettingsDialog(QDialog):
                   "Aus verschlüsselten Notizen (.ntx) fragt Notex vor jedem Senden nach.")
         return page
 
+    def _build_modules(self) -> SettingsPage:
+        """Module an/aus – wirkt sofort (Menüs, Palette, Shortcuts, Panels), ohne Neustart."""
+        from notex.core.modules import MODULES
+        page = SettingsPage()
+        registry = getattr(self.window_, "modules", None)
+        page.section("Module")
+        page.note("Ausgeschaltete Module haben keine Menüeinträge, Befehle, Tastenkürzel, Panels oder Hintergrundarbeit "
+                  "und laden ihre Bibliotheken nicht. Umschalten wirkt sofort.")
+        self.module_boxes = {}
+        for module in MODULES:
+            box = QCheckBox(module.name)
+            box.setChecked(registry.enabled(module.key) if registry else bool(module.default))
+            box.toggled.connect(lambda on, key=module.key: registry.set_enabled(key, on) if registry else None)
+            ready = registry is None or registry.has_contributions(module.key)
+            detail = module.description + (f" · Benötigt: {module.requires}" if module.requires != "keine" else "")
+            if not ready:
+                detail += f" · folgt in Block {module.block}"
+            info = QLabel(detail)
+            info.setObjectName("SettingsNote")
+            info.setWordWrap(True)
+            page.row(box, info)
+            self.module_boxes[module.key] = box
+        return page
+
     def _build_system(self) -> SettingsPage:
         page = SettingsPage()
         if hasattr(self.window_, "build_system_settings"):
@@ -820,4 +846,8 @@ class SettingsDialog(QDialog):
         self.window_.paper_action.setChecked(self.config["paper_mode"])
         self.window_.sidebar.tree.set_extensions(self.config["extensions"])
         self.window_.tabs.set_font_size(self._snapshot_config["font_size"])
+        registry = getattr(self.window_, "modules", None)
+        if registry is not None:            # Module wirken sofort – beim Abbrechen über die Registry zurückdrehen
+            for key, on in self._snapshot_config.get("modules", {}).items():
+                registry.set_enabled(key, bool(on))
         super().reject()
