@@ -24,13 +24,16 @@ from notex.ui import anim
 from notex.core.theme_store import ThemeStore
 from notex.paths import app_root
 from notex.theme.manager import theme_manager
+from notex.core import fileops
 from notex.core import text_ops as ops
+from notex.core.recent import add_recent, prune_recent
 from notex.ui.about_dialog import AboutDialog
 from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
 
 QWIDGETSIZE_MAX = 16777215
-from notex.ui.winapi import apply_dark_titlebar
+from notex.ui.recent_dialog import RecentDialog
+from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 
 
 class MainWindow(QMainWindow):
@@ -40,7 +43,9 @@ class MainWindow(QMainWindow):
         self.config = config
         self._save_config = on_save_config
         self.setWindowTitle(APP_NAME)
+        self.setAcceptDrops(True)
         self.theme_store = ThemeStore(app_root() / "themes")
+        config["recent_files"] = prune_recent(config["recent_files"])
 
         self.sidebar = Sidebar(root, config)
         self.tabs = EditorTabs(root, config)
@@ -94,6 +99,14 @@ class MainWindow(QMainWindow):
         tree.path_deleted.connect(self.tabs.close_paths_under)
 
         self.tabs.status_changed.connect(self._update_status)
+        self.tabs.file_opened.connect(self._on_file_opened)
+        self.tabs.files_dropped.connect(lambda paths: self.open_external([Path(p) for p in paths]))
+        self.tabs.file_closed.connect(lambda _p: self._refresh_open_files())
+        self.sidebar.open_files.activated.connect(lambda path: self.tabs.open_file(path))
+        self.sidebar.open_files.copy_requested.connect(lambda path: self._import_external(path, move=False))
+        self.sidebar.open_files.move_requested.connect(lambda path: self._import_external(path, move=True))
+        self.sidebar.open_files.reveal_requested.connect(fileops.reveal_in_file_manager)
+        self.empty_state.recent_chosen.connect(lambda path: self.open_external([path]))
         self.tabs.currentChanged.connect(lambda _i: self.find_bar.refresh_highlight())
         self.tabs.font_size_changed.connect(lambda size: self.config.__setitem__("font_size", size))
         self.tabs.file_opened.connect(self.watcher.watch)
@@ -122,7 +135,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Neue Datei", "Ctrl+N", lambda: tree.create_file(tree.folder_for(tree.selected_path()))))
         file_menu.addAction(self._action("Neuer Ordner", "Ctrl+Shift+N", lambda: tree.create_folder(tree.folder_for(tree.selected_path()))))
         file_menu.addSeparator()
+        file_menu.addAction(self._action("Datei öffnen …", "Ctrl+O", self.open_file_dialog))
+        file_menu.addAction(self._action("Zuletzt geöffnet …", "Ctrl+R", self.show_recent))
+        file_menu.addSeparator()
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
+        file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))
         file_menu.addAction(self._action("Tab schließen", "Ctrl+W", self.tabs.close_current))
         file_menu.addSeparator()
@@ -166,6 +183,78 @@ class MainWindow(QMainWindow):
         theme["animation"]["enabled"] = not theme["animation"]["enabled"]
         self.config["theme"] = theme_manager().apply(theme)
         self.anim_action.setChecked(not theme["animation"]["enabled"])
+
+    # ---- Dateien von außen ------------------------------------------------------------
+    def open_external(self, paths: list[Path], bring_front: bool = False) -> None:
+        """Dateien aus Kommandozeile, zweiter Instanz, Drag & Drop oder „Zuletzt geöffnet“ öffnen."""
+        opened = None
+        for path in paths:
+            path = Path(path)
+            if path.is_file():
+                opened = self.tabs.open_file(path) or opened
+            else:
+                self.toast.show_message(f"Nicht gefunden: {path.name}", "triangle-alert")
+        if bring_front:
+            bring_to_front(self)
+        if opened is not None:
+            self.editor_stack.setCurrentWidget(self.tabs)
+
+    def open_file_dialog(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        paths, _ = QFileDialog.getOpenFileNames(self, "Datei öffnen", str(self.root),
+                                                "Textdateien (*.txt *.md *.log *.csv *.json *.py *.ini);;Alle Dateien (*)")
+        if paths:
+            self.open_external([Path(p) for p in paths])
+
+    def show_recent(self) -> None:
+        self.config["recent_files"] = prune_recent(self.config["recent_files"])
+        dialog = RecentDialog(self.config["recent_files"], self)
+        if dialog.exec() == RecentDialog.DialogCode.Accepted and dialog.chosen is not None:
+            self.open_external([dialog.chosen])
+
+    def _on_file_opened(self, path: Path) -> None:
+        self.config["recent_files"] = add_recent(self.config["recent_files"], path)
+        self.empty_state.set_recent(self.config["recent_files"])
+        self._refresh_open_files()
+
+    def _refresh_open_files(self) -> None:
+        self.sidebar.open_files.set_files(self.tabs.external_files())
+
+    def _import_external(self, path: Path, move: bool) -> None:
+        """Externe Datei nach data/ kopieren oder verschieben; der Tab zeigt danach auf die neue Datei."""
+        import shutil
+        new_path = fileops.unique_path(self.root, path.stem, path.suffix)   # nie überschreiben: „Name (2).txt“
+        try:
+            if move:
+                editor = self.tabs.editor_for(path)
+                if editor is not None and editor.is_dirty and not self.tabs.save_editor(editor):
+                    return
+                shutil.move(str(path), str(new_path))
+                self.tabs.rename_open_file(path, new_path)
+                self.watcher.unwatch(path)
+                self.watcher.watch(new_path)
+            else:
+                shutil.copy2(path, new_path)
+        except OSError as error:
+            dialogs.warn(self, "Nach data/ übernehmen", str(error))
+            return
+        index = self.tabs.indexOf(self.tabs.page_for(self.tabs.editor_for(new_path))) if self.tabs.editor_for(new_path) else -1
+        if index >= 0:
+            from PySide6.QtGui import QIcon
+            self.tabs.setTabIcon(index, QIcon())
+        self._refresh_open_files()
+        self.toast.show_message(f"{'Verschoben' if move else 'Kopiert'} nach data/ · {new_path.name}", "check")
+        self.sidebar.tree.select_path(new_path)
+        self._update_status()
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls() and any(u.isLocalFile() for u in event.mimeData().urls()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:
+        paths = [Path(u.toLocalFile()) for u in event.mimeData().urls() if u.isLocalFile()]
+        self.open_external([p for p in paths if p.is_file()])
+        event.acceptProposedAction()
 
     # ---- Rechtschreibung / Grammatik --------------------------------------------
     def toggle_spellcheck(self) -> None:
@@ -277,6 +366,7 @@ class MainWindow(QMainWindow):
         self.tabs.retheme()
         self.find_bar.retheme()
         self.status.retheme()
+        self.sidebar.open_files.retheme()
         self.anim_action.setChecked(anim.reduced())
         self.sidebar.tree.setAnimated(not anim.reduced())
         self._update_status()
@@ -490,10 +580,11 @@ class MainWindow(QMainWindow):
         self.set_sidebar_visible(side["visible"])
         self.sidebar.tree.restore_expanded(self.config["expanded_folders"])
 
-        for rel in self.config["open_tabs"]:
-            path = self.root / rel
+        for entry in self.config["open_tabs"]:
+            path = self.tabs.resolve_saved(entry)
             if path.is_file():
                 self.tabs.open_file(path)
+        self.empty_state.set_recent(self.config["recent_files"])
         if 0 <= self.config["active_tab"] < self.tabs.count():
             self.tabs.setCurrentIndex(self.config["active_tab"])
 

@@ -1,11 +1,16 @@
 """Leerer Editorbereich: App-Name und die wichtigsten Tastenkürzel, ruhig und zentriert."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from pathlib import Path
+
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtGui import QPainter
-from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
+
+from notex.core.recent import shorten_path
+from notex.theme.icons import icon
 
 from notex import APP_NAME
 from notex.theme.icons import ICON_DIR
@@ -32,6 +37,8 @@ def _logo(size: int, dpr: float) -> QPixmap:
 
 
 class EmptyState(QWidget):
+    recent_chosen = Signal(Path)
+
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("EmptyState")
@@ -65,13 +72,46 @@ class EmptyState(QWidget):
         column.addWidget(title)
         column.addWidget(hint)
         column.addSpacing(SPACING.xl)
+        self.recent_box = QVBoxLayout()
+        self.recent_box.setSpacing(SPACING.xs)
+        self.recent_title = QLabel("Zuletzt geöffnet  ·  Ctrl+R")
+        self.recent_title.setObjectName("EmptyHint")
+        self.recent_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.recent_title.hide()
+        column.addWidget(self.recent_title)
+        recent_row = QHBoxLayout()
+        recent_row.addStretch(1)
+        recent_row.addLayout(self.recent_box)
+        recent_row.addStretch(1)
+        column.addLayout(recent_row)
+        column.addSpacing(SPACING.lg)
         keys_row = QHBoxLayout()   # Tabelle als Ganzes zentrieren
         keys_row.addStretch(1)
         keys_row.addLayout(keys)
         keys_row.addStretch(1)
         column.addLayout(keys_row)
 
+        self._recent_buttons: list[QToolButton] = []
         layout = QVBoxLayout(self)
         layout.addStretch(5)
         layout.addLayout(column)
         layout.addStretch(6)
+
+    def set_recent(self, entries: list[str]) -> None:
+        for button in self._recent_buttons:
+            self.recent_box.removeWidget(button)
+            button.deleteLater()
+        self._recent_buttons = []
+        for entry in entries[:5]:
+            path = Path(entry)
+            button = QToolButton()
+            button.setObjectName("RecentButton")
+            button.setIcon(icon("file-text"))
+            button.setText(f"{path.name}   {shorten_path(path.parent, 44)}")
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setToolTip(entry)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.clicked.connect(lambda _c=False, p=path: self.recent_chosen.emit(p))
+            self.recent_box.addWidget(button)
+            self._recent_buttons.append(button)
+        self.recent_title.setVisible(bool(entries))

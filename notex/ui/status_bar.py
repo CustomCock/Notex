@@ -44,6 +44,9 @@ class StatusBar(QStatusBar):
         self.language_button.setMenu(self.language_menu)
         self.grammar_state_label = QLabel()
         self.grammar_state_label.setObjectName("StatusDot")
+        self.readonly_label = QLabel("Schreibgeschützt")
+        self.readonly_label.setObjectName("StatusWarn")
+        self.readonly_label.setToolTip("Die Datei kann nicht überschrieben werden – Speichern bietet „Speichern unter …“ an")
         self.path_label = QLabel()
         self.position_label = QLabel()
         self.encoding_label = QLabel()
@@ -55,6 +58,7 @@ class StatusBar(QStatusBar):
         self.addPermanentWidget(self.grammar_button)
         self.addPermanentWidget(self.language_button)
         self.addPermanentWidget(self.grammar_state_label)
+        self.addPermanentWidget(self.readonly_label)
         for i, label in enumerate((self.position_label, self.encoding_label, self.chars_label, self.dirty_label)):
             if i:
                 dot = QLabel("·")
@@ -79,6 +83,7 @@ class StatusBar(QStatusBar):
         labels = (self.position_label, self.encoding_label, self.chars_label, self.dirty_label)
         for widget in (self.spell_button, self.grammar_button, self.language_button):
             widget.setVisible(editor is not None)
+        self.readonly_label.setVisible(editor is not None and getattr(editor, "read_only", False))
         if editor is None:
             self.path_label.setText("")
             for label in labels:

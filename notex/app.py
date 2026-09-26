@@ -10,7 +10,8 @@ from PySide6.QtWidgets import QApplication, QDialog
 
 from notex import APP_ID, APP_NAME, __version__
 from notex.core.config import load_config, save_config
-from notex.paths import config_path, data_dir
+from notex.core.ipc import file_arguments, server_name
+from notex.paths import app_root, config_path, data_dir
 from notex.theme.fonts import load_fonts, ui_font
 from notex.theme.manager import theme_manager
 from notex.theme.theme import load_stylesheet
@@ -58,7 +59,27 @@ def create_window() -> MainWindow:
 
 
 def run() -> int:
+    files = file_arguments(sys.argv[1:])
+    name = server_name(app_root())
+
+    # Läuft Notex schon? Dann die Dateien dorthin schicken und selbst nicht starten.
+    from notex.ui.single_instance import InstanceServer, send_to_running_instance
+    from notex.ui.winapi import allow_set_foreground
+    if files:
+        allow_set_foreground()
+    if send_to_running_instance(name, files):
+        return 0
+
     app = create_app(sys.argv)
+    server = InstanceServer(name)
+    if not server.start():
+        # Race: eine zweite Instanz war schneller – noch einmal als Client versuchen
+        if send_to_running_instance(name, files):
+            return 0
     window = create_window()
+    server.open_requested.connect(lambda paths: window.open_external([Path(p) for p in paths], bring_front=True))
+    app.aboutToQuit.connect(server.stop)
     window.show()
+    if files:
+        window.open_external(files)
     return app.exec()

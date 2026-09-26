@@ -24,6 +24,34 @@ def set_app_user_model_id(app_id: str) -> bool:
         return False
 
 
+def allow_set_foreground() -> None:
+    """Die zweite Instanz erlaubt der ersten, sich in den Vordergrund zu holen (Windows-Fokusregel)."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ASFW_ANY = -1
+        ctypes.windll.user32.AllowSetForegroundWindow(ASFW_ANY)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def bring_to_front(window) -> None:
+    """Fenster aus minimiert holen und aktivieren – unter Windows zusätzlich über SetForegroundWindow."""
+    from PySide6.QtCore import Qt
+    if window.isMinimized():
+        window.setWindowState((window.windowState() & ~Qt.WindowState.WindowMinimized) | Qt.WindowState.WindowActive)
+    window.show()
+    window.raise_()
+    window.activateWindow()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.user32.SetForegroundWindow(int(window.winId()))
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def apply_dark_titlebar(window, caption_color: str = "#121212") -> bool:
     """Schaltet die Titelleiste des Fensters auf dunkel. Gibt True bei Erfolg zurück."""
     if sys.platform != "win32":

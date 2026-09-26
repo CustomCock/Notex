@@ -43,6 +43,7 @@ class LineNumberArea(QWidget):
 
 class Editor(QTextEdit):
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
+    files_dropped = Signal(list)   # Dateien aufs Blatt gezogen -> öffnen statt Pfad einfügen
 
     def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None) -> None:
         super().__init__()
@@ -53,6 +54,7 @@ class Editor(QTextEdit):
         self._font_size = font_size
         self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
+        self.read_only = False
         self.highlighter: SpellHighlighter | None = None
         if checker is not None:
             self.highlighter = SpellHighlighter(self.document(), self, checker, markdown=path.suffix.lower() == ".md")
@@ -221,7 +223,13 @@ class Editor(QTextEdit):
         self._grouped(lambda: super(Editor, self).keyPressEvent(event))
 
     def insertFromMimeData(self, source) -> None:
+        if source.hasUrls() and any(u.isLocalFile() for u in source.urls()):
+            self.files_dropped.emit([u.toLocalFile() for u in source.urls() if u.isLocalFile()])
+            return
         self._grouped(lambda: super(Editor, self).insertFromMimeData(source))
+
+    def canInsertFromMimeData(self, source) -> bool:
+        return source.hasUrls() or super().canInsertFromMimeData(source)
 
     def cursor_line_col(self) -> tuple[int, int]:
         cursor = self.textCursor()

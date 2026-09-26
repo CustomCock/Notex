@@ -7,5 +7,5 @@
     <path d="M76 60 L180 196"/>
     <path d="M180 196 V60"/>
   </g>
-  <path d="M180 60 h-26 v26 z" fill="#7a8a9e"/>
+  <path d="M190 48 h28 v28 z" fill="#7a8a9e"/>
 </svg>

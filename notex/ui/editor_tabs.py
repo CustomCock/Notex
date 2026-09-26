@@ -4,10 +4,11 @@ Jeder Tab enthält eine EditorPage (Blatt + Schatten), die den eigentlichen Edit
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QIcon, QPainter
 from PySide6.QtWidgets import QMessageBox, QTabWidget, QWidget
 
 from notex.core import fileops
@@ -16,6 +17,7 @@ from notex.core.fileops import save_text_file
 from notex.core.spell import SpellChecker
 from notex.paths import app_root
 from notex.theme import tokens
+from notex.theme.icons import icon
 from notex.theme.tokens import COLORS, DURATION, FONT_SIZE
 from notex.ui import anim
 from notex.ui.editor import Editor
@@ -64,6 +66,7 @@ class EditorTabs(QTabWidget):
     file_closed = Signal(Path)
     font_size_changed = Signal(int)
     text_font_changed = Signal(str)     # Familie ("" = Standard)
+    files_dropped = Signal(list)        # Dateien aufs Blatt gezogen
     dirty_changed = Signal(int, bool)   # Tab-Index, dirty
 
     def __init__(self, root: Path, config: dict | None = None) -> None:
@@ -122,11 +125,26 @@ class EditorTabs(QTabWidget):
                 return editor
         return None
 
+    def is_external(self, path: Path) -> bool:
+        return not fileops.is_within(path, self.root)
+
+    def external_files(self) -> list[Path]:
+        return [e.path for e in self.editors() if self.is_external(e.path)]
+
     def relative(self, path: Path) -> str:
         try:
             return path.relative_to(self.root).as_posix()
         except ValueError:
             return str(path)
+
+    def resolve_saved(self, entry: str) -> Path:
+        """Eintrag aus open_tabs: relativ zu data/ oder absolut (externe Datei)."""
+        path = Path(entry)
+        return path if path.is_absolute() else self.root / entry
+
+    @staticmethod
+    def is_read_only(path: Path) -> bool:
+        return path.exists() and not os.access(path, os.W_OK)
 
     # ---- Öffnen / Schließen ------------------------------------------------
     def open_file(self, path: Path, line: int | None = None, column: int = 0, length: int = 0) -> Editor | None:
@@ -146,6 +164,7 @@ class EditorTabs(QTabWidget):
             editor.cursorPositionChanged.connect(self.status_changed.emit)
             editor.textChanged.connect(self.status_changed.emit)
             editor.zoom_requested.connect(self.zoom)
+            editor.files_dropped.connect(self.files_dropped)
             toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             toolbar.visibility_changed.connect(self._on_toolbar_toggled)
@@ -153,6 +172,9 @@ class EditorTabs(QTabWidget):
             page = EditorPage(editor, self.paper_mode, toolbar)
             index = self.addTab(page, path.name)
             self.setTabToolTip(index, self.relative(path))
+            if self.is_external(path):
+                self.setTabIcon(index, icon("external-link"))   # dezentes Kennzeichen: außerhalb von data/
+            editor.read_only = self.is_read_only(path)
             self.file_opened.emit(path)
         self.setCurrentWidget(self.page_for(editor))
         if line is not None:
@@ -221,8 +243,12 @@ class EditorTabs(QTabWidget):
 
     # ---- Speichern ---------------------------------------------------------
     def save_editor(self, editor: Editor) -> bool:
+        if getattr(editor, "read_only", False) or self.is_read_only(editor.path):
+            return self.save_editor_as(editor, reason="Die Datei ist schreibgeschützt.")
         try:
             save_text_file(editor.path, editor.toPlainText(), editor.encoding, editor.eol)
+        except PermissionError:
+            return self.save_editor_as(editor, reason="Keine Schreibrechte für diese Datei.")
         except OSError as error:
             QMessageBox.critical(self, "Speichern fehlgeschlagen", f"{self.relative(editor.path)}\n\n{error}")
             return False
@@ -235,6 +261,42 @@ class EditorTabs(QTabWidget):
         editor = self.current_editor()
         if editor is not None:
             self.save_editor(editor)
+
+    def save_editor_as(self, editor: Editor, reason: str = "") -> bool:
+        """„Speichern unter …“: neuer Pfad, Tab zieht mit, Watcher wird über file_closed/file_opened umgehängt."""
+        from PySide6.QtWidgets import QFileDialog
+        if reason:
+            from notex.ui import dialogs
+            if not dialogs.confirm(self, "Speichern unter", reason, yes="Speichern unter …", no="Abbrechen",
+                                   informative="Unter einem anderen Namen oder Ort speichern?"):
+                return False
+        start = str(editor.path if not self.is_external(editor.path) else editor.path)
+        target, _ = QFileDialog.getSaveFileName(self, "Speichern unter", start, "Textdateien (*.txt *.md *.log *.csv *.json *.ini);;Alle Dateien (*)")
+        if not target:
+            return False
+        new_path = Path(target)
+        try:
+            save_text_file(new_path, editor.toPlainText(), editor.encoding, editor.eol)
+        except OSError as error:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen", f"{new_path}\n\n{error}")
+            return False
+        old = editor.path
+        self.file_closed.emit(old)
+        editor.path = new_path
+        editor.read_only = False
+        editor.document().setModified(False)
+        self._refresh_title(editor)
+        index = self.indexOf(self.page_for(editor))
+        self.setTabIcon(index, icon("external-link") if self.is_external(new_path) else QIcon())
+        self.file_opened.emit(new_path)
+        self.file_saved.emit(new_path)
+        self.status_changed.emit()
+        return True
+
+    def save_current_as(self) -> None:
+        editor = self.current_editor()
+        if editor is not None:
+            self.save_editor_as(editor)
 
     def save_all(self) -> None:
         for editor in self.editors():
@@ -378,4 +440,6 @@ class EditorTabs(QTabWidget):
         self.grammar.shutdown()
 
     def open_paths(self) -> list[str]:
-        return [self.relative(editor.path) for editor in self.editors()]
+        """Für config.json: relativ innerhalb von data/, absolut für externe Dateien."""
+        return [self.relative(editor.path) if not self.is_external(editor.path) else str(editor.path)
+                for editor in self.editors()]

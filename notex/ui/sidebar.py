@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout, 
 
 from notex.core.search import SearchOptions, SearchResult
 from notex.ui.file_tree import FileTree
+from notex.ui.open_files import OpenFilesSection
 from notex.ui.search_results import SearchResults
 from notex.ui.search_worker import SearchWorker
 from notex.ui.widgets import Chip, IconButton, SearchField
@@ -53,6 +54,7 @@ class Sidebar(QWidget):
         checks.addStretch()
         checks.addWidget(self.results_info)
 
+        self.open_files = OpenFilesSection()
         self.tree = FileTree(root, config["extensions"])
         self.results = SearchResults()
         self.stack = QStackedWidget()
@@ -73,6 +75,7 @@ class Sidebar(QWidget):
         layout.setSpacing(SPACING.sm)
         layout.addWidget(self.search_field)
         layout.addLayout(checks)
+        layout.addWidget(self.open_files)
         layout.addWidget(self.stack, 1)
         layout.addLayout(footer)
         self._layout = layout

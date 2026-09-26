@@ -654,3 +654,45 @@ QDialog#AboutDialog {
 QDialog#AboutDialog QLabel {
     background: transparent;
 }
+
+/* Geöffnet-Bereich, Zuletzt geöffnet */
+QToolButton#SectionHeader {
+    background: transparent;
+    border: none;
+    color: @text_muted;
+    font-size: @fs_smallpx;
+    padding: 2px @sp_xspx;
+    min-height: 0;
+    text-align: left;
+}
+QToolButton#SectionHeader:hover {
+    color: @text;
+}
+QListWidget#OpenFilesList {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+QListWidget#OpenFilesList::item {
+    padding: 4px @sp_xspx;
+    color: @text;
+}
+QToolButton#RecentButton {
+    background: transparent;
+    border: 1px solid transparent;
+    color: @text_muted;
+    padding: 3px @sp_smpx;
+    min-height: 0;
+    font-size: @fs_smallpx;
+}
+QToolButton#RecentButton:hover {
+    background: @surface;
+    color: @text;
+}
+QLabel#StatusWarn {
+    color: @danger;
+    font-size: @fs_smallpx;
+}
+QDialog#RecentDialog {
+    background: @bg;
+}
