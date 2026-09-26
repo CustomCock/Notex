@@ -35,15 +35,21 @@ def test_profile_regions_and_assessment(tmp_path: Path) -> None:
     assert "Gemischt" in en.assess(prof)
 
 
-@pytest.mark.parametrize("data,expected", [
-    (os.urandom(256 * 1024), "Komprimiert oder verschlüsselt"),
-    (zlib.compress(os.urandom(64 * 1024) * 3), "Komprimiert oder verschlüsselt"),
-    (("Einfacher Text. " * 20000).encode(), "Text oder einfach strukturierte Daten"),
-    (b"\x00" * 100000, "Fast leer oder gleichförmig"),
-])
-def test_assessment(tmp_path: Path, data: bytes, expected: str) -> None:
+# Daten erst im Test erzeugen: große Parameter würden als Test-ID in PYTEST_CURRENT_TEST landen
+# (unter Windows höchstens 32 767 Zeichen je Umgebungsvariable)
+SAMPLES = {
+    "zufall": (lambda: os.urandom(256 * 1024), "Komprimiert oder verschlüsselt"),
+    "zlib": (lambda: zlib.compress(os.urandom(64 * 1024) * 3), "Komprimiert oder verschlüsselt"),
+    "text": (lambda: ("Einfacher Text. " * 20000).encode(), "Text oder einfach strukturierte Daten"),
+    "nullen": (lambda: b"\x00" * 100000, "Fast leer oder gleichförmig"),
+}
+
+
+@pytest.mark.parametrize("name", list(SAMPLES))
+def test_assessment(tmp_path: Path, name: str) -> None:
+    make, expected = SAMPLES[name]
     path = tmp_path / "x.bin"
-    path.write_bytes(data)
+    path.write_bytes(make())
     assert en.assess(en.profile(path)).startswith(expected)
 
 
