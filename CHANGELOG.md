@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.1.1] – 2026-09-26
+
+### Behoben
+- `build.py` bricht mit klarer Meldung ab, wenn PySide6 oder andere Pakete im Build-Python fehlen; vorher
+  entstand stumm eine Exe, die mit „No module named 'PySide6'“ startete
+- Ordner verschoben: Notex fragt beim Start, ob die Dateizuordnung auf den neuen Pfad gesetzt werden soll
+  (vorher nur ein Hinweis); die System-Seite zeigt, ob die registrierte Exe noch existiert
+- Warnung beim Start direkt aus der ZIP (Temp-Ordner): Notizen und Einstellungen würden dort verloren gehen
+
+### Geändert
+- README: Update-Anleitung mit „Pfad aktualisieren“, `build.bat` für den lokalen Build
+- PROGRESS.md hält Arbeitsstand, Entscheidungen und nächste Schritte fest
+
 ## [1.1.0] – 2026-09-26
 
 ### Hinzugefügt

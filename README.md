@@ -10,8 +10,15 @@ keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich
 3. `Notex.exe` starten. Beim ersten Start entstehen `data/` und `config.json` daneben.
 
 Mehr ist nicht nötig. SmartScreen warnt beim ersten Start, weil die EXE nicht signiert ist:
-„Weitere Informationen“ → „Trotzdem ausführen“. Ein Update ist ein Ersetzen von `Notex.exe`
-und `_internal/`; `data/`, `config.json`, `themes/` und `fonts/user/` bleiben liegen.
+„Weitere Informationen“ → „Trotzdem ausführen“. Die ZIP bitte komplett entpacken, nicht die
+`Notex.exe` direkt aus dem ZIP-Fenster starten: Windows legt sie dann in einen Temp-Ordner, und
+Notizen würden dort landen (Notex warnt in dem Fall beim Start).
+
+**Update:** Notex schließen, im bestehenden Ordner `Notex.exe` und `_internal/` durch die aus der
+neuen ZIP ersetzen (`licenses/`, `LICENSE`, `CHANGELOG.md` gleich mit). `data/`, `config.json`,
+`themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
+neu entpackt, bekommt beim nächsten Start die Frage, ob die Windows-Dateizuordnung auf den neuen
+Pfad gesetzt werden soll (auch später möglich unter Einstellungen → System → „Pfad aktualisieren“).
 
 ![Editor mit geöffneter Datei](docs/03-editor.png)
 
@@ -311,6 +318,11 @@ venv\Scripts\activate
 pip install -r requirements-dev.txt
 python main.py
 ```
+
+Lokaler Build: `build.bat` legt die venv an, installiert alles und ruft `python build.py` auf.
+`build.py` bricht ab, wenn PySide6 & Co. im verwendeten Python fehlen, denn PyInstaller würde
+sonst stumm eine Exe ohne Qt erzeugen. Immer denselben Interpreter für `pip install` und den
+Build nehmen (`py -3.12 -m pip …` und `py -3.12 build.py`).
 
 Im Dev-Modus liegen `data/` und `config.json` im Projektordner (beide in `.gitignore`).
 

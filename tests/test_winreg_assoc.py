@@ -3,7 +3,8 @@ import sys
 import pytest
 
 from notex import PROG_ID
-from notex.core.winreg_assoc import DEFAULT_EXTENSIONS, FileAssociation, MemoryRegistry, WinRegistry
+from notex.core.winreg_assoc import (DEFAULT_EXTENSIONS, FileAssociation, MemoryRegistry, WinRegistry,
+                                     is_temporary_location)
 
 EXE = r"C:\Apps\Notex\Notex.exe"
 
@@ -59,6 +60,28 @@ def test_update_path_after_move() -> None:
     assert not moved.status().matches(moved.exe_path)
     moved.update_path()
     assert moved.status().matches(moved.exe_path) and moved.status().extensions == [".txt"]
+
+
+def test_status_reports_missing_exe(tmp_path) -> None:
+    reg = MemoryRegistry()
+    exe = tmp_path / "Notex.exe"
+    exe.write_bytes(b"MZ")
+    assoc = FileAssociation(reg, str(exe))
+    assoc.register([".txt"])
+    assert assoc.status().exe_exists
+    exe.unlink()   # Ordner gelöscht → Windows blendet Notex in „Öffnen mit“ aus
+    assert assoc.status().registered and not assoc.status().exe_exists
+    assert not FileAssociation(MemoryRegistry(), str(exe)).status().exe_exists
+
+
+def test_temporary_location_detection() -> None:
+    temp = [r"C:\Users\me\AppData\Local\Temp"]
+    assert is_temporary_location(r"C:\Users\me\AppData\Local\Temp\Temp1_Notex-v1.1.0.zip\Notex\Notex.exe", temp)
+    assert is_temporary_location(r"c:\users\me\appdata\local\temp\x\Notex.exe", temp)   # Groß/Klein egal
+    assert is_temporary_location(r"D:\Downloads\Temp1_Notex-v1.1.0.zip\Notex\Notex.exe", [])   # ZIP-Vorschau ohne TEMP-Treffer
+    assert not is_temporary_location(r"C:\Apps\Notex\Notex.exe", temp)
+    assert not is_temporary_location(r"C:\Users\me\AppData\Local\Temporary Files\Notex.exe", temp)   # nur echte Unterordner
+    assert not is_temporary_location("", temp)
 
 
 def test_unknown_extensions_fall_back_to_default() -> None:

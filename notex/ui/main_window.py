@@ -38,7 +38,7 @@ from notex.core.wikilinks import find_heading_line, link_name, rewrite_links, un
 from notex.core.encoding import read_text_file as _read_text_file
 from notex.core.fileops import save_text_file
 from notex.core.recent import add_recent, prune_recent
-from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe
+from notex.core.winreg_assoc import SUPPORTED_EXTENSIONS, build_association, current_exe, is_temporary_location
 from notex.ui.about_dialog import AboutDialog
 from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
@@ -401,15 +401,41 @@ class MainWindow(QMainWindow):
 
     # ---- Windows-Dateizuordnung ----------------------------------------------------
     def _check_association_path(self) -> None:
-        """Wurde der Notex-Ordner verschoben, zeigt die Registrierung noch auf die alte EXE."""
+        """Start aus dem Temp-Ordner warnen; wurde der Notex-Ordner verschoben, zeigt die Registrierung noch
+        auf die alte EXE – dann einmal nachfragen, ob sie auf den neuen Pfad umgeschrieben werden soll."""
+        exe = current_exe()
+        if exe and is_temporary_location(exe):
+            dialogs.warn(self, "Notex läuft aus einem temporären Ordner",
+                         "Die Notex.exe wurde vermutlich direkt aus der ZIP gestartet.",
+                         informative="Windows hat sie nach %TEMP% entpackt. Notizen (data/) und Einstellungen würden "
+                                     "dort landen und beim nächsten Aufräumen verschwinden.\n\n"
+                                     "Bitte die ZIP komplett entpacken (Rechtsklick → „Alle extrahieren…“), "
+                                     "z. B. nach C:\\Apps\\Notex, und Notex.exe von dort starten.")
+            return
         if self.association is None:
             return
         try:
             status = self.association.status()
         except Exception:  # noqa: BLE001 – Registry-Zugriff darf den Start nie stören
             return
-        if status.registered and not status.matches(self.association.exe_path):
-            self.toast.show_message("Notex-Ordner verschoben – Einstellungen > System > „Pfad aktualisieren“", "triangle-alert")
+        if not status.registered or status.matches(self.association.exe_path):
+            return
+        where = "existiert nicht mehr" if not status.exe_exists else "ist eine andere Kopie"
+        if dialogs.confirm(self, "Notex-Ordner verschoben",
+                           "Die Dateizuordnung zeigt noch auf die alte Notex.exe.",
+                           yes="Pfad aktualisieren", no="Später",
+                           informative=f"Registriert: {status.exe_path} ({where}).\n"
+                                       f"Jetzt hier: {self.association.exe_path}\n\n"
+                                       "Solange der alte Pfad eingetragen ist, blendet Windows Notex unter „Öffnen mit“ "
+                                       "und in den Standard-Apps aus. Aktualisieren schreibt nur die Pfade neu, die "
+                                       "gewählten Endungen bleiben."):
+            try:
+                self.association.update_path()
+                self.toast.show_message("Dateizuordnung auf den neuen Pfad gesetzt", "check")
+            except OSError as error:
+                dialogs.warn(self, "Pfad aktualisieren", str(error))
+        else:
+            self.toast.show_message("Später: Einstellungen > System > „Pfad aktualisieren“", "triangle-alert")
 
     def build_system_settings(self, page) -> None:
         from PySide6.QtCore import QUrl
@@ -471,8 +497,15 @@ class MainWindow(QMainWindow):
             status = self.association.status()
             if status.registered:
                 same = status.matches(self.association.exe_path)
+                if same:
+                    hint = ""
+                elif status.exe_exists:
+                    hint = "\nAchtung: zeigt auf eine andere Kopie von Notex. „Pfad aktualisieren“ trägt diese hier ein."
+                else:
+                    hint = ("\nAchtung: diese Notex.exe existiert nicht mehr (Ordner verschoben oder gelöscht). Windows "
+                            "blendet Notex deshalb unter „Öffnen mit“ aus – „Pfad aktualisieren“ behebt das.")
                 status_label.setText(f"Registriert: ja · Endungen: {', '.join(status.extensions) or '–'}\n"
-                                     f"Pfad: {status.exe_path}" + ("" if same else "\nAchtung: zeigt auf eine andere Notex.exe (Ordner verschoben?)"))
+                                     f"Pfad: {status.exe_path}{hint}")
             else:
                 status_label.setText("Registriert: nein. Die Registrierung schreibt nur in HKCU (kein Admin) und "
                                      "überschreibt keine bestehende Zuordnung – Notex erscheint unter „Öffnen mit“ "

@@ -17,8 +17,11 @@ testbar ist (MemoryRegistry) und echte Tests in einen Test-Unterschlüssel schre
 """
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 from notex import APP_NAME, PROG_ID
@@ -141,6 +144,11 @@ class AssociationStatus:
     def matches(self, current_exe: str) -> bool:
         return self.registered and self.exe_path.lower() == current_exe.lower()
 
+    @property
+    def exe_exists(self) -> bool:
+        """Zeigt die Registrierung noch auf eine vorhandene Datei? (Ordner gelöscht/verschoben → False)"""
+        return self.registered and bool(self.exe_path) and Path(self.exe_path).is_file()
+
 
 class FileAssociation:
     def __init__(self, registry: Registry, exe_path: str, prefix: str = DEFAULT_PREFIX) -> None:
@@ -250,6 +258,25 @@ class FileAssociation:
             ctypes.windll.shell32.SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None)
         except Exception:  # noqa: BLE001
             pass
+
+
+def is_temporary_location(exe_path: str, temp_dirs: list[str] | None = None) -> bool:
+    """Läuft die EXE aus einem temporären Ordner? Typisch, wenn Notex.exe direkt aus dem ZIP gestartet wurde:
+    Windows entpackt dann nach %TEMP%, und data/ + config.json würden dort landen und verschwinden."""
+    if not exe_path:
+        return False
+    candidates = temp_dirs if temp_dirs is not None else [
+        tempfile.gettempdir(), os.environ.get("TEMP", ""), os.environ.get("TMP", ""),
+    ]
+
+    def norm(path: str) -> str:   # Windows-Pfade vergleichen: Trenner vereinheitlichen, Groß/Klein egal
+        return path.replace("\\", "/").rstrip("/").lower()
+
+    exe = norm(exe_path)
+    if any(temp and exe.startswith(norm(temp) + "/") for temp in candidates):
+        return True
+    # Explorer-Vorschau aus ZIP: ...\Temp1_Notex-v1.1.0.zip\Notex\Notex.exe
+    return any(part.startswith("temp") and part.endswith(".zip") for part in exe.split("/"))
 
 
 def real_registry() -> Registry | None:
