@@ -501,6 +501,29 @@ Dienst, Protokolle, einen kurzen Hinweis (z. B. „SMB – nie ins Internet“) 
   Aktualisieren: `python tools/update_ports.py` (lädt die CSV von iana.org).
 
 
+## IP-Übersicht und Konflikte
+
+Modul „IP-Konflikte“ (Standard aus). Sammelt IP-Zuordnungen aus allen `.md`/`.txt` in `data/` – verschlüsselte
+Notizen werden nie gelesen:
+
+- Markdown-Tabellen mit einer IP-Spalte (`IP`, `IP-Adresse`, `Adresse`, `IPv4`, `IPv6`) und einer Namensspalte
+  (`Host`, `Hostname`, `Name`, `Gerät`, `System`, `Server`, `Rechner`, `Client`),
+- Zeilen im hosts-Stil `10.0.0.5  fileserver` (auch als Listenpunkt, Kommentar mit `#` erlaubt),
+- `fileserver: 10.0.0.5` bzw. `fileserver = 10.0.0.5` (Rollen wie `Gateway:` oder `DNS:` zählen nicht als Host).
+
+**IP-Übersicht** (`Ctrl+Shift+Alt+I`, Menü Datei, Palette): nach Subnetz gruppiert (IPv4 /24, IPv6 /64),
+Konflikte (dieselbe IP bei verschiedenen Hosts; `fileserver` und `FileServer.corp.local` gelten als gleich) mit
+Warnsymbol und Tooltip, Doppelklick springt zur Stelle. Unten ein Subnetz eingeben (oder Gruppe anklicken) und
+optional Ausschlussbereiche wie den DHCP-Pool (`10.0.0.100-10.0.0.199, 10.0.0.1`): Notex zeigt nutzbare, belegte,
+ausgeschlossene und freie Adressen und kopiert die **nächste freie IP**.
+
+Im Editor werden Konflikt-IPs rot unterwellt, der Tooltip nennt die anderen Hosts. Das aktualisiert sich beim
+Speichern und beim Tippen (auch Ungespeichertes zählt); die Dateien werden inkrementell abgeglichen (nur Geänderte
+werden neu gelesen).
+
+![IP-Übersicht](docs/58-ip-overview.png)
+
+
 ## IOCs entschärfen
 
 Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
@@ -851,6 +874,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+M | Metadaten anzeigen / entfernen (Modul Metadaten) |
 | Ctrl+Alt+Y | YARA-Regel testen (Modul YARA) |
 | Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
+| Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |

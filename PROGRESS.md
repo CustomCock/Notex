@@ -277,6 +277,14 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Host:Port mit IP/Domain/localhost/[IPv6], n/tcp, tcp/n, nmap), Falsch-Positiv-Tests (Jahr, Betrag, Uhrzeit,
   Version, Pfad, Rechnungsnr., 16:9). `Editor.hover_providers` (neu, klassenweit) – Tooltip nur, wenn die Maus
   wirklich auf der Zeile steht; gesperrte .ntx nie. `ui/ports_dialog.py`.
+- I2 IP-Konflikte: `core/ipmap.py` (extract je Zeile: Tabellen mit IP-/Namensspalte, hosts-Stil, „Name: IP“ mit
+  Rollen-Ausschluss; conflicts mit Kurzname-Vergleich; group /24 bzw. /64; usage mit Ausschlussbereichen
+  „a-b“, „a-Endoktett“, CIDR, Einzel-IP; IpIndex inkrementell über (mtime, Größe), nur .md/.txt → .ntx nie gelesen,
+  auch nicht aus offenen Editoren). UI `ui/ip_dialog.py`; Abgleich im AnalysisWorker auf einer Kopie des Index,
+  Übernahme im UI-Thread. Editor: `set_module_marks` (neu, je Modul eine Gruppe welliger Unterstreichungen).
+  „File-Watcher“ = file_saved/file_opened/status_changed der Tabs + inkrementeller Ordnerabgleich beim Öffnen der
+  Übersicht bzw. „Aktualisieren“ (Qt-Watcher auf ganzen Bäumen ist unter Windows unzuverlässig und teuer).
+  Konflikte werden mit Warn-Icon markiert, weil das Stylesheet Baum-Textfarben festlegt.
 
 ## Offen
 

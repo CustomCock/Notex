@@ -9,6 +9,9 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   Portlisten, nmap-Zeilen) mit Dienst, Hinweis und IANA-Einträgen – ohne Treffer auf Jahreszahlen, Beträge oder
   Uhrzeiten; „Port nachschlagen“ (`Ctrl+Alt+P`) nach Nummer oder Name; IANA-Portliste offline mitgeliefert
 - Editor: allgemeine Hover-Schnittstelle für Module
+- Modul IP-Konflikte: IP-Zuordnungen aus Tabellen und „IP Host“/„Host: IP“ in allen Notizen (ohne .ntx),
+  IP-Übersicht nach Subnetz (`Ctrl+Shift+Alt+I`) mit Konflikten, Sprung zur Stelle, Subnetz-Auswertung mit
+  Ausschlussbereichen und „Nächste freie IP kopieren“; Konflikte im Editor unterwellt
 
 ## [1.9.0] – 2026-09-26
 

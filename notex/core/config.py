@@ -109,6 +109,10 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
         "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
     },
+    "ip_conflicts": {         # Modul IP-Konflikte: zuletzt ausgewertetes Subnetz und Ausschlussbereiche
+        "network": "",
+        "exclusions": "",
+    },
     "timeline": {             # Modul Zeitleiste: zuletzt benutzte Zeitleiste, Zeitanzeige (utc | local | original)
         "last": "",
         "mode": "utc",

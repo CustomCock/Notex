@@ -911,6 +911,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("timeline", self._activate_timeline)
         self.modules.contribute("ioc", self._activate_ioc)
         self.modules.contribute("ports", self._activate_ports)
+        self.modules.contribute("ip_conflicts", self._activate_ip_conflicts)
         self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1441,6 +1442,136 @@ class MainWindow(QMainWindow):
                 hit = ports.port_at(cursor.block().text(), cursor.positionInBlock())
                 term = str(hit[0]) if hit else ""
         PortDialog(self, term).show()
+
+    # ---- Modul: IP-Konflikte --------------------------------------------------------------------
+    ip_index = None
+
+    def _activate_ip_conflicts(self):
+        """IP-Zuordnungen aus data/ (ohne .ntx) sammeln: Übersicht, Konflikte im Editor unterwellt + Tooltip."""
+        from notex.core import ipmap
+        from notex.ui.editor import Editor
+        self.ip_index = ipmap.IpIndex(self.root)
+        self._ip_conflicts: dict = {}
+        self._ip_timer = QTimer(self)
+        self._ip_timer.setSingleShot(True)
+        self._ip_timer.setInterval(800)
+        self._ip_timer.timeout.connect(lambda: self._mark_ip_conflicts(only_current=True))
+        action = self._module_action("IP-Übersicht …", "Ctrl+Shift+Alt+I", lambda: self.show_ip_overview(),
+                                     self.file_menu)
+        self.registry.add("ip:overview", "IP-Übersicht (Zuordnungen, Konflikte, freie Adressen)",
+                          lambda: self.show_ip_overview(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+I",
+                          keywords="ip adresse konflikt subnetz netz frei dhcp host zuordnung")
+
+        def hover(editor, line: str, column: int):
+            if not ipmap.IpIndex.eligible(editor.path):
+                return None
+            for item in ipmap.extract(line, editor.path):
+                start = line.find(item.ip)
+                if item.ip in self._ip_conflicts and start <= column <= start + len(item.ip):
+                    others = [f"{o.host} ({o.file.name}:{o.line + 1})" for o in self._ip_conflicts[item.ip]
+                              if not (o.file == editor.path and o.host == item.host)]
+                    import html
+                    return (f"<b>IP-Konflikt {html.escape(item.ip)}</b><br>auch vergeben an: "
+                            + html.escape(", ".join(others)))
+            return None
+        Editor.hover_providers.append(hover)
+        self.tabs.status_changed.connect(self._ip_timer.start)
+        self.tabs.file_saved.connect(self._ip_file_saved)
+        self.tabs.file_opened.connect(self._ip_timer.start)
+        self.refresh_ip_index(full=True)
+        dialogs_open: list = self._analysis_dialogs.setdefault("ip_conflicts", [])
+
+        def undo() -> None:
+            if hover in Editor.hover_providers:
+                Editor.hover_providers.remove(hover)
+            self.tabs.status_changed.disconnect(self._ip_timer.start)
+            self.tabs.file_saved.disconnect(self._ip_file_saved)
+            self.tabs.file_opened.disconnect(self._ip_timer.start)
+            self._ip_timer.stop()
+            self._drop_actions([action])
+            self.registry.remove("ip:overview")
+            for editor in self.tabs.editors():
+                editor.set_module_marks("ip_conflicts", [])
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+            self.ip_index = None
+        return undo
+
+    def refresh_ip_index(self, full: bool = False) -> None:
+        """Abgleich im Hintergrund (liest nur geänderte Dateien), danach Übersicht und Markierungen aktualisieren."""
+        from notex.core import ipmap
+        from notex.ui.analysis_dialog import AnalysisWorker
+        index = self.ip_index
+        if index is None or getattr(self, "_ip_worker", None) is not None:
+            return
+        snapshot = dict(index.files)
+
+        def job(_progress, _cancelled):
+            copy = ipmap.IpIndex(index.root, index.limit)
+            copy.files = snapshot
+            copy.refresh()
+            return copy.files
+
+        def done(result, _error: str) -> None:
+            worker.wait()
+            self._ip_worker = None
+            if result is not None and self.ip_index is index:
+                index.files = result
+                self._mark_ip_conflicts()
+        worker = AnalysisWorker(job)
+        worker.done.connect(done)
+        self._ip_worker = worker
+        worker.start()
+
+    _ip_worker = None
+
+    def _ip_file_saved(self, path: Path) -> None:
+        if self.ip_index is not None and self.ip_index.update_file(path):
+            self._mark_ip_conflicts()
+
+    def _ip_assignments(self) -> list:
+        """Index + ungespeicherter Text offener Editoren (nie .ntx)."""
+        override = {e.path: e.toPlainText() for e in self.tabs.editors()
+                    if e.document().isModified() and not getattr(e, "encrypted", False)}
+        return self.ip_index.assignments(override)
+
+    def _mark_ip_conflicts(self, only_current: bool = False) -> None:
+        from notex.core import ipmap
+        if self.ip_index is None:
+            return
+        assignments = self._ip_assignments()
+        self._ip_conflicts = ipmap.conflicts(assignments)
+        editors = [self.tabs.current_editor()] if only_current else list(self.tabs.editors())
+        for editor in editors:
+            if editor is None:
+                continue
+            if getattr(editor, "locked", False) or not ipmap.IpIndex.eligible(editor.path):
+                editor.set_module_marks("ip_conflicts", [])
+                continue
+            spans = []
+            document = editor.document()
+            for item in ipmap.extract(editor.toPlainText(), editor.path):
+                if item.ip in self._ip_conflicts:
+                    block = document.findBlockByNumber(item.line)
+                    column = block.text().find(item.ip)
+                    if column >= 0:
+                        spans.append((block.position() + column, len(item.ip)))
+            editor.set_module_marks("ip_conflicts", spans)
+        for dialog in self._analysis_dialogs.get("ip_conflicts", []):
+            dialog.show_assignments(assignments)
+
+    def show_ip_overview(self) -> None:
+        from notex.ui.ip_dialog import IpOverviewDialog
+        if self.ip_index is None:
+            return
+        dialog = IpOverviewDialog(self)
+        self._analysis_dialogs.setdefault("ip_conflicts", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("ip_conflicts", []).remove(d)
+                                if d in self._analysis_dialogs.get("ip_conflicts", []) else None)
+        dialog.show_assignments(self._ip_assignments())
+        dialog.show()
+        self.refresh_ip_index()
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
     def _activate_ioc(self):
