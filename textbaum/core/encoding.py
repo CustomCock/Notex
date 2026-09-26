@@ -1,0 +1,65 @@
+"""Textdateien lesen: Encoding und Zeilenenden erkennen, beim Speichern beibehalten.
+
+Erkennung (in dieser Reihenfolge):
+1. UTF-8 mit BOM  (die 3 Bytes EF BB BF am Anfang)     -> "utf-8-sig"
+2. UTF-8 ohne BOM (Bytes lassen sich strikt dekodieren) -> "utf-8"
+3. Fallback cp1252 (Windows-Westeuropa, kann jedes Byte dekodieren) -> "cp1252"
+
+Intern arbeitet der Editor immer mit "\n". Beim Speichern werden die
+Zeilenenden wieder in das Original-Format (CRLF oder LF) gewandelt.
+"""
+from __future__ import annotations
+
+import codecs
+from dataclasses import dataclass
+from pathlib import Path
+
+CRLF = "\r\n"
+LF = "\n"
+
+
+@dataclass
+class TextFile:
+    text: str        # Inhalt, Zeilenenden normalisiert auf "\n"
+    encoding: str    # "utf-8-sig" | "utf-8" | "cp1252"
+    eol: str         # "\r\n" oder "\n"
+
+
+def detect_encoding(data: bytes) -> str:
+    if data.startswith(codecs.BOM_UTF8):
+        return "utf-8-sig"
+    try:
+        data.decode("utf-8")
+        return "utf-8"
+    except UnicodeDecodeError:
+        return "cp1252"
+
+
+def detect_eol(text: str) -> str:
+    """CRLF, sobald mindestens ein \\r\\n vorkommt – sonst LF (auch bei leerer Datei)."""
+    return CRLF if CRLF in text else LF
+
+
+def decode_bytes(data: bytes) -> TextFile:
+    encoding = detect_encoding(data)
+    raw_text = data.decode(encoding)
+    eol = detect_eol(raw_text)
+    # Erst CRLF, dann einsame CR (alte Mac-Dateien) auf LF bringen
+    text = raw_text.replace(CRLF, LF).replace("\r", LF)
+    return TextFile(text=text, encoding=encoding, eol=eol)
+
+
+def read_text_file(path: Path) -> TextFile:
+    return decode_bytes(Path(path).read_bytes())
+
+
+def encode_text(text: str, encoding: str, eol: str) -> bytes:
+    """Wandelt Editor-Text zurück in Bytes – mit Original-Zeilenenden und -Encoding.
+
+    cp1252 kann nicht jedes Zeichen darstellen (z. B. Emojis). Damit nichts
+    stillschweigend verloren geht, werden solche Zeichen als XML-Referenz
+    (&#128512;) geschrieben statt durch "?" ersetzt.
+    """
+    with_eol = text.replace(LF, eol) if eol != LF else text
+    errors = "xmlcharrefreplace" if encoding == "cp1252" else "strict"
+    return with_eol.encode(encoding, errors=errors)

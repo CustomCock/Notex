@@ -13,7 +13,7 @@ from textbaum.ui.main_window import MainWindow
 
 
 def run() -> int:
-    data_dir()  # legt data/ an, falls es fehlt
+    root = data_dir()  # legt data/ an, falls es fehlt
     config = load_config(config_path())
 
     app = QApplication(sys.argv)
@@ -21,6 +21,6 @@ def run() -> int:
     app.setStyle("Fusion")  # neutraler Basis-Stil, auf dem das QSS sauber aufsetzt
     app.setStyleSheet(load_stylesheet())
 
-    window = MainWindow(config, on_save_config=lambda cfg: save_config(config_path(), cfg))
+    window = MainWindow(root, config, on_save_config=lambda cfg: save_config(config_path(), cfg))
     window.show()
     return app.exec()
