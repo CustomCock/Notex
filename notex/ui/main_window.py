@@ -893,6 +893,9 @@ class MainWindow(QMainWindow):
         self.modules.contribute("strings", lambda: self._activate_analysis(
             "strings", "Strings extrahieren …", "Ctrl+Alt+S", "text-search", self.show_strings,
             "strings zeichenketten ascii utf-16 binär extrahieren"))
+        self.modules.contribute("embedded", lambda: self._activate_analysis(
+            "embedded", "Eingebettete Dateien finden …", "Ctrl+Alt+F", "file-search", self.show_embedded,
+            "binwalk eingebettet carving extrahieren signatur versteckt anhang"))
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -1116,6 +1119,10 @@ class MainWindow(QMainWindow):
     def show_strings(self, path: Path | None = None) -> None:
         from notex.ui.strings_dialog import StringsDialog
         self._open_analysis("strings", lambda target: StringsDialog(self, target, self.config), path)
+
+    def show_embedded(self, path: Path | None = None) -> None:
+        from notex.ui.embedded_dialog import EmbeddedDialog
+        self._open_analysis("embedded", lambda target: EmbeddedDialog(self, target), path)
 
     def show_in_hex(self, path: Path, offset: int, length: int = 1) -> None:
         """Sprung aus Strings/Eingebettete Dateien/Entropie an eine Stelle der Datei (Modul Hex & Dateianalyse)."""

@@ -358,6 +358,24 @@ Modul „Strings“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Str
 - Doppelklick springt in die Hex-Ansicht (Treffer markiert), „Als .txt exportieren“ speichert die gefilterte Liste.
 - Mehr als 200 000 Treffer werden abgeschnitten (Hinweis in der Statuszeile).
 
+## Eingebettete Dateien
+
+Modul „Eingebettete Dateien“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Eingebettete Dateien finden …**,
+Menü Datei oder `Ctrl+Alt+F`:
+
+- Durchsucht die Datei an jedem Offset nach bekannten Signaturen (dieselbe Tabelle wie die Dateityp-Erkennung):
+  PNG, JPEG, GIF, BMP, WEBP, WAV, PDF, ZIP (docx/xlsx/pptx/jar/apk erkannt), GZIP, BZIP2, XZ, 7z, RAR, ELF, PE,
+  SQLite, PCAP, PCAPNG, EVTX, TAR, .ntx. Jeder Kandidat muss eine Kopfprüfung bestehen – zufällige Bytefolgen wie
+  „MZ“ oder „BM“ zählen nicht.
+- **Größe**, wo das Format es hergibt (Blöcke durchlaufen, Verzeichnisende, Sektionstabellen, Stream-Ende beim
+  Dekomprimieren); sonst „unbekannt“.
+- **Daten hinter dem Ende** einer Datei werden eigens gemeldet (z. B. ZIP hinter einem JPEG, Text hinter PNG-IEND,
+  PE-Overlay). Reine Füllbytes (Nullen) zählen nicht.
+- Doppelklick springt in die Hex-Ansicht. **Extrahieren** (markierte oder alle) legt Kopien in
+  `<Datei>_extrahiert/` neben der Datei ab – nie überschreiben (`-2`, `-3` …), nie öffnen oder ausführen. Bei
+  unbekannter Größe wird bis zum nächsten Fund bzw. Dateiende kopiert.
+- Läuft gestreamt im Hintergrund mit Fortschritt und Abbrechen; höchstens 10 000 Funde.
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -676,6 +694,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
 | Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+S | Strings extrahieren (Modul Strings) |
+| Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |

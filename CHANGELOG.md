@@ -11,6 +11,8 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 - Modul Strings (Ctrl+Alt+S): ASCII/UTF-16LE/-BE mit Offset, Mindestlänge einstellbar, gestreamt im Hintergrund,
   Filter/Regex/Kategorie, interessante Treffer hervorgehoben (URL, E-Mail, IP, Pfad, Registry, Base64), Doppelklick
   → Hex-Ansicht, Export als .txt
+- Modul Eingebettete Dateien (Ctrl+Alt+F): Signaturen an jedem Offset mit Kopfprüfung, Größe aus dem Format,
+  Daten hinter Dateiende-Markern, Sprung in die Hex-Ansicht, Extrahieren in <Datei>_extrahiert/ ohne Überschreiben
 
 ## [1.7.0] – 2026-09-26
 
