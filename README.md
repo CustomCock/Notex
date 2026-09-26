@@ -72,6 +72,56 @@ den neuen Pfad. Aus dem Dev-Modus (`python main.py`) ist die Registrierung bewus
 
 ![Einstellungen System](docs/20-settings-system.png)
 
+## Quick Open und Command Palette
+
+**Ctrl+P** öffnet ein Overlay über dem Blatt mit Fuzzy-Suche über alle Dateien in `data/` und die
+zuletzt geöffneten externen Dateien: „ntz“ findet `notizen.md`, getroffene Zeichen sind
+hervorgehoben, zuletzt geöffnete Dateien stehen weiter oben. `:123` springt in der aktuellen
+Datei zu Zeile 123, `notizen:12` öffnet die Datei und springt. Der Dateiindex wird im Hintergrund
+aufgebaut und über den Watcher aktuell gehalten.
+
+**Ctrl+Shift+P** (oder `>` in Quick Open) zeigt alle Befehle der App mit Kategorie und Kürzel:
+Menüs, Toolbar, Einstellungsseiten, Theme-Presets und Blatt-Varianten, Toggles mit aktuellem
+Zustand. Zuletzt benutzte Befehle stehen oben. Neue Features melden sich an einer zentralen
+Registry an und tauchen automatisch auf.
+
+| Quick Open | Command Palette | Wiki-Links und Backlinks |
+|---|---|---|
+| ![Quick Open](docs/21-quick-open.png) | ![Command Palette](docs/22-command-palette.png) | ![Wiki-Links](docs/23-wikilinks-backlinks.png) |
+
+## Wiki-Links und Backlinks
+
+In jeder Textdatei verlinkt `[[notizen]]` auf die Datei `notizen.*` irgendwo in `data/`
+(Name ohne Endung, Groß-/Kleinschreibung egal; bei Mehrdeutigkeit gewinnt der kürzeste Pfad,
+`[[ordner/notizen]]` zielt explizit). `[[notizen|Anzeigetext]]` zeigt anderen Text,
+`[[notizen#Überschrift]]` springt zur Überschrift. Links sind im Akzent unterstrichen, kaputte
+Links gestrichelt und gedämpft. **Ctrl+Klick** öffnet das Ziel; bei einem kaputten Link bietet
+Notex an, die Datei anzulegen. Nach `[[` erscheint ein Vorschlags-Popup mit Dateien, nach `#`
+mit den Überschriften der Zieldatei (Enter oder Tab übernimmt). In Codeblöcken und Inline-Code
+zählen Links nicht.
+
+**Ctrl+Shift+K** zeigt das Backlinks-Panel (unter dem Blatt oder rechts, einstellbar): alle
+Dateien, die auf die aktuelle Datei verlinken, mit Zeile und Kontext, Klick springt hin.
+Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Text vorkommt, mit
+„verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt Notex „X Links in Y
+Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
+offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
+
+## Syntax-Highlighting
+
+Code und Logs werden über [Pygments](https://pygments.org) farbig hervorgehoben: `.py`, `.json`,
+`.ini`, `.sh`, `.ps1`, `.bat`, `.yaml`/`.yml`, `.xml`, `.html`, `.css`, `.js`, `.sql`, `.md` sowie
+in Markdown die Codeblöcke mit Sprachangabe (```python usw.). In `.log`-Dateien werden Zeitstempel,
+Level (ERROR/WARN/INFO/DEBUG), IP-Adressen und Pfade markiert. Die Farben sind Theme-Tokens mit je
+einem Schema für helle Blätter (Weiß, Papier, Sepia) und für das dunkle Blatt, anpassbar unter
+Einstellungen → Blatt → Syntax-Farben. Pro Endung abschaltbar unter Einstellungen → Editor.
+Gefärbt wird zeilenweise mit Zustand über Zeilengrenzen (Docstrings, `/* */`, Codeblöcke); Dateien
+über 2 MB bleiben ohne Highlighting, damit das Öffnen flott bleibt.
+
+| Python | Log |
+|---|---|
+| ![Syntax Python](docs/24-syntax-python.png) | ![Syntax Log](docs/25-syntax-log.png) |
+
 ## Bearbeitungsleiste
 
 Direkt über dem Blatt sitzt eine schmale Leiste in Blattbreite. Der kleine Chevron darunter
@@ -215,6 +265,10 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+E | Bearbeitungsleiste ein-/ausklappen |
 | Ctrl+Alt+N | Zeilennummern |
 | Alt+P | Blatt zentrieren / volle Breite |
+| Ctrl+P | Quick Open (Datei suchen, `:123` springt zur Zeile, `datei:123` öffnet und springt) |
+| Ctrl+Shift+P | Command Palette (alle Befehle, `>` in Quick Open wechselt ebenfalls dorthin) |
+| Ctrl+Shift+K | Backlinks-Panel |
+| Ctrl+Klick | Wiki-Link öffnen (bzw. Ziel anlegen) |
 | Ctrl+, | Einstellungen |
 | Ctrl+O / Ctrl+R | Datei öffnen / Zuletzt geöffnet |
 | Ctrl+Shift+Alt+S | Speichern unter |
@@ -232,7 +286,7 @@ Notex/
 ```
 
 Welche Dateiendungen im Baum erscheinen, steht in `config.json` unter `extensions`
-(Default: `.txt .md .log .csv .json .py .ini`). `fulltext_max_mb` begrenzt die Dateigröße
+(Default: `.txt .md .log .csv .json .py .ini .sh .ps1 .bat .yaml .yml .xml .html .css .js .sql`). `fulltext_max_mb` begrenzt die Dateigröße
 für die Volltextsuche (Default 5 MB).
 
 ## Bekannte Einschränkungen
@@ -311,10 +365,11 @@ Diesen Ordner kannst du komplett kopieren, z. B. auf einen USB-Stick.
 
 ## Release über GitHub Actions
 
-Ein Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut die App
-auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
+Ein annotiertes Tag der Form `v*` stößt den Workflow `.github/workflows/release.yml` an: Er baut
+die App auf `windows-latest`, packt `dist/Notex` als ZIP und hängt es an ein GitHub-Release.
+Die Version steht zentral in `notex/__init__.py` und muss zum Tag passen.
 
 ```bat
-git tag v0.1.0
-git push origin v0.1.0
+git tag -a v1.1.0 -m "Notex 1.1.0"
+git push origin v1.1.0
 ```

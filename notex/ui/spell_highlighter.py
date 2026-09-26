@@ -20,9 +20,12 @@ from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextBlock, QTextBlockUser
 
 from notex.core.spell import SpellChecker
 from notex.core.spell_rules import is_code_fence, tokenize
+from notex.core.wikilinks import links_in_line
+from notex.core import syntax
+from notex.theme import tokens
 from notex.theme.tokens import COLORS
 
-STATE_NORMAL, STATE_IN_FENCE = 0, 1
+STATE_NORMAL, STATE_IN_FENCE = 0, 1   # STATE_IN_FENCE nur ohne Syntax-Lexer; sonst tragen die Syntax-Zustände den Fence
 TYPING_PAUSE_MS = 400
 SCROLL_CHECK_MS = 120
 VISIBLE_BUFFER = 20     # Blöcke über/unter dem sichtbaren Bereich mitprüfen
@@ -39,12 +42,22 @@ class Issue:
     rule: str = ""
 
 
+@dataclass
+class LinkSpan:
+    start: int
+    end: int
+    target: str
+    heading: str | None
+    resolved: str | None      # relativer Pfad der Zieldatei oder None (kaputter Link)
+
+
 class BlockIssues(QTextBlockUserData):
-    """Hängt an jedem geprüften Block: die gefundenen Probleme, für das Kontextmenü."""
+    """Hängt an jedem geprüften Block: die gefundenen Probleme und Links, für Kontextmenü und Ctrl+Klick."""
 
     def __init__(self) -> None:
         super().__init__()
         self.issues: list[Issue] = []
+        self.links: list[LinkSpan] = []
         self.checked = False
 
 
@@ -57,6 +70,9 @@ class SpellHighlighter(QSyntaxHighlighter):
         self.spelling_enabled = False
         self.grammar_enabled = False
         self.language: str | None = None          # None = globale Sprache des Checkers
+        self.resolve_link = None                  # Callable[[str], str | None] – setzt das Hauptfenster
+        self.links_enabled = True
+        self.lexer: str | None = None             # Pygments-Lexername oder None (kein Syntax-Highlighting)
         self._grammar: dict[int, list[Issue]] = {}  # Blocknummer -> Grammatik-Treffer
         self._full_pass = False
 
@@ -95,12 +111,15 @@ class SpellHighlighter(QSyntaxHighlighter):
             if isinstance(data, BlockIssues):
                 data.checked = False
             block = block.next()
-        if not (self.spelling_enabled or self.grammar_enabled):
-            self._full_pass = True     # einmal komplett durchlaufen, um alte Wellenlinien zu löschen
-            self.rehighlight()
-            self._full_pass = False
-            return
-        self.check_visible()
+        self._full_pass = True     # Links und Syntax gelten für die ganze Datei, Rechtschreibung nur sichtbar
+        self.rehighlight()
+        self._full_pass = False
+        if self.spelling_enabled or self.grammar_enabled:
+            self.check_visible()
+
+    def relink(self) -> None:
+        """Nach Änderungen am Dateiindex: Links neu auflösen (nur der Link-Zustand ändert sich)."""
+        self.reset()
 
     def mark_loaded(self) -> None:
         """Nach dem Laden einer Datei: das ist kein Tippen, also sofort alles prüfen."""
@@ -119,8 +138,14 @@ class SpellHighlighter(QSyntaxHighlighter):
         self._grammar.clear()
         self.reset()
 
-    def in_code_fence(self, block: QTextBlock) -> bool:
-        return self.markdown and (block.userState() == STATE_IN_FENCE or is_code_fence(block.text()))
+    def link_at(self, block: QTextBlock, position_in_block: int) -> LinkSpan | None:
+        data = block.userData()
+        if not isinstance(data, BlockIssues):
+            return None
+        for span in data.links:
+            if span.start <= position_in_block < span.end:
+                return span
+        return None
 
     def issues_at(self, block: QTextBlock, position_in_block: int) -> list[Issue]:
         data = block.userData()
@@ -166,22 +191,44 @@ class SpellHighlighter(QSyntaxHighlighter):
             self.rehighlightBlock(block)
 
     # ---- Das eigentliche Prüfen -------------------------------------------------------
+    def in_code_fence(self, block: QTextBlock) -> bool:
+        state = block.userState()
+        return self.markdown and (state == STATE_IN_FENCE or state >= syntax.STATE_FENCE or is_code_fence(block.text()))
+
     def highlightBlock(self, text: str) -> None:
         block = self.currentBlock()
-        previous_state = self.previousBlockState()
-        in_fence = previous_state == STATE_IN_FENCE
-        if self.markdown and is_code_fence(text):
-            in_fence = not in_fence
+        previous_state = max(0, self.previousBlockState())
+        if self.lexer is not None:
+            # Syntax zuerst: Farben als Grundformat, danach Links und Wellenlinien obendrauf
+            spans, state = syntax.lex_line(text, self.lexer, previous_state)
+            for span in spans:
+                color = tokens.SYNTAX.get(span.style)
+                if color:
+                    fmt = QTextCharFormat()
+                    fmt.setForeground(QColor(color))
+                    self.setFormat(span.start, span.end - span.start, fmt)
+            self.setCurrentBlockState(state)
+            in_fence = self.markdown and (state >= syntax.STATE_FENCE or previous_state >= syntax.STATE_FENCE)
+            if self.markdown and is_code_fence(text):
+                self._store(block, [])
+                return
+        else:
+            in_fence = previous_state == STATE_IN_FENCE
+            if self.markdown and is_code_fence(text):
+                in_fence = not in_fence
+                self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
+                self._store(block, [])
+                return
             self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
-            self._store(block, [])
-            return
-        self.setCurrentBlockState(STATE_IN_FENCE if in_fence else STATE_NORMAL)
 
+        links = self._link_spans(text, in_fence) if self.links_enabled else []
+        self._paint_links(links)
         if not (self.spelling_enabled or self.grammar_enabled):
-            self._store(block, [])
+            self._store(block, [], links)
             return
-        if not self._full_pass and not self._in_visible_range(block):
-            return   # später, wenn der Block sichtbar wird
+        if not self._in_visible_range(block):
+            self._store_links(block, links)
+            return   # Rechtschreibung später, wenn der Block sichtbar wird
 
         issues: list[Issue] = []
         if self.spelling_enabled and not (self.markdown and in_fence):
@@ -196,8 +243,41 @@ class SpellHighlighter(QSyntaxHighlighter):
         grammar_format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
         grammar_format.setUnderlineColor(QColor(COLORS.grammar_underline))
         for issue in issues:
-            self.setFormat(issue.start, issue.length, spell_format if issue.kind == "spelling" else grammar_format)
-        self._store(block, issues)
+            # Vorhandenes Format (z. B. Link-Farbe) behalten, nur die Wellenlinie ergänzen
+            base = spell_format if issue.kind == "spelling" else grammar_format
+            for pos in range(issue.start, issue.start + issue.length):
+                merged = QTextCharFormat(self.format(pos))
+                merged.setUnderlineStyle(base.underlineStyle())
+                merged.setUnderlineColor(base.underlineColor())
+                self.setFormat(pos, 1, merged)
+        self._store(block, issues, links)
+
+    def _link_spans(self, text: str, in_fence: bool) -> list[LinkSpan]:
+        spans = []
+        for link in links_in_line(text, in_fence):
+            resolved = self.resolve_link(link.target) if self.resolve_link else None
+            spans.append(LinkSpan(link.start, link.end, link.target, link.heading, resolved))
+        return spans
+
+    def _paint_links(self, links: list[LinkSpan]) -> None:
+        for span in links:
+            fmt = QTextCharFormat()
+            if span.resolved:
+                fmt.setForeground(QColor(COLORS.accent))
+                fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.SingleUnderline)
+                fmt.setUnderlineColor(QColor(COLORS.accent))
+            else:
+                fmt.setForeground(QColor(COLORS.paper_muted))
+                fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.DashUnderline)
+                fmt.setUnderlineColor(QColor(COLORS.paper_muted))
+            self.setFormat(span.start, span.end - span.start, fmt)
+
+    def _store_links(self, block: QTextBlock, links: list[LinkSpan]) -> None:
+        data = block.userData()
+        if not isinstance(data, BlockIssues):
+            data = BlockIssues()
+            self.setCurrentBlockUserData(data)
+        data.links = links
 
     def _spell_issues(self, block: QTextBlock, text: str) -> list[Issue]:
         # Das Wort unter dem Cursor auslassen, solange getippt wird
@@ -211,10 +291,12 @@ class SpellHighlighter(QSyntaxHighlighter):
                 issues.append(Issue(token.start, token.end - token.start, "spelling", word=token.text))
         return issues
 
-    def _store(self, block: QTextBlock, issues: list[Issue]) -> None:
+    def _store(self, block: QTextBlock, issues: list[Issue], links: list[LinkSpan] | None = None) -> None:
         data = block.userData()
         if not isinstance(data, BlockIssues):
             data = BlockIssues()
             self.setCurrentBlockUserData(data)
         data.issues = issues
+        if links is not None:
+            data.links = links
         data.checked = True

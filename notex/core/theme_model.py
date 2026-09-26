@@ -64,7 +64,24 @@ DEFAULT_THEME: dict[str, Any] = {
         "enabled": True,
         "speed": "normal",
     },
+    # Syntax-Highlighting: ein Schema für helle Blätter (Weiß/Papier/Sepia), eines für dunkle
+    "syntax": {
+        "light": {
+            "keyword": "#4a5b78", "string": "#5f7a4f", "comment": "#9a9a9a", "number": "#8a6d3b",
+            "function": "#5a4f7a", "operator": "#6b6b6b", "tag": "#7a5757", "attribute": "#5f6f84",
+            "log_error": "#b04a4a", "log_warn": "#a8842e", "log_info": "#4f7a8f", "log_debug": "#9a9a9a",
+            "log_time": "#8a8a8a", "log_ip": "#5f6f84", "log_path": "#5f7a4f",
+        },
+        "dark": {
+            "keyword": "#9fb3d1", "string": "#a9c398", "comment": "#7a7a7a", "number": "#d0b07a",
+            "function": "#c0b2e0", "operator": "#a0a0a0", "tag": "#d09a9a", "attribute": "#a9bcd0",
+            "log_error": "#e08080", "log_warn": "#e0c070", "log_info": "#88bcd0", "log_debug": "#8a8a8a",
+            "log_time": "#9a9a9a", "log_ip": "#a9bcd0", "log_path": "#a9c398",
+        },
+    },
 }
+
+SYNTAX_CLASSES = list(DEFAULT_THEME["syntax"]["light"])
 
 # Basis-Presets: nur die Abweichungen vom Standard
 PRESETS: dict[str, dict[str, Any]] = {
@@ -145,6 +162,13 @@ def merge_theme(raw: Any) -> dict[str, Any]:
     theme["shape"]["radius"] = int(_clamp(shape.get("radius"), 0, 12, theme["shape"]["radius"]))
     if shape.get("density") in DENSITIES:
         theme["shape"]["density"] = shape["density"]
+
+    syntax = raw.get("syntax") if isinstance(raw.get("syntax"), dict) else {}
+    for scheme in ("light", "dark"):
+        values = syntax.get(scheme) if isinstance(syntax.get(scheme), dict) else {}
+        for key in theme["syntax"][scheme]:
+            if is_hex_color(values.get(key)):
+                theme["syntax"][scheme][key] = values[key].lower()
 
     animation = raw.get("animation") if isinstance(raw.get("animation"), dict) else {}
     if isinstance(animation.get("enabled"), bool):

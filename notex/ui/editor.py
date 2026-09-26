@@ -44,6 +44,8 @@ class LineNumberArea(QWidget):
 class Editor(QTextEdit):
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
     files_dropped = Signal(list)   # Dateien aufs Blatt gezogen -> öffnen statt Pfad einfügen
+    link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
+    completion_requested = Signal(str, str)   # ("file", Präfix) oder ("heading", Ziel) nach "[[" bzw. "#"
 
     def __init__(self, path: Path, text_file: TextFile, font_size: int, checker: SpellChecker | None = None) -> None:
         super().__init__()
@@ -92,6 +94,8 @@ class Editor(QTextEdit):
         self.setPlainText(text_file.text)
         self._apply_line_height()
         self._apply_hanging_indents()
+        self._indent_timer.stop()          # das Laden selbst ist keine Tipp-Änderung
+        self._indent_pending.clear()
         self.document().clearUndoRedoStacks()
         self.document().setModified(False)
         self._update_margins()
@@ -151,6 +155,22 @@ class Editor(QTextEdit):
         self.setTabStopDistance(4 * self.fontMetrics().horizontalAdvance(" "))
         self._update_margins()
         self.line_numbers.update()
+        self.refresh_indents()
+
+    def refresh_indents(self) -> None:
+        """Einrückungsbreiten hängen von der Schrift ab: nach Schriftwechsel neu setzen,
+        ohne die Datei als geändert zu markieren (bei ungeänderter Datei bleibt auch Undo leer)."""
+        if not self.document().blockCount() or not self.document().firstBlock().isValid():
+            return
+        modified = self.document().isModified()
+        self._indent_timer.stop()
+        self._indent_pending.clear()
+        self._apply_hanging_indents()
+        if not modified:
+            # Reihenfolge wichtig: erst Undo leeren, dann „unverändert“ setzen – sonst gilt jeder
+            # spätere (auch leere) Edit-Block als Änderung
+            self.document().clearUndoRedoStacks()
+        self.document().setModified(modified)
 
     def _number_font(self):
         """Zeilennummern in der UI-Schrift mit tabellarischen Ziffern, etwas kleiner als der Text."""
@@ -184,10 +204,13 @@ class Editor(QTextEdit):
         cursor.setBlockFormat(fmt)
 
     def _apply_hanging_indents(self) -> None:
-        """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen)."""
+        """Beim Laden für alle Blöcke (vor setModified(False), also ohne Dirty-Folgen).
+        Nur Blöcke mit Präfix bekommen ein Format – bei 40 000 Zeilen spart das die meiste Zeit."""
         block = self.document().firstBlock()
         while block.isValid():
-            self._set_hanging_indent(block, self._indent_for(block.text()))
+            text = block.text()
+            if text[:1] in (" ", "\t", "-", "*", "+") or text[:1].isdigit():
+                self._set_hanging_indent(block, self._indent_for(text))
             block = block.next()
 
     def _on_block_changed(self, position: int, removed: int, added: int) -> None:
@@ -221,6 +244,59 @@ class Editor(QTextEdit):
 
     def keyPressEvent(self, event) -> None:
         self._grouped(lambda: super(Editor, self).keyPressEvent(event))
+        self._maybe_complete()
+
+    def _maybe_complete(self) -> None:
+        """Nach "[[" Dateien vorschlagen, nach "#" innerhalb eines Links die Überschriften des Ziels."""
+        cursor = self.textCursor()
+        before = cursor.block().text()[: cursor.positionInBlock()]
+        start = before.rfind("[[")
+        if start < 0 or "]]" in before[start:]:
+            return
+        inner = before[start + 2:]
+        if "#" in inner:
+            target, _, prefix = inner.partition("#")
+            self.completion_requested.emit("heading", target + "\x00" + prefix)
+        elif "|" not in inner:
+            self.completion_requested.emit("file", inner)
+
+    def complete_with(self, text: str) -> None:
+        """Ersetzt den angefangenen Link-Teil hinter "[[" bzw. "#" durch `text` und schließt mit "]]"."""
+        cursor = self.textCursor()
+        block_text = cursor.block().text()
+        col = cursor.positionInBlock()
+        before = block_text[:col]
+        start = before.rfind("[[")
+        if start < 0:
+            return
+        hash_pos = before.rfind("#", start)
+        replace_from = hash_pos + 1 if hash_pos > start else start + 2
+        after = block_text[col:]
+        closing = "" if after.startswith("]]") else "]]"
+        edit = QTextCursor(self.document())
+        edit.setPosition(cursor.block().position() + replace_from)
+        edit.setPosition(cursor.block().position() + col, QTextCursor.MoveMode.KeepAnchor)
+        self._grouped(lambda: edit.insertText(text + closing))
+        if closing:
+            self.setTextCursor(edit)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and event.modifiers() & Qt.KeyboardModifier.ControlModifier \
+                and self.highlighter is not None:
+            cursor = self.cursorForPosition(event.position().toPoint())
+            span = self.highlighter.link_at(cursor.block(), cursor.positionInBlock())
+            if span is not None:
+                self.link_activated.emit(span)
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        super().mouseMoveEvent(event)
+        over_link = False
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier and self.highlighter is not None:
+            cursor = self.cursorForPosition(event.position().toPoint())
+            over_link = self.highlighter.link_at(cursor.block(), cursor.positionInBlock()) is not None
+        self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.IBeamCursor)
 
     def insertFromMimeData(self, source) -> None:
         if source.hasUrls() and any(u.isLocalFile() for u in source.urls()):

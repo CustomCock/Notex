@@ -68,6 +68,10 @@ def main() -> None:
         "--add-data", f"{PACKAGE / 'assets'}{SEP}notex/assets",
         "--add-data", f"{PACKAGE / 'dictionaries'}{SEP}notex/dictionaries",
         "--collect-data", "enchant",   # enchant-DLLs + Provider aus dem Windows-Wheel
+        # Pygments lädt Lexer dynamisch – nur die benutzten Module einsammeln (klein halten)
+        *[f"--hidden-import=pygments.lexers.{m}" for m in ("python", "data", "configs", "shell", "html", "css",
+                                                          "javascript", "sql", "markup", "textfmts", "special")],
+        "--hidden-import=pygments.formatters",
         # Nicht benötigte Qt-Module weglassen, damit der Ordner kleiner bleibt
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtWebEngineWidgets",
@@ -80,7 +84,12 @@ def main() -> None:
         "--exclude-module", "PySide6.QtPdf",
     ]
     PyInstaller.__main__.run(args)
-    print(f"\nFertig: {ROOT / 'dist' / 'Notex'}")
+    # Lizenzen gehören in den Build-Ordner: eigene Lizenz, Übersicht und die Texte der Bibliotheken
+    target = ROOT / "dist" / "Notex"
+    for name in ("LICENSE", "THIRD_PARTY_LICENSES.md", "CHANGELOG.md"):
+        shutil.copyfile(ROOT / name, target / name)
+    shutil.copytree(ROOT / "licenses", target / "licenses", dirs_exist_ok=True)
+    print(f"\nFertig: {target}")
 
 
 if __name__ == "__main__":
