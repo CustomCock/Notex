@@ -49,8 +49,24 @@ VSVersionInfo(
     return path
 
 
+def check_dependencies() -> None:
+    """PyInstaller baut auch ohne PySide6 stumm weiter – dann startet die Exe mit „No module named 'PySide6'“."""
+    missing = []
+    for module in ("PySide6", "pygments", "enchant", "spylls", "send2trash"):
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(module)
+    if missing:
+        sys.exit(
+            f"Fehlende Pakete im Build-Python ({sys.executable}): {', '.join(missing)}\n"
+            f"Bitte mit demselben Interpreter installieren:  {sys.executable} -m pip install -r requirements-dev.txt"
+        )
+
+
 def main() -> None:
     os.chdir(ROOT)
+    check_dependencies()
     for stale in (ROOT / "build", ROOT / "dist" / "Notex"):
         shutil.rmtree(stale, ignore_errors=True)
     version_file = write_version_file()
