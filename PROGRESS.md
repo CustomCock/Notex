@@ -14,7 +14,7 @@ der Repo-Besitzer pushen.
 |---|---|---|
 | 1.0.0 | Explorer + Editor, Design-System, Themes, Rechtschreibung/Grammatik, Toolbar, Dateizuordnung, Einzelinstanz | released |
 | 1.1.0 | Block A: Lizenzen, Config-Autosave, Quick Open / Command Palette, Wiki-Links + Backlinks, Syntax-Highlighting | released |
-| 1.1.1 | Fixes nach 1.1.0 (siehe unten) | in Arbeit |
+| 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
 | 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | offen |
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | offen |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | offen |
@@ -88,7 +88,5 @@ der Repo-Besitzer pushen.
 
 ## Nächster Schritt
 
-1. v1.1.1 abschließen: Version, CHANGELOG, Tests, Push. Tag `v1.1.1` setzt der Besitzer auf dem Commit, der in
-   diesem Dokument unter „Stand“ vermerkt wird.
-2. Block B beginnen mit der Markdown-Vorschau (Core: Renderer + Sanitizer in `notex/core/markdown.py`, Tests), dann
+1. Block B beginnen mit der Markdown-Vorschau (Core: Renderer + Sanitizer in `notex/core/markdown.py`, Tests), dann
    Split View, dann Suche. Nach Block B anhalten, Zusammenfassung, Release 1.2.0.
