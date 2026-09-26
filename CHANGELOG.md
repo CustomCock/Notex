@@ -13,6 +13,8 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   → Hex-Ansicht, Export als .txt
 - Modul Eingebettete Dateien (Ctrl+Alt+F): Signaturen an jedem Offset mit Kopfprüfung, Größe aus dem Format,
   Daten hinter Dateiende-Markern, Sprung in die Hex-Ansicht, Extrahieren in <Datei>_extrahiert/ ohne Überschreiben
+- Modul Entropie (Ctrl+Alt+E): Kurve je Block (einstellbar), Bereiche ≥ 7,5 / < 2 markiert, Gesamtentropie mit
+  Einschätzung, Hover und Klick in die Hex-Ansicht
 
 ## [1.7.0] – 2026-09-26
 

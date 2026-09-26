@@ -376,6 +376,20 @@ Menü Datei oder `Ctrl+Alt+F`:
   unbekannter Größe wird bis zum nächsten Fund bzw. Dateiende kopiert.
 - Läuft gestreamt im Hintergrund mit Fortschritt und Abbrechen; höchstens 10 000 Funde.
 
+## Entropie
+
+Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Entropie anzeigen …**, Menü Datei oder
+`Ctrl+Alt+E`:
+
+- Kurve der Shannon-Entropie je Block (0–8 Bit pro Byte) über die ganze Datei; Blockgröße automatisch oder 1 KB bis
+  1 MB. Bereiche ≥ 7,5 (komprimiert/verschlüsselt) und < 2 (leer/Füllbytes) sind farbig hinterlegt und darunter
+  aufgelistet. Hover zeigt Offset und Wert, Klick springt in die Hex-Ansicht.
+- Gesamtentropie mit Einschätzung: Text, gemischt/strukturiert, komprimiert oder verschlüsselt – oder „gemischt“
+  mit Anteil, wenn nur Teile der Datei hohe Entropie haben (Hinweis auf eingebettete oder verschlüsselte Daten).
+- Kleine Blöcke unterschätzen die Entropie systematisch; Notex korrigiert das je Block (Miller–Madow), damit auch
+  1-KB-Blöcke aus Zufallsdaten über 7,5 liegen.
+- Gestreamt im Hintergrund mit Fortschritt und Abbrechen – auch für mehrere GB.
+
 ## Live verfolgen (Logs)
 
 „Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
@@ -695,6 +709,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+S | Strings extrahieren (Modul Strings) |
 | Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
+| Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |

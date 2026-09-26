@@ -896,6 +896,9 @@ class MainWindow(QMainWindow):
         self.modules.contribute("embedded", lambda: self._activate_analysis(
             "embedded", "Eingebettete Dateien finden …", "Ctrl+Alt+F", "file-search", self.show_embedded,
             "binwalk eingebettet carving extrahieren signatur versteckt anhang"))
+        self.modules.contribute("entropy", lambda: self._activate_analysis(
+            "entropy", "Entropie anzeigen …", "Ctrl+Alt+E", "activity", self.show_entropy,
+            "entropie verschlüsselt komprimiert zufall kurve"))
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -1123,6 +1126,10 @@ class MainWindow(QMainWindow):
     def show_embedded(self, path: Path | None = None) -> None:
         from notex.ui.embedded_dialog import EmbeddedDialog
         self._open_analysis("embedded", lambda target: EmbeddedDialog(self, target), path)
+
+    def show_entropy(self, path: Path | None = None) -> None:
+        from notex.ui.entropy_dialog import EntropyDialog
+        self._open_analysis("entropy", lambda target: EntropyDialog(self, target), path)
 
     def show_in_hex(self, path: Path, offset: int, length: int = 1) -> None:
         """Sprung aus Strings/Eingebettete Dateien/Entropie an eine Stelle der Datei (Modul Hex & Dateianalyse)."""
