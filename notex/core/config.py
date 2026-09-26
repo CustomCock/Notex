@@ -69,6 +69,7 @@ DEFAULTS: dict[str, Any] = {
     "data_view": {            # Datenformate: CSV/TSV als Tabelle, JSON/YAML formatieren und als Baum
         "csv_as_table": False,       # .csv/.tsv direkt in der Tabellenansicht öffnen
         "json_indent": 2,            # Einrückung beim Formatieren (JSON und YAML)
+        "follow_logs": False,        # .log-Dateien direkt „live verfolgen“
     },
     "lookup": {               # Nachschlagen (Kontextmenü, Ctrl+Alt+W/T/G)
         "online": True,           # Wikipedia/Wiktionary per API abfragen erlaubt

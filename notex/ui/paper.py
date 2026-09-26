@@ -22,7 +22,8 @@ from notex.ui.preview import MarkdownPreview
 from notex.ui.toolbar import EditorToolbar
 
 VIEW_MODES = ("edit", "preview", "split")
-DATA_MODES = ("table", "tree")      # Datenansicht statt Vorschau: CSV/TSV → Tabelle, JSON/YAML → Baum
+DATA_MODES = ("table", "tree", "live")   # Datenansicht statt Vorschau: CSV/TSV → Tabelle, JSON/YAML → Baum,
+                                          # „live“ = Datei verfolgen (jede Textdatei, nicht im Ctrl+Shift+V-Zyklus)
 ALL_MODES = VIEW_MODES + DATA_MODES
 PREVIEW_DEBOUNCE_MS = 300
 
@@ -206,16 +207,24 @@ class EditorPage(QWidget):
         return ("edit", kind) if kind else ("edit",)
 
     @property
+    def supports_live(self) -> bool:
+        """„Live verfolgen“ für jede Textdatei auf der Platte – nie für .ntx (Klartext nur im Editor)."""
+        from notex.core.tail import can_follow
+        return not getattr(self.editor, "encrypted", False) and can_follow(self.editor.path)
+
+    @property
     def supports_alt_view(self) -> bool:
         return len(self.view_modes) > 1
 
     def set_view_mode(self, mode: str) -> None:
         """"edit" (nur Blatt), "preview" (nur Vorschau), "split" (beides nebeneinander) – bei CSV/TSV "table",
         bei JSON/YAML "tree". Nicht passende Modi fallen auf "edit" zurück."""
-        if mode not in self.view_modes:
+        if mode not in self.view_modes and not (mode == "live" and self.supports_live):
             mode = "edit"
         if self.view_mode in DATA_MODES and mode != self.view_mode:
             self.flush_data_view()
+        if self.view_mode == "live" and mode != "live":
+            self._stop_live()
         if mode in ("preview", "split") and self.preview is None:
             self._create_preview()
         if mode in DATA_MODES:
@@ -260,6 +269,11 @@ class EditorPage(QWidget):
             from notex.ui.tree_view import DataTreeView
             view = DataTreeView()
             view.jump_requested.connect(self._jump_to_error)
+        elif mode == "live":
+            from notex.ui.log_view import LogView
+            view = LogView()
+            view.set_font(self.editor.font())
+            view.stop_requested.connect(lambda: self.set_view_mode("edit"))
         else:
             from notex.ui.csv_view import CsvView
             view = CsvView()
@@ -277,8 +291,23 @@ class EditorPage(QWidget):
 
     def _load_data_view(self, dialect=None) -> None:
         view = self.data_view
+        if view.kind == "live":
+            view.load_text("", self.editor.path.name, None, self.editor.encoding, path=self.editor.path)
+            return
         keep = dialect or (view.dialect if view.overridden else None)
         view.load_text(self.editor.toPlainText(), self.editor.path.name, keep, self.editor.encoding)
+
+    def _stop_live(self) -> None:
+        """Live beendet: Tailer anhalten, Editor zeigt den aktuellen Stand der Datei (ungespeicherte Änderungen
+        gibt es nicht – live startet nur bei gespeichertem Tab)."""
+        if self.data_view is not None and self.data_view.kind == "live":
+            self.data_view.stop()
+        if not self.editor.is_dirty:
+            from notex.core.encoding import read_text_file
+            try:
+                self.editor.replace_content(read_text_file(self.editor.path))
+            except OSError:
+                pass
 
     def _jump_to_error(self, position: int) -> None:
         self.set_view_mode("edit")
@@ -301,6 +330,8 @@ class EditorPage(QWidget):
         ungespeicherte Änderungen, dann gewinnt die Tabelle beim nächsten Zurückschreiben."""
         if self._flushing or self.view_mode not in DATA_MODES or self.data_view is None or self.data_view.dirty:
             return
+        if self.view_mode == "live":
+            return                       # liest selbst von der Platte
         self._data_reload.start()
 
     def _on_modification_for_data(self, modified: bool) -> None:

@@ -39,6 +39,7 @@ class Colors:
     grammar_underline: str = "#5f8fd0"
     danger: str = "#b56b6b"
     success: str = "#6f9a7a"          # z. B. Prüfsumme stimmt überein (gedämpft wie danger)
+    warning: str = "#b39a5c"          # z. B. WARN-Zeilen im Live-Log
 
 
 @dataclass

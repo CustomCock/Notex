@@ -1012,3 +1012,20 @@ QAbstractScrollArea#HexArea {
     border-bottom-left-radius: @r_panelpx;
     border-bottom-right-radius: @r_panelpx;
 }
+
+/* Live verfolgen */
+QPlainTextEdit#LogText {
+    background: @paper;
+    color: @paper_text;
+    border: none;
+    padding: @sp_smpx;
+    selection-background-color: @paper_selection;
+    selection-color: @paper_text;
+}
+QLabel#LiveBadge {
+    color: @success;
+    font-size: @fs_smallpx;
+}
+QPushButton#LogPaused {
+    color: @warning;
+}

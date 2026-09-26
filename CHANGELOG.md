@@ -24,6 +24,9 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   Lesen ohne offenes Handle – mehrere GB öffnen sofort
 - Dateityp per Magic Bytes in der Statusleiste mit Warnung, wenn die Endung nicht passt
 - Prüfsummen (MD5, SHA-1, SHA-256, SHA-512) im Hintergrund mit Fortschritt, kopierbar, „Vergleichen mit …“ grün/rot
+- Live verfolgen (Ctrl+Shift+Alt+F) für .log und jede Textdatei: neue Zeilen mit Autoscroll, Pause beim
+  Hochscrollen („Pausiert – Ende anspringen“), Rotation/Kürzung erkannt, Filter ERROR / WARN+ / Text / Regex nur für
+  die Anzeige, ERROR/WARN farbig, nur lesend, keine „Neu laden?“-Rückfragen während live; optional für .log automatisch
 - Neue Abhängigkeit PyYAML 6.0.3 (MIT, exakt gepinnt)
 - UTF-16-Dateien mit BOM werden erkannt (z. B. „Unicode-Text“-Export aus Excel)
 

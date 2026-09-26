@@ -251,6 +251,22 @@ Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Pal
   Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
 - Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
 
+## Live verfolgen (Logs)
+
+„Live verfolgen“ (`Ctrl+Shift+Alt+F`, Menü Datei, Rechtsklick im Baum) funktioniert für `.log` und jede andere
+Textdatei:
+
+- Neue Zeilen erscheinen unten, die Ansicht scrollt mit. Scrollst du nach oben, pausiert das Mitscrollen – oben
+  erscheint „Pausiert – Ende anspringen“.
+- Rotation (Datei umbenannt und neu angelegt) und Kürzung (`> app.log`) werden erkannt, die Ansicht liest neu.
+  Große Dateien starten mit den letzten 8 MB.
+- Filterleiste: Alle / WARN und schlimmer / nur ERROR, dazu Text oder Regex (`Ctrl+F`). Filter ändern nur die
+  Anzeige, nie die Datei. ERROR-Zeilen sind rot, WARN-Zeilen gelblich.
+- Solange live läuft, ist der Tab nur lesend und fragt nicht bei jeder Änderung „Neu laden?“. Beim Beenden zeigt
+  der Editor den aktuellen Stand der Datei. Start nur bei gespeichertem Tab.
+- Einstellungen → Editor → Datenformate: „.log-Dateien direkt live verfolgen“.
+- Nicht für verschlüsselte Notizen (`.ntx`).
+
 ## Hex-Ansicht, Dateityp und Prüfsummen
 
 - **Als Hex öffnen** (Rechtsklick im Baum, Menü Datei oder `Ctrl+Shift+Alt+H`): Offset | 16 Bytes hex | ASCII,
@@ -537,6 +553,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+V | Markdown-Vorschau: Bearbeiten → Vorschau → Geteilt; CSV/TSV: Text ↔ Tabelle; JSON/YAML: Text ↔ Baum |
 | Ctrl+F (in der Tabelle) | Filterfeld der Tabelle |
 | Shift+Alt+F / Shift+Alt+M / Shift+Alt+V | JSON/YAML formatieren / minimieren / prüfen |
+| Ctrl+Shift+Alt+F | Live verfolgen ein/aus |
 | Ctrl+Shift+Alt+H | Aktuelle Datei als Hex öffnen |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |

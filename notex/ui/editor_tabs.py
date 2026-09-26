@@ -308,6 +308,9 @@ class EditorTabs(QTabWidget):
                 page.set_view_mode(self.config.get("markdown_view", "edit"))
             elif page.data_kind == "table" and self.config.get("data_view", {}).get("csv_as_table", False):
                 page.set_view_mode("table")
+            elif (path.suffix.lower() == ".log" and page.supports_live
+                  and self.config.get("data_view", {}).get("follow_logs", False)):
+                page.set_view_mode("live")
             if editor.encrypted:
                 self._show_locked(page)
             self.setTabToolTip(index, self.relative(path))

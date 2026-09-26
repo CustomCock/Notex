@@ -53,6 +53,7 @@ class FileTree(QTreeView):
     path_deleted = Signal(Path)
     open_hex_requested = Signal(Path)     # Kontextmenü „Als Hex öffnen“
     checksums_requested = Signal(Path)    # Kontextmenü „Prüfsummen …“
+    follow_requested = Signal(Path)       # Kontextmenü „Live verfolgen“
 
     def __init__(self, root: Path, extensions: list[str]) -> None:
         super().__init__()
@@ -340,6 +341,8 @@ class FileTree(QTreeView):
         if path is not None:
             menu.addSeparator()
             if path.is_file():
+                if not fileops.is_encrypted_path(path):
+                    menu.addAction(icon("activity"), "Live verfolgen", lambda: self.follow_requested.emit(path))
                 menu.addAction(icon("binary"), "Als Hex öffnen", lambda: self.open_hex_requested.emit(path))
                 menu.addAction(icon("hash"), "Prüfsummen …", lambda: self.checksums_requested.emit(path))
                 menu.addSeparator()

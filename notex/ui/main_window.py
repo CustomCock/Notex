@@ -178,6 +178,8 @@ class MainWindow(QMainWindow):
         tree.path_deleted.connect(self.tabs.close_paths_under)
         tree.open_hex_requested.connect(self.open_as_hex)
         tree.checksums_requested.connect(self.show_checksums)
+        tree.follow_requested.connect(self.toggle_live)
+        self.tabs.view_mode_changed.connect(self._on_view_mode_changed)
         tree.path_deleted.connect(lambda p: (self.links.remove(self.tabs.relative(p)), self.file_index.request_rescan()))
 
         self.tabs.status_changed.connect(self._update_status)
@@ -244,6 +246,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
         file_menu.addAction(self._action("Passwort ändern …", None, self.change_note_password))
         file_menu.addAction(self._action("Verschlüsselte Notizen sperren", "Ctrl+Shift+L", lambda: self.lock_all(manual=True)))
+        file_menu.addAction(self._action("Live verfolgen ein/aus", "Ctrl+Shift+Alt+F", lambda: self.toggle_live()))
         file_menu.addAction(self._action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()))
         file_menu.addAction(self._action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums()))
         file_menu.addSeparator()
@@ -775,6 +778,8 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _on_external_change(self, path: Path) -> None:
+        if any(page.view_mode == "live" and page.editor.path == path for page in self.tabs.pages()):
+            return                                   # „Live verfolgen“ liest die Änderungen selbst – keine Rückfrage
         editor = self.tabs.editor_for(path)
         if editor is None:
             for viewer in self.tabs.viewers():       # Viewer (Hex, Bild …) lesen nur – still neu laden
@@ -828,6 +833,8 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _on_external_remove(self, path: Path) -> None:
+        if any(page.view_mode == "live" and page.editor.path == path for page in self.tabs.pages()):
+            return                                   # Rotation: die Live-Ansicht wartet auf die neue Datei
         editor = self.tabs.editor_for(path)
         if editor is None:
             return
@@ -875,6 +882,37 @@ class MainWindow(QMainWindow):
             self.toast.show_message("Keine Datei zum Anzeigen", "info")
             return
         self.tabs.open_viewer(Path(path), "hex")
+
+    def _on_view_mode_changed(self, mode: str) -> None:
+        """Nach „Live verfolgen“: Datei neu beobachten – nach einer Rotation ist es eine andere Datei."""
+        editor = self.tabs.current_editor()
+        if mode != "live" and editor is not None and editor.path.is_file() and not editor.encrypted:
+            self.watcher.watch(editor.path)
+
+    def toggle_live(self, path: Path | None = None) -> None:
+        """„Live verfolgen“ ein/aus: neue Zeilen unten anhängen, nur lesend, Filter nur in der Anzeige."""
+        if path is not None:
+            if fileops.is_encrypted_path(path):
+                self.toast.show_message("Verschlüsselte Notizen lassen sich nicht live verfolgen", "lock")
+                return
+            self.tabs.open_file(Path(path))
+        page = self.tabs.current_page()
+        if page is None:
+            self.toast.show_message("Live verfolgen geht für Textdateien im Editor", "info")
+            return
+        if page.view_mode == "live":
+            if path is None:
+                page.set_view_mode("edit")
+                self.toast.show_message("Live verfolgen beendet", "square")
+            return
+        if not page.supports_live:
+            self.toast.show_message("Nicht für verschlüsselte oder ungespeicherte Dateien", "info")
+            return
+        if page.editor.is_dirty:
+            self.toast.show_message("Erst speichern – live verfolgen zeigt die Datei auf der Platte", "info")
+            return
+        page.set_view_mode("live")
+        self.toast.show_message("Live verfolgen – nur lesend", "activity")
 
     def show_checksums(self, path: Path | None = None) -> None:
         from notex.ui.hash_dialog import HashDialog
@@ -1927,6 +1965,8 @@ class MainWindow(QMainWindow):
                           shortcut="Shift+Alt+V", keywords="json yaml validieren syntax fehler lint")
         self.registry.add("data:path", "JSON/YAML: Pfad kopieren", self.structured.copy_path, category="Bearbeiten",
                           keywords="json yaml jsonpath pfad kopieren baum")
+        self.registry.add("file:live", "Live verfolgen (Log) ein/aus", lambda: self.toggle_live(), category="Datei",
+                          shortcut="Ctrl+Shift+Alt+F", keywords="tail follow log live mitlesen logdatei")
         self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
                           shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
         self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),

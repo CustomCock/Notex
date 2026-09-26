@@ -409,6 +409,10 @@ class SettingsDialog(QDialog):
         page.row("", csv_box)
         page.note("Ctrl+Shift+V wechselt bei .csv/.tsv zwischen Text und Tabelle. Sortieren und Filtern ändern nur die "
                   "Ansicht; Speichern behält Trennzeichen, Anführungszeichen-Stil, Encoding und Zeilenenden.")
+        follow_box = QCheckBox(".log-Dateien direkt live verfolgen")
+        follow_box.setChecked(bool(data_cfg.get("follow_logs", False)))
+        follow_box.toggled.connect(lambda on: self.config.setdefault("data_view", {}).__setitem__("follow_logs", on))
+        page.row("", follow_box)
         indent_spin = QSpinBox()
         indent_spin.setRange(1, 8)
         indent_spin.setValue(int(data_cfg.get("json_indent", 2)))
