@@ -268,6 +268,15 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Screenshots 54–57 (Metadaten, YARA, Zeitleiste, IOC entschärft).
 
 ### 1.10.0 – Block I (in Arbeit)
+- I1 Port-Infos: `core/ports.py`, Daten `assets/ports/iana-ports.tsv.gz` (11 721 Einträge, 149 KB, Bereiche als
+  start–ende), erzeugt mit `tools/update_ports.py` (reproduzierbares gzip, mtime=0). **Quelle:** iana.org ist in der
+  Arbeitsumgebung per Netzwerk-Policy gesperrt → CSV von einem GitHub-Spiegel (HackBugs/Computer-Networking,
+  neuester Eintrag 2024-10-08, Stichproben gegen bekannte Einträge geprüft); Lizenz: IANA/IETF-Erklärung 2021 „frei
+  für jeden Zweck“. Beim nächsten Lauf mit Netz `python tools/update_ports.py` direkt von iana.org. Eigene Tabelle
+  COMMON (~85 Dienste, Hinweise auf Deutsch) + ALIASES. Erkennung nur mit Kontext (Port-Wort, Liste nach „Ports“,
+  Host:Port mit IP/Domain/localhost/[IPv6], n/tcp, tcp/n, nmap), Falsch-Positiv-Tests (Jahr, Betrag, Uhrzeit,
+  Version, Pfad, Rechnungsnr., 16:9). `Editor.hover_providers` (neu, klassenweit) – Tooltip nur, wenn die Maus
+  wirklich auf der Zeile steht; gesperrte .ntx nie. `ui/ports_dialog.py`.
 
 ## Offen
 

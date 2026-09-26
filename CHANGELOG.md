@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.10.0] – unveröffentlicht
+
+### Hinzugefügt
+- Modul Port-Infos (Standard an): Tooltip über Portangaben im Editor (Port 3389, :443, 3389/tcp, tcp/445,
+  Portlisten, nmap-Zeilen) mit Dienst, Hinweis und IANA-Einträgen – ohne Treffer auf Jahreszahlen, Beträge oder
+  Uhrzeiten; „Port nachschlagen“ (`Ctrl+Alt+P`) nach Nummer oder Name; IANA-Portliste offline mitgeliefert
+- Editor: allgemeine Hover-Schnittstelle für Module
+
 ## [1.9.0] – 2026-09-26
 
 ### Hinzugefügt

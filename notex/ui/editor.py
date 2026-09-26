@@ -43,6 +43,7 @@ class LineNumberArea(QWidget):
 
 class Editor(QTextEdit):
     variables = None               # VariableService, solange das Modul „Variablen“ an ist (für alle Editoren)
+    hover_providers: list = []     # Module: Callable[[Editor, Zeilentext, Spalte], HTML | None] (z. B. Port-Infos)
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
     files_dropped = Signal(list)   # Dateien aufs Blatt gezogen -> öffnen statt Pfad einfügen
     link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
@@ -327,6 +328,18 @@ class Editor(QTextEdit):
             if hit is not None:
                 QToolTip.showText(event.globalPos(), variable_render.tooltip_text(self, hit[0]), self.viewport())
                 return True
+            QToolTip.hideText()
+        if event.type() == QEvent.Type.ToolTip and Editor.hover_providers and not self.locked:
+            from PySide6.QtWidgets import QToolTip
+            cursor = self.cursorForPosition(event.pos())
+            rect = self.cursorRect(cursor)
+            if abs(rect.center().y() - event.pos().y()) <= rect.height():
+                block = cursor.block()
+                for provider in list(Editor.hover_providers):
+                    text = provider(self, block.text(), cursor.positionInBlock())
+                    if text:
+                        QToolTip.showText(event.globalPos(), text, self.viewport())
+                        return True
             QToolTip.hideText()
         return super().viewportEvent(event)
 

@@ -28,6 +28,7 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 | pycparser | 2.x/3.x | BSD 3-Clause | https://github.com/eliben/pycparser | `licenses/LICENSE-pycparser.txt` |
 | Inter (Schrift) | 4.1 | SIL Open Font License 1.1 | https://rsms.me/inter | `notex/assets/fonts/LICENSE-Inter.txt` |
 | JetBrains Mono (Schrift) | 2.304 | SIL Open Font License 1.1 | https://www.jetbrains.com/lp/mono | `notex/assets/fonts/LICENSE-JetBrainsMono.txt` |
+| IANA Service Name and Transport Protocol Port Number Registry (Daten) | Stand 2024-10 | frei für jeden Zweck (gemeinsame Erklärung IANA/IETF 2021, https://www.iana.org/help/licensing-terms) | https://www.iana.org/assignments/service-names-port-numbers | – |
 | Lucide Icons | 2026 | ISC | https://lucide.dev | `notex/assets/icons/LICENSE-Lucide.txt` |
 | Hunspell-Wörterbuch de_DE (frami, igerman98) | LibreOffice dictionaries | GPL v2 oder v3 | https://github.com/LibreOffice/dictionaries · https://www.j3e.de/ispell/igerman98 | `notex/dictionaries/LICENSE_de_DE_GPLv2.txt`, `README_de_DE.txt` |
 | Hunspell-Wörterbuch en_US (SCOWL) | 2020.12.07 | MIT/BSD-artig (SCOWL, Ispell, WordNet) | http://wordlist.sourceforge.net | `notex/dictionaries/README_en_US_LICENSE.txt` |

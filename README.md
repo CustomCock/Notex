@@ -486,6 +486,21 @@ an die Übergaben an und setzt den Cursor in „Von“.
 ![Zeitleiste](docs/56-timeline.png)
 
 
+## Port-Infos
+
+Modul „Port-Infos“ (Standard an, rein offline). Fährt die Maus im Editor über eine Portangabe, zeigt ein Tooltip
+Dienst, Protokolle, einen kurzen Hinweis (z. B. „SMB – nie ins Internet“) und die IANA-Einträge.
+
+- Erkannt werden nur Angaben mit Kontext: `Port 3389`, `Ports: 22, 80, 443 und 8080`, `10.0.0.5:445`,
+  `https://host.example.com:8443`, `[::1]:5432`, `3389/tcp`, `tcp/445`, nmap-Zeilen wie `22/tcp open ssh`, Logzeilen
+  wie `… port 52344 ssh2`. Nackte Zahlen (Jahreszahlen, Beträge, Rechnungsnummern), Uhrzeiten und Versionen nie.
+- **Port nachschlagen** (`Ctrl+Alt+P`, Palette): Suche nach Nummer, Kurzname (`rdp`, `smb`, `winrm`) oder IANA-Name,
+  vorbelegt mit der Markierung bzw. dem Port unter dem Cursor; „Als Markdown einfügen“.
+- Daten: IANA „Service Name and Transport Protocol Port Number Registry“ (RFC 6335), mitgeliefert als
+  `notex/assets/ports/iana-ports.tsv.gz` (~150 KB), plus eine eigene Tabelle mit Hinweisen zu gut 80 gängigen Diensten.
+  Aktualisieren: `python tools/update_ports.py` (lädt die CSV von iana.org).
+
+
 ## IOCs entschärfen
 
 Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
@@ -835,6 +850,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
 | Ctrl+Alt+M | Metadaten anzeigen / entfernen (Modul Metadaten) |
 | Ctrl+Alt+Y | YARA-Regel testen (Modul YARA) |
+| Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |

@@ -910,6 +910,7 @@ class MainWindow(QMainWindow):
             "metadaten exif gps kamera autor pdf office docx entfernen bereinigen xmp iptc"))
         self.modules.contribute("timeline", self._activate_timeline)
         self.modules.contribute("ioc", self._activate_ioc)
+        self.modules.contribute("ports", self._activate_ports)
         self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1400,6 +1401,46 @@ class MainWindow(QMainWindow):
             editor.set_problem(None)
             editor.textChanged.disconnect(self._clear_yara_error)
             editor._yara_error_hooked = False
+
+    # ---- Modul: Port-Infos ----------------------------------------------------------------------
+    def _activate_ports(self):
+        """Hover über Portangaben im Editor (offline) und „Port nachschlagen“."""
+        from notex.core import ports
+        from notex.ui.editor import Editor
+
+        def hover(_editor, line: str, column: int):
+            hit = ports.port_at(line, column)
+            if hit is None:
+                return None
+            info = ports.lookup(hit[0])
+            return ports.tooltip_html(info) if info else None
+        Editor.hover_providers.append(hover)
+        action = self._action("Port nachschlagen …", "Ctrl+Alt+P", lambda: self.lookup_port())
+        self.edit_menu.addAction(action)
+        self.registry.add("ports:lookup", "Port nachschlagen", lambda: self.lookup_port(), category="Netzwerk",
+                          shortcut="Ctrl+Alt+P", keywords="port dienst service iana tcp udp rdp smb nummer")
+
+        def undo() -> None:
+            if hover in Editor.hover_providers:
+                Editor.hover_providers.remove(hover)
+            self.edit_menu.removeAction(action)
+            self._drop_actions([action])
+            self.registry.remove("ports:lookup")
+        return undo
+
+    def lookup_port(self) -> None:
+        from notex.core import ports
+        from notex.ui.ports_dialog import PortDialog
+        term = ""
+        editor = self.tabs.current_editor()
+        if editor is not None and not getattr(editor, "locked", False):
+            cursor = editor.textCursor()
+            if cursor.hasSelection():
+                term = cursor.selectedText().strip()[:40]
+            else:
+                hit = ports.port_at(cursor.block().text(), cursor.positionInBlock())
+                term = str(hit[0]) if hit else ""
+        PortDialog(self, term).show()
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
     def _activate_ioc(self):
