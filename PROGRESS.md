@@ -15,7 +15,7 @@ der Repo-Besitzer pushen.
 | 1.0.0 | Explorer + Editor, Design-System, Themes, Rechtschreibung/Grammatik, Toolbar, Dateizuordnung, Einzelinstanz | released |
 | 1.1.0 | Block A: Lizenzen, Config-Autosave, Quick Open / Command Palette, Wiki-Links + Backlinks, Syntax-Highlighting | released |
 | 1.1.1 | Fixes nach 1.1.0 (siehe unten) | fertig auf Commit `a332ee9`, Tag `v1.1.1` durch Besitzer |
-| 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Branch, Tag `v1.2.0` durch Besitzer |
+| 1.2.0 | Block B: Markdown-Vorschau, Split View, erweiterte Suche | fertig auf Commit `c178bcc` (CI grün), Tag `v1.2.0` durch Besitzer |
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | offen |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | offen |
 
@@ -56,6 +56,7 @@ der Repo-Besitzer pushen.
   Ganzes Wort, Mehrfach-Spans; `ui/replace_dialog.py` (Ctrl+Shift+H) mit Häkchen je Zeile.
 - Selbstprüfung am Blockende: Zoom/Toolbar-Klappen/Beenden-Rückfrage gruppenübergreifend korrigiert; lokaler
   PyInstaller-Build geprüft (neue Module im Archiv, Build +2 MB), 127 Tests grün.
+- CI-Fix: Test-Workflow installiert markdown-it-py, regex und Pygments ausdrücklich (war beim ersten Push rot).
 
 ## Offen
 
