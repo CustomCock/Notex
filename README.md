@@ -1,0 +1,2 @@
+# Notex
+Explorer für Textdatein
