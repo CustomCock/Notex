@@ -79,6 +79,18 @@ class StatusBar(QStatusBar):
         self.spell_button.setIcon(icon("spell-check"))
         self.grammar_button.setIcon(icon("languages"))
 
+    def update_for_viewer(self, relative_path: str, parts: list[str]) -> None:
+        """Bild-/Hex-/PDF-Tab: Pfad links, rechts bis zu vier Angaben (Maße, Größe, Typ, Zoom …)."""
+        for widget in (self.spell_button, self.grammar_button, self.language_button, self.readonly_label):
+            widget.setVisible(False)
+        self.path_label.setText(relative_path)
+        labels = (self.position_label, self.encoding_label, self.chars_label, self.dirty_label)
+        parts = list(parts)[:4] + [""] * (4 - min(4, len(parts)))
+        for label, text in zip(labels, parts):
+            label.setText(text)
+        for dot, text in zip(self._separators, parts[1:]):
+            dot.setVisible(bool(text))
+
     def update_for(self, editor: Editor | None, relative_path: str) -> None:
         labels = (self.position_label, self.encoding_label, self.chars_label, self.dirty_label)
         for widget in (self.spell_button, self.grammar_button, self.language_button):

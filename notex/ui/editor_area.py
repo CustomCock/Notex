@@ -25,7 +25,7 @@ from notex.ui.editor_tabs import EditorTabs
 from notex.ui.paper import EditorPage
 
 SHARED_ATTRS = {"font_size", "paper_mode", "resolve_link", "open_font_settings", "toolbar_visible", "line_numbers",
-                "context_menu_hook"}
+                "context_menu_hook", "image_hook"}
 FORWARDED_SIGNALS = ("status_changed", "file_saved", "file_opened", "font_size_changed", "text_font_changed",
                      "files_dropped", "link_activated", "completion_requested", "preview_link", "view_mode_changed")
 
@@ -229,6 +229,16 @@ class EditorArea(QWidget):
 
     def move_tab(self, source: EditorTabs, index: int, target: EditorTabs) -> None:
         page = source.widget(index)
+        if source is not target and page in source.viewers() and target in self.groups:
+            title, tooltip, icon_ = source.tabText(index), source.tabToolTip(index), source.tabIcon(index)
+            source.removeTab(index)
+            new_index = target.addTab(page, icon_, title)
+            target.setTabToolTip(new_index, tooltip)
+            target.setCurrentIndex(new_index)
+            self.set_active(target)
+            if source.count() == 0:
+                source.tabs_emptied.emit()
+            return
         if source is target or not isinstance(page, EditorPage) or target not in self.groups:
             return
         self._move_page(source, page, target)
@@ -274,6 +284,12 @@ class EditorArea(QWidget):
     def pages(self) -> list[EditorPage]:
         return [p for g in self.groups for p in g.pages()]
 
+    def viewers(self) -> list:
+        return [v for g in self.groups for v in g.viewers()]
+
+    def current_viewer(self):
+        return self.active.current_viewer()
+
     def editor_for(self, path: Path) -> Editor | None:
         editor = self.active.editor_for(path)
         if editor is None:
@@ -305,9 +321,9 @@ class EditorArea(QWidget):
     def open_file(self, path: Path, line: int | None = None, column: int = 0, length: int = 0) -> Editor | None:
         """In der aktiven Gruppe öffnen; ist die Datei nur in der anderen Gruppe offen, dorthin wechseln."""
         path = Path(path)
-        if self.active.editor_for(path) is None:
+        if self.active.editor_for(path) is None and self.active.viewer_for(path) is None:
             for group in self.groups:
-                if group.editor_for(path) is not None:
+                if group.editor_for(path) is not None or group.viewer_for(path) is not None:
                     self.set_active(group)
                     break
         return self.active.open_file(path, line, column, length)

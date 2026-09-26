@@ -201,6 +201,20 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 
 ![Neue Woche](docs/31-new-week.png)
 
+## Bilder
+
+- **Einfügen:** Ctrl+V mit einem Bild in der Zwischenablage (z. B. Screenshot) oder Bilddateien auf eine
+  `.md` ziehen: Notex legt das Bild als Datei in `assets/` neben der Notiz ab (Name aus Notizname und
+  Zeitstempel, Ordnername in Einstellungen → Editor) und fügt `![](assets/…png)` am Cursor ein. In
+  verschlüsselte Notizen (`.ntx`) werden keine Bilder eingefügt – das Bild läge sonst unverschlüsselt daneben.
+- **Anzeigen:** `.png .jpg .jpeg .gif .webp .bmp .svg` erscheinen im Baum und öffnen in einem Bild-Tab:
+  Einpassen oder 100 %, Zoom mit dem Mausrad, Verschieben mit gedrückter Maus, dunkler neutraler Hintergrund.
+  Maße, Dateigröße, Format und Zoom stehen in der Statusleiste.
+- **Verschieben:** Wandert eine Notiz in einen anderen Ordner, fragt Notex, ob ihre Bilder aus `assets/`
+  mitkommen; Links werden angepasst, Bilder, die andere Notizen im alten Ordner auch nutzen, werden kopiert.
+- **Aufräumen:** „Unbenutzte Bilder finden …“ (Menü Datei, Command Palette) listet Bilder ohne Verweis mit
+  Vorschau; nur Angekreuztes kommt in den Papierkorb. Gelöscht wird nie automatisch.
+
 ## Nachschlagen
 
 Rechtsklick auf eine Markierung – ohne Markierung gilt das Wort unter dem Mauszeiger – öffnet ein
@@ -454,6 +468,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
 | Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
+| Ctrl+V (Bild in der Zwischenablage, .md) | Bild in `assets/` ablegen und verlinken |
 | Ctrl+Alt+W | Wikipedia zur Markierung (Karte) |
 | Ctrl+Alt+T | Wiktionary zur Markierung (Karte) |
 | Ctrl+Alt+G | Websuche zur Markierung (nur Browser) |

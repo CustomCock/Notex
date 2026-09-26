@@ -318,14 +318,24 @@ class Editor(QTextEdit):
             over_link = self.highlighter.link_at(cursor.block(), cursor.positionInBlock()) is not None
         self.viewport().setCursor(Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.IBeamCursor)
 
+    image_hook = None   # (editor, QImage | None, [Pfade]) -> bool; setzt das Hauptfenster (Bilder → assets/)
+
     def insertFromMimeData(self, source) -> None:
+        from notex.core.images import is_image
         if source.hasUrls() and any(u.isLocalFile() for u in source.urls()):
-            self.files_dropped.emit([u.toLocalFile() for u in source.urls() if u.isLocalFile()])
+            paths = [u.toLocalFile() for u in source.urls() if u.isLocalFile()]
+            if self.image_hook is not None and paths and all(is_image(p) for p in paths):
+                if self.image_hook(self, None, paths):
+                    return
+            self.files_dropped.emit(paths)
             return
+        if source.hasImage() and not source.hasText() and self.image_hook is not None:
+            if self.image_hook(self, source.imageData(), []):
+                return
         self._grouped(lambda: super(Editor, self).insertFromMimeData(source))
 
     def canInsertFromMimeData(self, source) -> bool:
-        return source.hasUrls() or super().canInsertFromMimeData(source)
+        return source.hasUrls() or source.hasImage() or super().canInsertFromMimeData(source)
 
     def cursor_line_col(self) -> tuple[int, int]:
         cursor = self.textCursor()

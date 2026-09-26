@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.6.0] – unveröffentlicht
+
+### Hinzugefügt
+- Bilder: Ctrl+V mit Bild bzw. Bilddateien auf eine .md ziehen legt das Bild in assets/ neben der Notiz ab und
+  verlinkt es (Ordner einstellbar, nie in .ntx); Bild-Tab mit Einpassen/100 %, Mausrad-Zoom, Verschieben, Maße und
+  Größe in der Statusleiste; Bilder und PDFs im Baum (Config-Migration); beim Verschieben einer Notiz Rückfrage,
+  ob ihre Bilder mitkommen; „Unbenutzte Bilder finden“ mit Vorschau statt automatischem Löschen
+- Dateityp-Erkennung über Magic Bytes (eigene Signaturtabelle) als Grundlage für Viewer-Tabs; Symbole im Baum
+  nach Dateityp
+
 ## [1.5.0] – 2026-09-26
 
 ### Hinzugefügt

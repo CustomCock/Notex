@@ -50,9 +50,17 @@ from notex.ui.recent_dialog import RecentDialog
 from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 
 
+def _register_viewers() -> None:
+    """Viewer-Tabs (Bild, später Hex/PDF) bei den Tab-Gruppen anmelden."""
+    from notex.ui.editor_tabs import EditorTabs
+    from notex.ui.image_view import ImagePage
+    EditorTabs.register_viewer("image", ImagePage)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, root: Path, config: dict[str, Any], on_save_config) -> None:
         super().__init__()
+        _register_viewers()
         self.root = root
         self.config = config
         self._save_config = on_save_config
@@ -224,6 +232,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Neue Woche", "Alt+W", lambda: self.new_week()))
         file_menu.addAction(self._action("Nächste Woche anlegen", None, lambda: self.new_week(next_week=True)))
         file_menu.addAction(self._action("Vorlagen-Ordner öffnen", None, self.open_templates_folder))
+        file_menu.addAction(self._action("Unbenutzte Bilder finden …", None, self.find_unused_images))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Neue verschlüsselte Notiz …", "Ctrl+Shift+Alt+N", self.new_encrypted_note))
         file_menu.addAction(self._action("Datei verschlüsseln …", None, self.encrypt_current_file))
@@ -736,6 +745,8 @@ class MainWindow(QMainWindow):
     # ---- Reaktionen auf Baum / Watcher -----------------------------------------
     def _on_path_renamed(self, old: Path, new: Path) -> None:
         self.tabs.rename_open_file(old, new)
+        if old.parent != new.parent and new.suffix.lower() in (".md", ".markdown") and new.is_file():
+            QTimer.singleShot(0, lambda: self._move_note_assets(old, new))
         if not self.tabs.is_external(new):
             try:
                 self.history.rename(self.tabs.relative(old), self.tabs.relative(new))   # Verlauf zieht mit
@@ -872,6 +883,7 @@ class MainWindow(QMainWindow):
         self.menuBar().actions()[2].menu().addAction(self.toolbar_action)   # Menü „Ansicht“
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
         self.tabs.context_menu_hook = self._extend_context_menu
+        self.tabs.image_hook = self._insert_images
 
     # ---- Linux-Desktop-Integration ----------------------------------------------------------
     def _linux_integration(self):
@@ -945,6 +957,123 @@ class MainWindow(QMainWindow):
         register.clicked.connect(do_register)
         remove.clicked.connect(do_remove)
         refresh()
+
+    # ---- Bilder in Notizen ---------------------------------------------------------------------
+    def _assets_folder_name(self) -> str:
+        return str(self.config.get("images", {}).get("assets_folder", "assets"))
+
+    def _insert_images(self, editor, image, paths: list[str]) -> bool:
+        """Ctrl+V mit Bild bzw. Bilddateien auf eine .md ziehen: als Datei in assets/ ablegen und verlinken.
+        True = erledigt (auch wenn abgelehnt), False = normal weiter (z. B. Dateien öffnen)."""
+        import shutil
+        from datetime import datetime
+        from notex.core.images import asset_name, assets_dir, can_embed_images, markdown_image
+        if not can_embed_images(editor.path):
+            if getattr(editor, "encrypted", False):
+                self.toast.show_message("Keine Bilder in verschlüsselten Notizen – das Bild läge unverschlüsselt daneben", "lock")
+                return True
+            if image is not None:
+                self.toast.show_message("Bilder einfügen geht nur in Markdown-Notizen (.md)", "info")
+                return True
+            return False     # Bilddateien auf eine .txt gezogen: wie bisher öffnen
+        if editor.isReadOnly():
+            return True
+        folder = assets_dir(editor.path, self._assets_folder_name())
+        links = []
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            existing = {p.name.lower() for p in folder.iterdir()}
+            if image is not None:
+                name = asset_name(editor.path, datetime.now(), ".png", existing)
+                target = folder / name
+                tmp = folder / f".{name}.tmp"
+                if not image.save(str(tmp), "PNG"):
+                    raise OSError("Bild konnte nicht gespeichert werden")
+                import os
+                os.replace(tmp, target)
+                links.append(markdown_image(editor.path, target, "Bild"))
+            for source in map(Path, paths):
+                target = folder / source.name
+                if target.exists() and target.resolve() != source.resolve():
+                    target = fileops.unique_path(folder, source.stem, source.suffix)
+                if target.resolve() != source.resolve():
+                    shutil.copy2(source, target)
+                links.append(markdown_image(editor.path, target, source.stem))
+        except OSError as error:
+            dialogs.warn(self, "Bild einfügen", str(error))
+            return True
+        editor.insert_text("\n".join(links))
+        self.file_index.request_rescan()
+        self.toast.show_message(f"{len(links)} Bild(er) in {folder.name}/ abgelegt", "image")
+        return True
+
+    def _move_note_assets(self, old: Path, new: Path) -> None:
+        """Notiz in einen anderen Ordner verschoben: ihre Bilder aus assets/ mitnehmen und Links anpassen?"""
+        import shutil
+        from notex.core.images import plan_assets_move
+        editor = self.tabs.editor_for(new)
+        try:
+            text = editor.toPlainText() if editor is not None else _read_text_file(new).text
+        except (OSError, UnicodeDecodeError):
+            return
+        others: dict[Path, str] = {}
+        for sibling in old.parent.glob("*.md"):
+            try:
+                others[sibling] = _read_text_file(sibling).text
+            except (OSError, UnicodeDecodeError):
+                continue
+        plan = plan_assets_move(old, new, text, others, self._assets_folder_name())
+        if plan.empty:
+            return
+        detail = (f"{len(plan.moves)} Bild(er) verschieben" + (f", {len(plan.copies)} kopieren (andere Notizen nutzen sie auch)"
+                                                                if plan.copies else ""))
+        if not dialogs.confirm(self, "Bilder mitnehmen?", f"„{new.name}“ verlinkt Bilder aus dem alten assets-Ordner.",
+                               yes="Mitnehmen", no="Nicht mitnehmen",
+                               informative=f"{detail} und die Links in der Notiz anpassen?"):
+            return
+        try:
+            for source, target in plan.moves + plan.copies:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    continue
+                if (source, target) in plan.moves:
+                    shutil.move(str(source), str(target))
+                else:
+                    shutil.copy2(source, target)
+        except OSError as error:
+            dialogs.warn(self, "Bilder mitnehmen", str(error))
+            return
+        if plan.new_text != text:
+            if editor is not None:
+                was_clean = not editor.is_dirty
+                self.tabs.replace_text_keep_cursor(editor, plan.new_text)
+                if was_clean:
+                    self.tabs.group_of(editor).save_editor(editor)
+            else:
+                self._write_tracked(new, _read_text_file(new), plan.new_text, "vor Bilder-Umzug")
+        self.file_index.request_rescan()
+        self.toast.show_message("Bilder mitgenommen", "image")
+
+    def find_unused_images(self) -> None:
+        from notex.core.images import NOTE_SUFFIXES, find_unused_images
+        from notex.ui.unused_images_dialog import UnusedImagesDialog
+        texts: dict[Path, str] = {}
+        skipped_ntx = 0
+        for rel in self.file_index.index.files:
+            path = self.root / rel
+            if fileops.is_encrypted_path(path):
+                skipped_ntx += 1        # Inhalt unbekannt – nie entschlüsseln, nur zählen
+                continue
+            if path.suffix.lower() in NOTE_SUFFIXES:
+                editor = self.tabs.editor_for(path)
+                try:
+                    texts[path] = editor.toPlainText() if editor is not None else _read_text_file(path).text
+                except (OSError, UnicodeDecodeError):
+                    continue
+        unused = find_unused_images(self.root, texts)
+        dialog = UnusedImagesDialog(self, self.root, unused, skipped_ntx)
+        dialog.trashed.connect(lambda _paths: self.file_index.request_rescan())
+        dialog.exec()
 
     # ---- Nachschlagen ------------------------------------------------------------------------
     def _lookup_cfg(self) -> dict:
@@ -1780,6 +1909,12 @@ class MainWindow(QMainWindow):
         if not self.tabs.count():
             self.find_bar.hide()
         editor = self.tabs.current_editor()
+        viewer = self.tabs.current_viewer() if editor is None else None
+        if viewer is not None:
+            relative = self.tabs.relative(viewer.path)
+            self.status.update_for_viewer(relative, viewer.status_parts())
+            self.setWindowTitle(f"{relative} – {APP_NAME}")
+            return
         if editor is None:
             self.status.update_for(None, "")
             self.setWindowTitle(APP_NAME)

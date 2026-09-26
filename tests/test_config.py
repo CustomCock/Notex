@@ -21,7 +21,7 @@ def test_wrong_types_fall_back_per_key(tmp_path: Path) -> None:
         "font_size": "gross",
         "open_tabs": "nur ein String",
         "extensions": [".txt"],
-        "extensions_version": 3,
+        "extensions_version": 4,
         "unbekannt": 123,
     }), encoding="utf-8")
     cfg = load_config(path)
@@ -82,10 +82,14 @@ def test_migration_adds_new_default_extensions_once(tmp_path: Path) -> None:
     cfg = load_config(path)
     assert cfg["extensions"][:2] == [".txt", ".eigene"]          # eigene Reihenfolge/Einträge bleiben
     assert ".py" in cfg["extensions"] and ".sql" in cfg["extensions"]
-    assert ".ntx" in cfg["extensions"] and cfg["extensions_version"] == 3
-    # v2 → v3: nur .ntx kommt dazu, bewusst entfernte Endungen bleiben entfernt
+    assert ".ntx" in cfg["extensions"] and ".png" in cfg["extensions"] and cfg["extensions_version"] == 4
+    new_v4 = [".tsv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".pdf"]
+    # v2 → v4: .ntx und die Bild-/PDF-Endungen kommen dazu, bewusst entfernte Endungen bleiben entfernt
     path.write_text(json.dumps({"extensions": [".txt"], "extensions_version": 2}), encoding="utf-8")
-    assert load_config(path)["extensions"] == [".txt", ".ntx"]
-    # v3: bewusst entferntes .ntx bleibt entfernt
+    assert load_config(path)["extensions"] == [".txt", ".ntx"] + new_v4
+    # v3 → v4: nur die neuen, entferntes .ntx bleibt entfernt
     path.write_text(json.dumps({"extensions": [".txt"], "extensions_version": 3}), encoding="utf-8")
+    assert load_config(path)["extensions"] == [".txt"] + new_v4
+    # v4: nichts mehr ergänzen
+    path.write_text(json.dumps({"extensions": [".txt"], "extensions_version": 4}), encoding="utf-8")
     assert load_config(path)["extensions"] == [".txt"]

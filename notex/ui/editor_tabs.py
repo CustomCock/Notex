@@ -94,6 +94,7 @@ class EditorTabs(QTabWidget):
             self.toolbar_visible = shared.toolbar_visible
             self.line_numbers = shared.line_numbers
             self.context_menu_hook = shared.context_menu_hook
+            self.image_hook = shared.image_hook
         else:
             self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
             self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
@@ -109,6 +110,7 @@ class EditorTabs(QTabWidget):
             self.toolbar_visible = bool(self.config.get("toolbar_visible", True))
             self.line_numbers = bool(self.config.get("line_numbers", True))
             self.context_menu_hook = None          # setzt das Hauptfenster (Text + Nachschlagen im Kontextmenü)
+            self.image_hook = None                 # setzt das Hauptfenster (Bilder einfügen → assets/)
         self.setAcceptDrops(True)
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)
@@ -140,6 +142,76 @@ class EditorTabs(QTabWidget):
     def current_editor(self) -> Editor | None:
         widget = self.currentWidget()
         return widget.editor if isinstance(widget, EditorPage) else None
+
+    # ---- Viewer-Tabs (Bild, Hex, PDF) --------------------------------------------------------
+    VIEWERS: dict = {}   # kind -> Klasse; befüllt register_viewer()
+
+    @classmethod
+    def register_viewer(cls, kind: str, factory) -> None:
+        cls.VIEWERS[kind] = factory
+
+    def viewers(self) -> list:
+        from notex.ui.viewer_page import ViewerPage
+        return [self.widget(i) for i in range(self.count()) if isinstance(self.widget(i), ViewerPage)]
+
+    def viewer_for(self, path: Path, kind: str | None = None):
+        for page in self.viewers():
+            if page.path == path and (kind is None or page.kind == kind):
+                return page
+        return None
+
+    def current_viewer(self):
+        from notex.ui.viewer_page import ViewerPage
+        widget = self.currentWidget()
+        return widget if isinstance(widget, ViewerPage) else None
+
+    def viewer_kind_for(self, path: Path) -> str | None:
+        """Welcher Viewer eine Datei öffnet – None = Texteditor. Unbekannte Binärdateien → Hex."""
+        from notex.core import filetype
+        from notex.core.images import is_image
+        if fileops.is_encrypted_path(path):
+            return None
+        if is_image(path) and "image" in self.VIEWERS:
+            return "image"
+        ftype = filetype.detect_file(path)
+        if ftype.key == "pdf" and "pdf" in self.VIEWERS:
+            return "pdf"
+        if ftype.category in ("image",) and "image" in self.VIEWERS and ftype.key in ("png", "jpeg", "gif", "webp", "bmp"):
+            return "image"
+        if ftype.key not in ("text", "empty") and "hex" in self.VIEWERS:
+            return "hex"
+        return None
+
+    def open_viewer(self, path: Path, kind: str):
+        path = Path(path)
+        page = self.viewer_for(path, kind)
+        if page is None:
+            factory = self.VIEWERS.get(kind)
+            if factory is None:
+                return None
+            try:
+                page = factory(path)
+            except OSError as error:
+                QMessageBox.warning(self, "Öffnen fehlgeschlagen", f"{self.relative(path)}\n\n{error}")
+                return None
+            page.status_changed.connect(self.status_changed.emit)
+            index = self.addTab(page, path.name)
+            self.setTabToolTip(index, self.relative(path))
+            self.setTabIcon(index, icon(page.icon_name))
+            self.file_opened.emit(path)
+        self.setCurrentWidget(page)
+        self.status_changed.emit()
+        return page
+
+    def _remove_viewer(self, page) -> None:
+        index = self.indexOf(page)
+        if index >= 0:
+            self.removeTab(index)
+        page.shutdown()
+        page.deleteLater()
+        self.file_closed.emit(page.path)
+        if self.count() == 0:
+            self.tabs_emptied.emit()
 
     def page_for(self, editor: Editor) -> EditorPage | None:
         for page in self.pages():
@@ -180,6 +252,11 @@ class EditorTabs(QTabWidget):
         """`share_from`: zweite Ansicht eines schon offenen Editors (gleiches Dokument, geteilter Editor)."""
         path = Path(path)
         editor = self.editor_for(path)
+        if editor is None and share_from is None:
+            kind = self.viewer_kind_for(path) if path.is_file() else None
+            if kind is not None:
+                self.open_viewer(path, kind)
+                return None
         if editor is None:
             if share_from is not None and share_from.path == path:
                 from notex.core.encoding import TextFile
@@ -210,6 +287,7 @@ class EditorTabs(QTabWidget):
             editor.link_activated.connect(lambda span, e=editor: self.link_activated.emit(e, span))
             editor.completion_requested.connect(lambda kind, text, e=editor: self.completion_requested.emit(e, kind, text))
             editor.context_menu_hook = self.context_menu_hook
+            editor.image_hook = self.image_hook
             if editor.highlighter is not None:
                 editor.highlighter.resolve_link = self.resolve_link
                 editor.highlighter.links_enabled = bool(self.config.get("wiki_links", True))
@@ -277,6 +355,10 @@ class EditorTabs(QTabWidget):
 
     def close_tab(self, index: int) -> bool:
         page = self.widget(index)
+        if page in self.viewers():
+            self._remove_viewer(page)
+            self.status_changed.emit()
+            return True
         if not isinstance(page, EditorPage):
             return False
         return self.remove_page(page, ask=True)
@@ -290,6 +372,9 @@ class EditorTabs(QTabWidget):
         for editor in self.editors():
             if editor.path == path or fileops.is_within(editor.path, path):
                 self._remove(editor)
+        for page in self.viewers():
+            if page.path == path or fileops.is_within(page.path, path):
+                self._remove_viewer(page)
         self.status_changed.emit()
 
     def confirm_close_all(self) -> bool:
@@ -421,6 +506,15 @@ class EditorTabs(QTabWidget):
                 continue
             editor.path = new / rel if editor.path != old else new
             self._refresh_title(editor)
+        for page in self.viewers():
+            try:
+                rel = page.path.relative_to(old)
+            except ValueError:
+                continue
+            page.rename(new / rel if page.path != old else new)
+            index = self.indexOf(page)
+            self.setTabText(index, page.path.name)
+            self.setTabToolTip(index, self.relative(page.path))
 
     def set_font_size(self, size: int, local: bool = False) -> None:
         """Zoom gilt für alle Gruppen des geteilten Editors; `local` nur für den Aufruf aus EditorArea."""
@@ -767,8 +861,16 @@ class EditorTabs(QTabWidget):
         for page in self.pages():
             if page.preview is not None:
                 page.preview.shutdown()
+        for page in self.viewers():
+            page.shutdown()
 
     def open_paths(self) -> list[str]:
-        """Für config.json: relativ innerhalb von data/, absolut für externe Dateien."""
-        return [self.relative(editor.path) if not self.is_external(editor.path) else str(editor.path)
-                for editor in self.editors()]
+        """Für config.json: relativ innerhalb von data/, absolut für externe Dateien – in Tab-Reihenfolge,
+        Editoren und Viewer (Bild/Hex/PDF) gemeinsam."""
+        paths = []
+        for i in range(self.count()):
+            widget = self.widget(i)
+            path = widget.editor.path if isinstance(widget, EditorPage) else getattr(widget, "path", None)
+            if path is not None:
+                paths.append(self.relative(path) if not self.is_external(path) else str(path))
+        return paths

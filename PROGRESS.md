@@ -23,6 +23,7 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 | 1.3.0 | Block C: Versionshistorie, verschlüsselte Notizen `.ntx` | fertig, kein Release (Besitzer) |
 | 1.4.0 | Block D: Vorlagen, Update-Check, Linux-Support | fertig, CI grün (Tests Win+Ubuntu, Builds Win+Linux), kein Release (Besitzer) |
 | 1.5.0 | Block E: Kontextmenü, Nachschlagen (Wikipedia/Wiktionary-Karte, Websuche) | fertig, kein Release (Besitzer) |
+| 1.6.0 | Block F: Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | in Arbeit |
 
 ## Erledigt
 
@@ -109,6 +110,17 @@ wird gestoppt und zusammengefasst, danach geht es ohne Release direkt weiter, we
 - Live-Abgleich mit den Wikimedia-APIs war in der Arbeitsumgebung nicht möglich (Netzrichtlinie sperrt wikipedia.org/
   wiktionary.org); Parser auf die dokumentierten Wikitext-Formate gebaut und mit realistischen Auszügen getestet.
 - Screenshot-Skript: virtueller Full-HD-Bildschirm (offscreen war 800×600 und kürzte Menüs).
+
+### 1.6.0 – Block F (in Arbeit)
+- Baseline Build-Größen (Build-Check-Artefakte v1.4/1.5): Windows-ZIP ≈ 96,2 MB, Linux-tar.gz ≈ 91,4 MB.
+- F6 vorab gemessen: QtPdf+QtPdfWidgets Windows 5,0 MB entpackt / ≈ 2,7 MB in der ZIP, Linux ≈ 5 MB entpackt
+  (QtNetwork ist wegen der Einzelinstanz ohnehin dabei) → unter 25 MB, wird umgesetzt.
+- F1 Bilder: `core/images.py` (asset_name, assets_dir, relative/encodierte Links, image_links inkl. <…>-Links und <img>,
+  plan_assets_move mit Verschieben/Kopieren, find_unused_images, can_embed_images = nie in .ntx), `ui/viewer_page.py`
+  (Basis für Nicht-Editor-Tabs), `ui/image_view.py`, `ui/unused_images_dialog.py`; EditorTabs mit Viewer-Registry,
+  viewer_kind_for (Bild/PDF/Hex nach Endung + Magic), Viewer in open_paths/Umbenennen/Schließen/Split-Verschieben;
+  Editor.image_hook für Ctrl+V/Drop; Config images.assets_folder, extensions_version 4.
+- `core/filetype.py` (aus F4 vorgezogen, weil die Tab-Wahl ihn braucht).
 
 ## Offen
 

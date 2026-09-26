@@ -63,6 +63,9 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "images": {               # Bilder in Notizen (Einfügen per Ctrl+V / Drag & Drop in .md)
+        "assets_folder": "assets",   # Ordner neben der Notiz
+    },
     "lookup": {               # Nachschlagen (Kontextmenü, Ctrl+Alt+W/T/G)
         "online": True,           # Wikipedia/Wiktionary per API abfragen erlaubt
         "language": "auto",       # "auto" (Sprache des Tabs) | "de" | "en"
@@ -94,8 +97,9 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
-                   ".xml", ".html", ".css", ".js", ".sql", ".ntx"],
-    "extensions_version": 3,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
+                   ".xml", ".html", ".css", ".js", ".sql", ".ntx", ".tsv",
+                   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".pdf"],
+    "extensions_version": 4,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
     "syntax_highlighting": True,
     "syntax_extensions": [".py", ".json", ".ini", ".log", ".sh", ".ps1", ".bat", ".yaml", ".yml", ".xml",
                           ".html", ".css", ".js", ".sql", ".md"],
@@ -176,10 +180,11 @@ def migrate(config: dict[str, Any], raw: Any) -> dict[str, Any]:
             if ext not in existing:
                 existing.append(ext)
         config["extensions"] = existing
-    elif isinstance(raw, dict) and "extensions" in raw and raw_version < 3:
-        # v1.3: verschlüsselte Notizen im Baum anzeigen
-        if ".ntx" not in config["extensions"]:
-            config["extensions"] = list(config["extensions"]) + [".ntx"]
+    elif isinstance(raw, dict) and "extensions" in raw and raw_version < 4:
+        # v1.3: verschlüsselte Notizen; v1.6: Bilder, PDF, TSV im Baum anzeigen
+        added = ([".ntx"] if raw_version < 3 else []) + [".tsv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+                                                         ".svg", ".pdf"]
+        config["extensions"] = list(config["extensions"]) + [e for e in added if e not in config["extensions"]]
     config["extensions_version"] = DEFAULTS["extensions_version"]
     return config
 

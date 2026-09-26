@@ -392,6 +392,15 @@ class SettingsDialog(QDialog):
         page.note("Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt. Die Vorschau lädt nie von selbst aus dem "
                   "Internet: externe Bilder erscheinen als „Bild laden“, externe Links öffnen den Browser erst auf Klick.")
 
+        page.section("Bilder")
+        assets_edit = QLineEdit(str(self.config.get("images", {}).get("assets_folder", "assets")))
+        assets_edit.setToolTip("Ordner neben der Notiz, in den eingefügte Bilder gespeichert werden")
+        assets_edit.editingFinished.connect(
+            lambda: self.config.setdefault("images", {}).__setitem__("assets_folder", assets_edit.text().strip() or "assets"))
+        page.row("Bilder-Ordner", assets_edit)
+        page.note("Ctrl+V mit einem Bild oder Bilddateien auf eine .md ziehen legt das Bild in diesem Ordner neben der "
+                  "Notiz ab und fügt ![](…) ein. In verschlüsselte Notizen (.ntx) werden keine Bilder eingefügt.")
+
         page.section("Versionshistorie")
         self.history_box = QCheckBox("Bei jedem Speichern einen Schnappschuss in history/ ablegen")
         self.history_box.toggled.connect(lambda on: self.config.setdefault("history", {}).__setitem__("enabled", on)
