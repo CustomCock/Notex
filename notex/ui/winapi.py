@@ -12,6 +12,18 @@ _DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19
 _DWMWA_CAPTION_COLOR = 35  # erst ab Windows 11
 
 
+def set_app_user_model_id(app_id: str) -> bool:
+    """Eigene AppUserModelID: Windows gruppiert die Fenster in der Taskleiste und zeigt unser Icon
+    statt des Python-Icons. Muss vor dem ersten Fenster gesetzt werden."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        return ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id) == 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def apply_dark_titlebar(window, caption_color: str = "#121212") -> bool:
     """Schaltet die Titelleiste des Fensters auf dunkel. Gibt True bei Erfolg zurück."""
     if sys.platform != "win32":

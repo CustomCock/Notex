@@ -1,10 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- Notex App-Icon: dunkles, abgerundetes Quadrat mit einem Verzeichnisbaum als Strichzeichnung. Monochrom. -->
+  <!-- Notex App-Icon: dunkles, abgerundetes Quadrat, darauf ein "N" als Strichzeichnung mit
+       eingeknicktem Blatt-Eck oben rechts. Monochrom, passend zum Theme. -->
   <rect x="0" y="0" width="256" height="256" rx="56" fill="#1e1e1e"/>
   <g fill="none" stroke="#d6d6d6" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M72 56 V200"/>
-    <path d="M72 92 H184"/>
-    <path d="M72 140 H160"/>
-    <path d="M72 188 H136"/>
+    <path d="M76 196 V60"/>
+    <path d="M76 60 L180 196"/>
+    <path d="M180 196 V60"/>
   </g>
+  <path d="M180 60 h-26 v26 z" fill="#7a8a9e"/>
 </svg>

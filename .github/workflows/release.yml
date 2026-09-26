@@ -32,7 +32,7 @@ jobs:
       - name: ZIP packen
         shell: pwsh
         run: |
-          $name = "Notex-${{ github.ref_name }}-windows-portable.zip"
+          $name = "Notex-${{ github.ref_name }}.zip"
           Compress-Archive -Path dist/Notex -DestinationPath $name
           "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 

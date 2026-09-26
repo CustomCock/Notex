@@ -25,6 +25,7 @@ from notex.core.theme_store import ThemeStore
 from notex.paths import app_root
 from notex.theme.manager import theme_manager
 from notex.core import text_ops as ops
+from notex.ui.about_dialog import AboutDialog
 from notex.ui.settings_dialog import SettingsDialog
 from notex.ui.widgets import IconButton
 
@@ -155,6 +156,8 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self._action("Vergrößern", QKeySequence.StandardKey.ZoomIn, lambda: self.tabs.zoom(+1)))
         view_menu.addAction(self._action("Verkleinern", QKeySequence.StandardKey.ZoomOut, lambda: self.tabs.zoom(-1)))
         view_menu.addAction(self._action("Zoom zurücksetzen", "Ctrl+0", lambda: self.tabs.set_font_size(FONT_SIZE.editor)))
+        help_menu = self.menuBar().addMenu("&Hilfe")
+        help_menu.addAction(self._action(f"Über {APP_NAME}", None, lambda: AboutDialog(self).exec()))
         # Ctrl+Plus liegt je nach Tastatur auf "Ctrl+=" – beides abdecken
         self._action("Vergrößern (Alternative)", "Ctrl+=", lambda: self.tabs.zoom(+1))
 

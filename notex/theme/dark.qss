@@ -647,3 +647,10 @@ QLineEdit#ToolbarSize:hover, QLineEdit#ToolbarSize:focus {
     background: @hover;
     color: @text;
 }
+
+QDialog#AboutDialog {
+    background: @bg;
+}
+QDialog#AboutDialog QLabel {
+    background: transparent;
+}

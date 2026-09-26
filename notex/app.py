@@ -8,14 +8,14 @@ from PySide6.QtCore import QEvent, QLibraryInfo, QLocale, QObject, QTranslator
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QDialog
 
-from notex import APP_NAME
+from notex import APP_ID, APP_NAME, __version__
 from notex.core.config import load_config, save_config
 from notex.paths import config_path, data_dir
 from notex.theme.fonts import load_fonts, ui_font
 from notex.theme.manager import theme_manager
 from notex.theme.theme import load_stylesheet
 from notex.ui.main_window import MainWindow
-from notex.ui.winapi import apply_dark_titlebar
+from notex.ui.winapi import apply_dark_titlebar, set_app_user_model_id
 
 
 class _DarkDialogs(QObject):
@@ -28,8 +28,12 @@ class _DarkDialogs(QObject):
 
 
 def create_app(argv: list[str]) -> QApplication:
+    set_app_user_model_id(APP_ID)   # vor dem ersten Fenster
     app = QApplication(argv)
     app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_NAME)
+    app.setApplicationVersion(__version__)
+    app.setOrganizationName(APP_NAME)
     app.setStyle("Fusion")  # neutraler Basis-Stil, auf dem das QSS sauber aufsetzt
     # Qt-eigene Beschriftungen (OK / Abbrechen in Eingabedialogen) auf Deutsch, falls vorhanden
     translator = QTranslator(app)
