@@ -548,6 +548,32 @@ bzw. Palette „RDAP / ASN abfragen“ (Markierung oder Wert unter dem Cursor, s
 ![RDAP-Karte](docs/60-rdap-card.png)
 
 
+## Netzwerk-Scanner
+
+Modul „Netzwerk-Scanner“ (Standard aus). **Nur für das eigene Netz** – Ziele außerhalb privater Bereiche verlangen
+eine Bestätigung (abschaltbar). Menü Datei → „Netzwerk-Scanner …“, `Ctrl+Shift+Alt+P` oder Palette.
+
+- **Ziele**: einzelne IP, Hostname, CIDR (`192.168.1.0/24`), Bereich (`10.0.0.1-10.0.0.50` oder `10.0.0.1-50`),
+  Liste – gemischt. Obergrenze mit Warnung (Standard 4096), Rückfrage ab 512 Zielen.
+- **Ports**: Profile Top-100 / Top-1000, eigene Listen (`22,80,443` oder `1-1024`), als **eigenes Profil speicherbar**.
+  Timeout und Parallelität einstellbar; optional „Banner lesen“, „Erst Hosts finden“, „auch System-ping“.
+- **Ergebnis**: Tabelle mit Host, Name (Reverse-DNS), MAC (aus der System-ARP-Tabelle), offenen Ports, Dienst (aus
+  dem Modul Port-Infos) und Banner. Live-Fortschritt, jederzeit abbrechbar – die Oberfläche bleibt bedienbar.
+- **Speichern**: JSON plus Markdown-Report in `data/scans/` mit Zeitstempel.
+- **Vergleich**: „Mit Scan vergleichen …“ zeigt neue/verschwundene Hosts, neu geöffnete/geschlossene Ports und
+  geänderte Banner gegenüber einem früheren Scan.
+- **An IP-Übersicht geben**: nutzt das Ergebnis als zusätzliche Quelle für das Modul IP-Konflikte.
+- **Skript-Export**: den konfigurierten Scan als eigenständiges **PowerShell**- (nur .NET-Bordmittel) oder
+  **Bash**-Skript (`/dev/tcp`, `timeout`, `ping`) speichern – gleiche Ziele/Ports, CSV-Ausgabe, mit
+  Ausführungshinweis im Header. Für Rechner ohne Notex.
+
+**Ehrliche Grenzen**: Es ist ein **TCP-Connect-Scan** (voller Handshake, keine Admin-Rechte). Kein SYN-/Stealth-Scan,
+keine Betriebssystem-Erkennung, kein UDP. „Host aktiv?“ ist heuristisch (TCP-Anklopfen, optional `ping`); eine
+Firewall, die alles verwirft, lässt einen Host tot wirken. Offene Ports gelten immer als Beleg, dass der Host lebt.
+
+![Netzwerk-Scanner](docs/61-scanner.png)
+
+
 ## IOCs entschärfen
 
 Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
@@ -900,6 +926,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
 | Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
 | Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
+| Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |

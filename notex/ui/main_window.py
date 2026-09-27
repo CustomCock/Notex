@@ -913,6 +913,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("ports", self._activate_ports)
         self.modules.contribute("ip_conflicts", self._activate_ip_conflicts)
         self.modules.contribute("rdap", self._activate_rdap)
+        self.modules.contribute("scanner", self._activate_scanner)
         self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1625,6 +1626,32 @@ class MainWindow(QMainWindow):
         if self._rdap_client is None:
             self._rdap_client = rdap.Client()          # Sitzungs-Cache für die Laufzeit der App
         RdapDialog(self, self._rdap_client, query or "", editor).show()
+
+    # ---- Modul: Netzwerk-Scanner ----------------------------------------------------------------
+    def _activate_scanner(self):
+        """Scanner nur auf ausdrücklichen Start; öffentliche Ziele verlangen eine Bestätigung."""
+        action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner(),
+                                     self.file_menu)
+        self.registry.add("scan:open", "Netzwerk-Scanner (Hosts und offene Ports im eigenen Netz)",
+                          lambda: self.open_scanner(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+P",
+                          keywords="scan scanner netzwerk port host offen tcp nmap discovery")
+        dialogs_open: list = self._analysis_dialogs.setdefault("scanner", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("scan:open")
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def open_scanner(self) -> None:
+        from notex.ui.scan_dialog import ScanDialog
+        dialog = ScanDialog(self)
+        self._analysis_dialogs.setdefault("scanner", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("scanner", []).remove(d)
+                                if d in self._analysis_dialogs.get("scanner", []) else None)
+        dialog.show()
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
     def _activate_ioc(self):

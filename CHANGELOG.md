@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.11.0] – 2026-09-27
+
+### Hinzugefügt
+- Modul Netzwerk-Scanner (Standard aus, `Ctrl+Shift+Alt+P`): TCP-Connect-Scan im eigenen Netz (asyncio, ohne
+  Admin-Rechte, Windows und Linux gleich), Host-Erkennung (TCP-Anklopfen, optional System-ping), Banner für
+  HTTP/SSH/FTP/SMTP u. a., Reverse-DNS, MAC aus der ARP-Tabelle; Ziele als IP/Hostname/CIDR/Bereich/Liste mit
+  Obergrenze und Bestätigung für öffentliche Ziele; speicherbare Portprofile; Ergebnis als Tabelle, Speichern als
+  JSON + Markdown-Report in data/scans/, Scan-Vergleich, Übergabe an die IP-Übersicht
+- Skript-Export des Scans als eigenständiges PowerShell- und Bash-Skript (nur Bordmittel, CSV-Ausgabe); CI prüft die
+  erzeugten Skripte auf Syntax (bash -n, PowerShell-Parser)
+
 ## [1.10.0] – 2026-09-26
 
 ### Hinzugefügt

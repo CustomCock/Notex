@@ -34,7 +34,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 | 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
 | 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
-| 1.11.0 | Block J: Netzwerk-Scanner | nicht begonnen – angehalten, Rücksprache mit dem Besitzer |
+| 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
+| 1.12.0 | Block K: Log-Auswertung, PCAP | in Arbeit |
 
 ## Erledigt
 
@@ -296,10 +297,23 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   HTTPS) statt Team Cymru (DNS-TXT – bräuchte eine DNS-Bibliothek) oder ipinfo/ipapi (Schlüssel/Limits/Lizenz).
   `ui/rdap_dialog.py` (QThread; beim Schließen wird nicht gewartet, der Thread hängt sich ans Fenster und räumt sich
   weg). Kontextmenü zeigt private IPs ausgegraut mit Grund; .ntx → Rückfrage vor dem Senden.
-- Screenshots 58–60 (IP-Übersicht, Port nachschlagen, RDAP-Karte mit Beispieldaten aus den Tests).
+- Screenshots 58–60 (IP-Übersicht, Port nachschlagen, RDAP-Karte).
+- Screenshot 61 (Netzwerk-Scanner mit Beispieldaten).
 
-### 1.11.0 – Block J (nicht begonnen)
-- Angehalten nach Block I; Blöcke J und K sind offen.
+### 1.11.0 – Block J
+- J1 Scan-Engine `core/scan.py`: asyncio TCP-Connect (Connector injizierbar → Tests ohne Netz), Semaphore für
+  Parallelität, Host-Semaphore begrenzt gleichzeitige Hosts; parse_targets (IP/Name/CIDR/Bereich/Liste, dedupe,
+  Obergrenze), parse_ports (Profile top100/top1000, Listen/Bereiche), Banner (HTTP-Probe + Gruß-Dienste),
+  Host-Erkennung per TCP-Knock, optional System-ping über Executor; ping_alive und parse_arp robust gegen DE/EN und
+  Linux/Windows/macOS. to_dict/load, Markdown-Report, compare (neue/weg, offen/zu, Banner), as_ip_note.
+- **Umgebung: kein ping/arp, TCP nach außen wird vom Agent-Proxy abgefangen** → alle Netzpfade injizierbar, Tests
+  nutzen Fake-Reader/Writer; im Smoke-Test asyncio.open_connection gepatcht.
+- J2 UI `ui/scan_dialog.py`: ScanThread(QThread) trägt asyncio.run, Signale host_found/progress/finished/failed;
+  Tabelle live, Abbrechen, Speichern (JSON+MD in data/scans/), Vergleich, „An IP-Übersicht geben“
+  (ip_index.extra["scan"]), Skript-Export-Dialog. Bestätigung bei öffentlichen Zielen (merkbar „nicht mehr fragen“).
+- J3 `core/scan_export.py`: PowerShell (TcpClient, ExecutionPolicy-Hinweis) und Bash (/dev/tcp, timeout, ping),
+  gleiche Ziele/Ports, CSV. Test: bash -n immer, PowerShell-Parser wenn pwsh da (auf CI-Ubuntu/Windows vorhanden).
+- Keine neue Python-Abhängigkeit (nur Standardbibliothek) → Build unverändert.
 
 ## Offen
 

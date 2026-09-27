@@ -113,6 +113,16 @@ DEFAULTS: dict[str, Any] = {
         "network": "",
         "exclusions": "",
     },
+    "scan": {                 # Modul Netzwerk-Scanner: letzte Eingaben und eigene Portprofile
+        "last_target": "",
+        "timeout": 1.0,
+        "concurrency": 200,
+        "grab_banner": True,
+        "discover": True,
+        "use_ping": False,
+        "confirm_public": True,   # Rückfrage bei Zielen außerhalb privater Bereiche
+        "profiles": {},
+    },
     "timeline": {             # Modul Zeitleiste: zuletzt benutzte Zeitleiste, Zeitanzeige (utc | local | original)
         "last": "",
         "mode": "utc",

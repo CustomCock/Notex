@@ -768,7 +768,40 @@ def main() -> int:
 
             def rdap_shot():
                 client = rdap.Client(FakeNet(ROUTES), lambda _s: None)
-                dialog_shot(RdapDialog(window, client, "8.8.8.8"), "60-rdap-card", finish)
+                dialog_shot(RdapDialog(window, client, "8.8.8.8"), "60-rdap-card", scanner_shot)
+
+            def scanner_shot():
+                from test_scan import FakeReader, FakeWriter
+                from notex.core import scan as scanmod
+                from notex.ui.scan_dialog import ScanDialog
+                ports = {"192.168.1.5": {80: b"HTTP/1.1 200 OK\r\nServer: nginx/1.25\r\n\r\n<title>NAS</title>",
+                                         22: b"SSH-2.0-OpenSSH_9.6\r\n", 445: b""},
+                         "192.168.1.7": {3389: b""},
+                         "192.168.1.20": {80: b"HTTP/1.1 200 OK\r\nServer: lighttpd\r\n\r\n"}}
+
+                async def fake(ip, port, **k):
+                    table = ports.get(ip, {})
+                    if port not in table:
+                        raise ConnectionRefusedError()
+                    return FakeReader(table[port]), FakeWriter()
+                scanmod.asyncio.open_connection = fake
+                scanmod.arp_table = lambda runner=None: {"192.168.1.5": "AA:BB:CC:00:11:22",
+                                                         "192.168.1.7": "DE:AD:BE:EF:00:07"}
+                window.modules.set_enabled("scanner", True)
+                dialog = ScanDialog(window)
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+                dialog.target.setText("192.168.1.0/24")
+                dialog.ports.setEnabled(True)
+                dialog.ports.setText("22,80,443,445,3389")
+                dialog.profile.setCurrentIndex(2)
+                dialog.start()
+
+                def grab():
+                    compose(window, dialog, "61-scanner", window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    finish()
+                later_rel(6000, grab)
             ip_shot()
 
         def finish():
