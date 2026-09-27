@@ -41,6 +41,10 @@ _LEVEL_RE = re.compile(r"(?<![A-Za-z])(?P<lvl>" + _LEVEL_WORDS + r")(?![A-Za-z])
 _BRACKET_SRC = re.compile(r"\[(?P<src>[^\]\[]{1,48})\]")
 _PROG_SRC = re.compile(r"(?P<src>[\w.\-/]{1,48})\[\d+\]")   # prog[pid], auch nach einem Hostnamen (syslog)
 _LEADING_SRC = re.compile(r"^(?P<src>[A-Za-z][\w.\-]{1,40}):\s")
+# Für die Nachrichten-Bereinigung: führende Stufe bzw. führende Komponente abtrennen.
+_LEAD_LEVEL_RE = re.compile(r"^\s*\[?(?:" + _LEVEL_WORDS + r")\]?\s*[:,\-|)\]]*\s*", re.IGNORECASE)
+_LEAD_BRACKET_RE = re.compile(r"^\s*\[[^\]]*\]\s*")
+_LEAD_COMPONENT_RE = re.compile(r"^(?P<src>[A-Za-z][\w.\-]{1,20})(?:\s{2,}|:\s+)")
 
 # Verdichtung: Zahlen, Hex, IPs, UUIDs, Pfade, Anführungszeichen → Platzhalter, um ähnliche Meldungen zu gruppieren.
 _UUID = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
@@ -116,8 +120,19 @@ def parse_line(line: str, number: int = -1, year: int | None = None) -> GenericE
     rest = rest.strip(" \t-:,|")
     level = detect_level(rest if ts else raw)
     source = detect_source(rest)
-    message = rest.strip()
-    return GenericEvent(when, level, source, message, number, raw)
+    message = rest
+    # Nachricht aufräumen: führende [Quelle], Stufe und kurze Komponente abtrennen, damit die Spalten sauber sind.
+    if source and message.lstrip().startswith("["):
+        message = _LEAD_BRACKET_RE.sub("", message, count=1)
+    m = _LEAD_LEVEL_RE.match(message)
+    if m and m.end() < len(message):
+        message = message[m.end():]
+    if not source:
+        cm = _LEAD_COMPONENT_RE.match(message)
+        if cm:
+            source = cm.group("src")
+            message = message[cm.end():]
+    return GenericEvent(when, level, source, message.strip(), number, raw)
 
 
 def _open_text(path: Path):

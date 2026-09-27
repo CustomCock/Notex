@@ -2,6 +2,34 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.13.0] – 2026-09-27
+
+### Hinzugefügt
+- Menü **Werkzeuge** in der Menüleiste (nach „Bearbeiten“) mit Kategorien (Dateianalyse, Netzwerk, Logs & Vorfälle,
+  Text & Daten, Dokumentation) als Untermenüs; nicht passende Werkzeuge sind ausgegraut (Tooltip erklärt warum),
+  abgeschaltete Module erscheinen nicht. **Werkzeug-Übersicht** (`Ctrl+Shift+W`, auch in der Palette) als
+  durchsuchbarer Katalog mit „Starten“/„Aktivieren“. „Werkzeuge“-Button in der Blatt-Leiste und Untermenü im
+  Baum-Kontextmenü (jeweils nur passende Werkzeuge). Alles aus einer zentralen Registry (`notex/core/tools.py`)
+- **Explorer-Baum mit Orten**: Leiste über dem Datei-Baum mit „Notizen“ (data/), „Schnellzugriff“ (angeheftete
+  Ordner) und „Dieser PC“ (persönlicher Ordner + Laufwerke/Wurzeln, plattformabhängig). Ein Klick schaltet den Baum
+  auf den Ort um; versteckte Dateien per Kontextmenü einblendbar; außerhalb des Notiz-Ordners wird vor Schreibzugriffen
+  gewarnt, in Systemordnern besonders deutlich; Ordner per Kontextmenü anheften. Palette-Befehle für Notizen/Dieser
+  PC/verstecken/anheften
+- **Neue Datei nach Typ**: Text, Markdown, CSV, JSON, YAML, HTML, Python, Shell, INI mit passendem Startinhalt und
+  wählbarem Zeilenende (LF/CRLF, gemerkt); im Datei-Menü, im Baum-Kontextmenü und je Typ in der Palette
+- **Export als PDF und HTML** (Datei › Exportieren, auch in der Palette): Markdown wird gerendert, CSV als Tabelle,
+  sonst als Text; Variablen (`§name`) werden aufgelöst. PDF mit seitenweiser Kopf- (Logo, Titel, Autor/Datum) und
+  Fußzeile (Seite X von Y); HTML als eigenständiges Dokument mit eingebettetem Logo und Druck-CSS. Klartext
+  verschlüsselter Notizen (.ntx) nur nach Rückfrage
+- **Allgemeine Log-Auswertung** für beliebige Logs (setupact.log, dpkg/apt, pip, Nginx/Apache, App- und Dienst-Logs,
+  MailStore u. a.): Stufen-Verteilung (ERROR/WARN/INFO/DEBUG, deutsch und englisch), Fehler/Warnungen, häufigste
+  Meldungen zu Mustern verdichtet, aktivste Quellen, Zeitspanne und Stunden-Zeitleiste; Filter, Tabelle, Report.
+  Die Log-Auswertung wählt automatisch zwischen Sicherheits-Dashboard (Anmelde-Logs) und allgemeiner Auswertung
+
+### Geändert
+- Neues **App-Icon** (helles Notizblatt mit Terminal-Prompt `>_` im Akzent) – vereint Editor- und Werkzeug-Charakter
+- Analyse-, Netzwerk- und Log-Werkzeuge stehen nicht mehr doppelt im Datei-Menü; ihre Tastenkürzel bleiben erhalten
+
 ## [1.12.1] – 2026-09-27
 
 ### Behoben

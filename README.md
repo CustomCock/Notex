@@ -218,6 +218,34 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 ![Bild-Tab](docs/38-image-tab.png)
 
 
+## Werkzeuge, Explorer und Export
+
+| Explorer mit Orten | Werkzeug-Übersicht | Allgemeine Log-Auswertung |
+|---|---|---|
+| ![Explorer mit Orten](docs/65-explorer-orte.png) | ![Werkzeug-Übersicht](docs/64-werkzeuge.png) | ![Allgemeine Log-Auswertung](docs/66-log-allgemein.png) |
+
+**Menü „Werkzeuge“** (neben „Bearbeiten“) sammelt alle Werkzeuge nach Kategorie: Dateianalyse, Netzwerk,
+Logs & Vorfälle, Text & Daten, Dokumentation. Werkzeuge, die nicht zur aktuellen Datei passen, sind ausgegraut
+(der Tooltip erklärt warum); Werkzeuge abgeschalteter Module erscheinen gar nicht. Die **Werkzeug-Übersicht**
+(`Ctrl+Shift+W`, auch in der Palette) ist ein durchsuchbarer Katalog mit Kurzbeschreibung, Kürzel und Modul-Status –
+je Kachel „Starten“ oder, wenn das Modul aus ist, „Aktivieren“. In der Blatt-Leiste gibt es einen „Werkzeuge“-Button
+und im Datei-Baum ein Kontextmenü „Werkzeuge“ (jeweils nur die passenden).
+
+**Explorer mit Orten:** Über dem Datei-Baum stehen drei Orte. **Notizen** ist der Datenordner (`data/`).
+**Schnellzugriff** sind selbst angeheftete Ordner (Rechtsklick auf einen Ordner → „An Schnellzugriff anheften“).
+**Dieser PC** zeigt den persönlichen Ordner und die Laufwerke/Wurzeln – so lassen sich beliebige Dateien auf dem
+Rechner öffnen und mit den Werkzeugen untersuchen. Ein Klick auf einen Ort schaltet den Baum um. Versteckte Dateien
+blendet das Kontextmenü ein. Außerhalb des Notiz-Ordners warnt Notex vor Schreibzugriffen, in Systemordnern besonders
+deutlich – gelesen wird nie automatisch.
+
+**Neue Datei nach Typ** (Menü Datei bzw. Baum-Kontextmenü, je Typ auch in der Palette) legt Text, Markdown, CSV, JSON,
+YAML, HTML, Python, Shell oder INI mit passendem Startinhalt an; das Zeilenende (LF/CRLF) ist wählbar und wird gemerkt.
+
+**Export** (Datei → Exportieren, auch in der Palette) schreibt die aktuelle Notiz als **PDF** oder **HTML**. Markdown
+wird gerendert, CSV als Tabelle, sonst als Text; Variablen (`§name`) werden aufgelöst. Das PDF bekommt je Seite eine
+Kopfzeile (Logo, Titel, Autor/Datum) und eine Fußzeile (Seite X von Y), das HTML ist ein eigenständiges Dokument mit
+eingebettetem Logo. Der Klartext einer verschlüsselten Notiz (.ntx) wird nur nach ausdrücklicher Rückfrage exportiert.
+
 ## Module
 
 Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der Command Palette) schaltet Funktionen
@@ -944,6 +972,9 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
 | Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Ctrl+Shift+W | Werkzeug-Übersicht (durchsuchbarer Katalog aller Werkzeuge) |
+| Datei › Neue Datei nach Typ | Text/Markdown/CSV/JSON/YAML/HTML/Python/Shell/INI mit Startinhalt und Zeilenende (auch je Typ in der Palette) |
+| Datei › Exportieren | Aktuelle Notiz als PDF oder HTML (Variablen aufgelöst; .ntx nur nach Rückfrage; auch in der Palette) |
 | Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
 | Ctrl+Shift+L | Alle verschlüsselten Notizen sperren |
@@ -975,7 +1006,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
 | Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
 | Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
-| Ctrl+Shift+Alt+L | Log-Auswertung (Modul Log-Auswertung) |
+| Ctrl+Shift+Alt+L | Log-Auswertung – beliebige Logs (Stufen/Fehler/Muster) oder Anmelde-Logs/.evtx (Modul Log-Auswertung) |
 | Ctrl+Shift+Alt+K | PCAP-Übersicht (Modul PCAP-Übersicht) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
