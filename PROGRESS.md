@@ -331,6 +331,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   pcaps (dpkt.pcap.Writer). `ui/pcap_dialog.py` (sortierbare Tabellen, Zugangsdaten rot, RDAP je IP).
   ANALYSIS_MODULES um logs/pcap erweitert → Baum zeigt .evtx/.pcap, solange das Modul an ist.
 - Screenshots 62–63 (Log-Auswertung, PCAP-Übersicht).
+- Build-Größe nach K (Build-Check-Artefakte, commit c8b5445): Windows ≈ 104,3 MB, Linux ≈ 101,8 MB (vorher nach H ≈ 99,9 / 96,7 MB; + evtx-Rust-Wheel und dpkt). CI Tests + Build-Check grün auf Win+Linux.
+- Fix: dpkt fehlte zunächst in requirements.txt (nur in build.py/CI/Lizenzen) → Build-Check rot; mit c8b5445 ergänzt, danach grün.
 
 ## Offen
 
