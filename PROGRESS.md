@@ -38,6 +38,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.12.0 | Block K: Log-Auswertung, PCAP | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.12.1 | Block L: Fehlerbehebung (Scanner, Encoding-Menü, JPEG-Metadaten, PCAP-Auswertung) | fertig, Tests grün, lokal getaggt |
 | 1.13.0 | Block M: Werkzeuge-Menü, Explorer-Orte, Neu nach Typ, App-Icon, PDF/HTML-Export, allgemeine Log-Auswertung | fertig, Tests grün, lokal getaggt |
+| 1.14.0 | Block Q: Analyse per Rechtsklick (Typ-Erkennung, Karte, Netz-/Hash-/Umwandeln-Aktionen) | fertig, Tests grün, lokal getaggt |
 
 ## Erledigt
 
@@ -386,6 +387,29 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Neue Qt-freie Tests: `test_tools`, `test_places`, `test_newfile`, `test_export`, `test_loggeneric` und Ergänzungen
   in `test_logauth`. Keine neuen Abhängigkeiten (QtPdf war ab Block F im Build). Alle Tests grün (offscreen).
 
+### 1.14.0 – Block Q
+- Q1 Erkennung: `core/detect.py` (Qt-frei) – `analyze(text)` liefert alle plausiblen Typen mit Konfidenz
+  (IPv4/IPv6/CIDR/MAC/Domain/URL/E-Mail/Port, Hashes nach Länge+Präfix, Base64/Base32/Hex-Blob, JWT, Unix-Zeit,
+  ISO-Datum, Zahl, Hex-Farbe, CVE, ATT&CK, User-Agent). Bewusst konservativ (Satz != Base64, Jahr != Port,
+  gültige Oktette). `token_at` für „nichts markiert". 16 Tests.
+- Q2 Menü: `ui/analyze_actions.py::AnalyzeController.menu_provider` hängt die Gruppe „Analysieren" ins Editor-
+  Kontextmenü (über `_editor_menu_providers`), nur passende Aktionen, modul-gated (sonst „… – Modul aktivieren"),
+  „Erkennen …" + Palette-Befehle `analyze:*`.
+- Q3 Netzwerk: DNS (socket A/AAAA/PTR – MX/TXT bräuchten eine DNS-Lib, nicht im Build), Ping/Ports über `core/scan`,
+  Port-Info über `core/ports`; RDAP/IP-Übersicht/Scanner rufen die vorhandenen Fenster. Alles im Worker-Thread.
+- Q4 Hash-Info: `core/hashlookup.py` (Qt-frei, Netz injizierbar) – **Nitrxgen MD5-Datenbank** (frei, ohne Schlüssel).
+  **Entscheidung:** nur MD5 hat einen freien, schlüssellosen Klartext-Dienst → SHA-1/256/NTLM-Knopf deaktiviert mit
+  Begründung; gesalzene Formate ebenso. Datenschutz-Rückfrage, Einstellung `analysis.hash_online` (Settings-Seite
+  „Analyse"), .ntx sperrt den Lookup. „Hash dieses Worts bilden" lokal (NTLM = MD4(UTF-16LE), eigenes MD4 in
+  `core/convert.py`, da OpenSSL 3 oft kein md4 hat). Hash klar von Verschlüsselung getrennt (UI + Doku). Keine
+  Wortlisten/Rainbow-Tables (Begründung in der Doku).
+- Q5 Umwandeln: `core/convert.py` (Qt-frei) – Base64/Base32/Hex/URL, JWT (Signatur ungeprüft), Zeitstempel, Zahl in
+  Basen, Hex-Farbe, User-Agent. Ergebnisse in der Karte (`ui/analysis_card.py`, Popover, wiederverwendbar), „Als Notiz
+  einfügen".
+- Q6 Doku: README-Abschnitt „Analyse per Rechtsklick" (Tabelle Typ→Aktionen, Hash≠Verschlüsselung), CHANGELOG,
+  THIRD_PARTY_LICENSES (Online-Dienste inkl. Nitrxgen). Screenshot 67.
+- Neue Qt-freie Tests: `test_detect` (16), `test_convert` (10), `test_hashlookup` (9). Keine neuen Abhängigkeiten.
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -451,9 +475,8 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Blöcke F–K, L und M (1.13.0) fertig.** Neuer Plan des Besitzers (27.09.2026): **Q → N → O**, danach Abschluss.
-- **Q (1.14.0)** Kontextmenü-Analyse für markierten Text (Erkennung von IP/Hash/Base64/JWT/… + Aktionen in einer Karte;
-  Hash-Info mit Online-Lookup, sauber getrennt von Verschlüsselung).
+**Blöcke F–K, L, M (1.13.0) und Q (1.14.0) fertig.** Plan des Besitzers (27.09.2026): **Q → N → O**, danach Abschluss.
+- **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.
 - **N (1.15.0)** eigener IP-/Netzwerk-Scanner als Ersatz für „Advanced IP Scanner“ (OUI-Liste NICHT aus Wiresharks
   manuf/GPL); Erkennungs-/Netzwerklogik mit Block Q geteilt.
 - **O (1.16.0)** Formatierte Bearbeitung (WYSIWYG-Markdown) + Fragebögen/Vorlagen (Berichtsheft, Systemcheck,

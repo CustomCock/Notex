@@ -246,6 +246,37 @@ wird gerendert, CSV als Tabelle, sonst als Text; Variablen (`§name`) werden auf
 Kopfzeile (Logo, Titel, Autor/Datum) und eine Fußzeile (Seite X von Y), das HTML ist ein eigenständiges Dokument mit
 eingebettetem Logo. Der Klartext einer verschlüsselten Notiz (.ntx) wird nur nach ausdrücklicher Rückfrage exportiert.
 
+## Analyse per Rechtsklick
+
+Text markieren (oder mit dem Cursor auf einem Wort stehen) und rechtsklicken → Gruppe **Analysieren**. Notex erkennt
+den Typ der Markierung und bietet nur die passenden Aktionen; das Ergebnis erscheint in einer kompakten Karte neben
+der Markierung. Dieselben Aktionen stehen auch in der Command Palette („Analysieren: …“). Aktionen abgeschalteter
+Module erscheinen als „… – Modul aktivieren“.
+
+![Analyse per Rechtsklick](docs/67-analyse.png)
+
+| Erkannter Typ | Aktionen |
+|---|---|
+| IPv4 / IPv6 / Domain | DNS auflösen (A/AAAA/PTR), Ping, gängige Ports prüfen, Port nachschlagen, RDAP/ASN, in IP-Übersicht/Scanner öffnen |
+| CIDR (z. B. `10.0.0.0/24`) | im Netzwerk-Scanner öffnen |
+| Port (`443/tcp`, `host:443`) | Port nachschlagen (IANA + gängige Dienste, offline) |
+| Hash (MD5/SHA-1/256/512, NTLM, bcrypt/argon2/…) | **Hash-Info**: Typ erkennen, Online-Lookup (nur ungesalzen) |
+| Base64 / Base32 / Hex / URL | dekodieren (Binärergebnis als Hex) |
+| JWT | Header/Payload als JSON, Zeiten lesbar (Signatur **nicht** geprüft) |
+| Unix-Zeit / ISO-Datum | Zeitstempel ↔ Datum (UTC + lokal) |
+| Zahl (dez/hex/bin) | in allen Basen + Bit-Ansicht |
+| Hex-Farbe (`#1e1e1e`) | Farbvorschau + RGB |
+| CVE-ID | im Browser bei der NVD nachschlagen |
+| User-Agent | in Browser / System / Gerät zerlegen |
+| jedes Wort | „Hash dieses Worts bilden“ (MD5/SHA-1/SHA-256/NTLM, lokal) |
+
+**Hash ist nicht Verschlüsselung.** Ein Hash ist eine Einwegfunktion – er lässt sich nicht „entschlüsseln“. „Hash-Info“
+schlägt einen Hash höchstens in einer öffentlichen Datenbank nach (ob der Klartext eines bekannten Passworts vorliegt).
+Das geht nur bei **ungesalzenen** Hashes; gesalzene Formate (bcrypt, argon2, sha512crypt …) sind sinnlos abzufragen und
+der Knopf bleibt deaktiviert. Der Online-Lookup ist standardmäßig aus (Einstellungen → **Analyse**), fragt vor dem
+ersten Senden nach und ist aus verschlüsselten Notizen (.ntx) gesperrt. Bewusst **keine** mitgelieferte Wortliste und
+**keine** Rainbow-Tables – Offline-Cracking ist Aufgabe eigener Werkzeuge wie hashcat oder John the Ripper.
+
 ## Module
 
 Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der Command Palette) schaltet Funktionen

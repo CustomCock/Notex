@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.14.0] – 2026-09-27
+
+### Hinzugefügt
+- **Analyse per Rechtsklick** (Block Q): Text markieren → Kontextmenü **Analysieren**. Notex erkennt den Typ
+  (IPv4/IPv6/CIDR/MAC, Domain/URL/E-Mail, Port, Hash, Base64/Base32/Hex, JWT, Unix-Zeit, ISO-Datum, Zahl, Hex-Farbe,
+  CVE, ATT&CK-ID, User-Agent – Mehrdeutigkeit erlaubt) und bietet passende Aktionen; das Ergebnis erscheint in einer
+  kompakten Karte neben der Markierung, nicht in großen Dialogen. Dieselben Aktionen gibt es in der Command Palette.
+  Nicht passende oder abgeschaltete Module erscheinen als „… – Modul aktivieren".
+- **Netzwerk-Aktionen** auf markiertem Text: DNS auflösen (A/AAAA/PTR), Ping, gängige Ports prüfen (Modul-frei über
+  die Scan-Engine), Port nachschlagen, RDAP/ASN, „In IP-Übersicht/Netzwerk-Scanner öffnen" – alles im Hintergrund,
+  private/reservierte Adressen bei RDAP abgefangen.
+- **Hash-Info**: erkannte Hash-Typen mit Konfidenz (Länge/Zeichensatz/Präfix erklärt), ein Button „Online-Lookup"
+  mit Ergebniszeile darunter. Nur ungesalzene Hashes (MD5 über die Nitrxgen-Datenbank); gesalzene Formate
+  (bcrypt/argon2/sha512crypt) sind deaktiviert mit Begründung. Datenschutz-Rückfrage vor dem ersten Senden,
+  Einstellung unter „Analyse"; aus verschlüsselten Notizen (.ntx) gesperrt. Zusätzlich „Hash dieses Worts bilden"
+  (MD5/SHA-1/SHA-256/NTLM, lokal). **Ein Hash ist eine Einwegfunktion, keine Verschlüsselung** – Notex „entschlüsselt"
+  nichts und bringt bewusst keine Wortlisten/Rainbow-Tables mit (dafür gibt es hashcat/John the Ripper).
+- **Umwandeln** in der Karte: Base64/Base32/Hex/URL dekodieren, JWT zerlegen (Signatur ungeprüft), Unix-Zeit ↔ Datum,
+  Zahl in Basen + Bits, Hex-Farbvorschau, User-Agent zerlegen, CVE im Browser nachschlagen. Jedes Ergebnis lässt sich
+  „Als Notiz einfügen".
+
 ## [1.13.0] – 2026-09-27
 
 ### Hinzugefügt

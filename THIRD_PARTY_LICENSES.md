@@ -51,3 +51,8 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 - **SF Pro** wird nie mitgeliefert (Apple-Lizenz). Eigene Schriften in `fonts/user/` liegen in
   der Verantwortung des Nutzers.
 - **LanguageTool** wird nicht gebündelt, sondern optional über HTTP angesprochen.
+- **Online-Dienste (nur auf Nutzeraktion):** RDAP/RIPEstat (Netz-/ASN-Infos), Wikipedia/Wiktionary (Nachschlagen)
+  und – für die Hash-Info – die **Nitrxgen MD5-Datenbank** (https://www.nitrxgen.net/md5db/, frei nutzbar ohne
+  Schlüssel). Diese Dienste werden nicht gebündelt, sondern nur abgefragt, wenn der Nutzer die Aktion ausdrücklich
+  auslöst; der Hash-Online-Lookup ist standardmäßig aus und fragt vor dem ersten Senden nach. Es werden nur
+  ungesalzene Hashes abgefragt; aus verschlüsselten Notizen (.ntx) findet kein Lookup statt.
