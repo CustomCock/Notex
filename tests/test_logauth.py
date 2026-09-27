@@ -106,3 +106,25 @@ def test_read_evtx_library_path(tmp_path: Path) -> None:
     fake.write_bytes(b"not an evtx file")
     with pytest.raises(Exception):
         list(la.read_evtx(fake))
+
+
+def test_looks_like_auth_detects_sshd(tmp_path):
+    from notex.core import logauth
+    p = tmp_path / "auth.log"
+    p.write_text(
+        "Sep 27 04:03:11 host sshd[111]: Failed password for root from 10.0.0.9 port 22 ssh2\n"
+        "Sep 27 04:03:14 host sshd[112]: Failed password for admin from 10.0.0.9 port 22 ssh2\n"
+        "Sep 27 04:03:20 host sshd[113]: Accepted password for user from 10.0.0.9 port 22 ssh2\n"
+    )
+    assert logauth.looks_like_auth(p) is True
+
+
+def test_looks_like_auth_false_for_generic(tmp_path):
+    from notex.core import logauth
+    p = tmp_path / "setupact.log"
+    p.write_text(
+        "2016-07-16 12:00:00, Info                  SP     Executing action\n"
+        "2016-07-16 12:00:01, Warning               SP     Missing component\n"
+        "2016-07-16 12:00:02, Error                 SP     Failed to copy file\n"
+    )
+    assert logauth.looks_like_auth(p) is False

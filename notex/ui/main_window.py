@@ -1699,9 +1699,13 @@ class MainWindow(QMainWindow):
     # ---- Modul: Log-Auswertung -------------------------------------------------------------------
     def _activate_logs(self):
         action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log())
-        self.registry.add("logs:open", "Log-Auswertung (auth.log, secure, .evtx)", lambda: self.analyze_log(),
+        self.registry.add("logs:open", "Log-Auswertung (beliebige Logs, auth.log, .evtx)", lambda: self.analyze_log(),
                           category="Sicherheit", shortcut="Ctrl+Shift+Alt+L",
-                          keywords="log auth secure evtx anmeldung login brute force ereignis windows linux")
+                          keywords="log auth secure evtx setupact anmeldung login brute force ereignis windows linux "
+                                   "fehler warnung error warning allgemein app dienst mailstore")
+        self.registry.add("logs:generic", "Log-Auswertung: allgemein (Stufen, Fehler, Muster)",
+                          lambda: self.analyze_log(mode="generic"), category="Sicherheit",
+                          keywords="log allgemein generisch stufen fehler warnung muster app dienst setupact")
 
         def tree_entry(menu, path: Path) -> None:
             if self._is_log_file(path):
@@ -1722,19 +1726,27 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _is_log_file(path: Path) -> bool:
         name = path.name.lower()
-        return (name.endswith(".evtx") or name.endswith(".log") or name.endswith(".log.gz")
-                or "auth" in name or "secure" in name or name.endswith(".gz"))
+        return (name.endswith((".evtx", ".log", ".log.gz", ".gz", ".out", ".trace", ".journal"))
+                or "log" in name or "auth" in name or "secure" in name or name in ("syslog", "messages", "dmesg"))
 
-    def analyze_log(self, path: Path | None = None) -> None:
+    def analyze_log(self, path: Path | None = None, mode: str = "auto") -> None:
         from notex.core import logauth
         from notex.ui.logauth_dialog import LogAuthDialog
+        from notex.ui.loggeneric_dialog import GenericLogDialog
         target = self._analysis_target(path)
         if target is None:
             return
         if target.suffix.lower() == ".evtx" and not logauth.evtx_available():
             self.toast.show_message("Für .evtx fehlt das Paket „evtx“ in diesem Build", "info")
             return
-        dialog = LogAuthDialog(self, target)
+        # Auto: Anmelde-/Sicherheits-Logs bekommen das Sicherheits-Dashboard, alles andere die allgemeine Auswertung.
+        if mode == "generic":
+            use_auth = False
+        elif mode == "auth":
+            use_auth = True
+        else:
+            use_auth = logauth.looks_like_auth(target)
+        dialog = LogAuthDialog(self, target) if use_auth else GenericLogDialog(self, target)
         self._analysis_dialogs.setdefault("logs", []).append(dialog)
         dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("logs", []).remove(d)
                                 if d in self._analysis_dialogs.get("logs", []) else None)

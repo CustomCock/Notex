@@ -266,6 +266,34 @@ def read_any(path: Path, **kwargs) -> Iterator[LogEvent]:
     return read_auth_log(path, **kwargs)
 
 
+def looks_like_auth(path: Path, max_lines: int = 400, min_events: int = 3) -> bool:
+    """Grobe Prüfung, ob eine Textdatei ein Anmelde-/Sicherheits-Log ist (auth.log/secure-Stil).
+
+    Zählt in den ersten `max_lines` Zeilen erkannte Auth-Ereignisse. `.evtx` gilt immer als Auth-Log.
+    So kann die Oberfläche automatisch zwischen Sicherheits-Dashboard und allgemeiner Auswertung wählen.
+    """
+    path = Path(path)
+    if path.suffix.lower() == ".evtx":
+        return True
+    name = path.name.lower()
+    hits = 0
+    try:
+        with _open_text(path) as handle:
+            for number, line in enumerate(handle):
+                if number >= max_lines:
+                    break
+                if parse_auth_line(line, str(path), number) is not None:
+                    hits += 1
+                    if hits >= min_events:
+                        return True
+    except OSError:
+        return False
+    # Bei sehr kurzen Dateien mit passendem Namen milder urteilen
+    if hits >= 1 and ("auth" in name or "secure" in name):
+        return True
+    return False
+
+
 def collect(path: Path, limit: int = MAX_EVENTS, **kwargs) -> tuple[list[LogEvent], bool]:
     events: list[LogEvent] = []
     for event in read_any(path, **kwargs):
