@@ -800,8 +800,53 @@ def main() -> int:
                 def grab():
                     compose(window, dialog, "61-scanner", window.mapFromGlobal(dialog.geometry().topLeft()))
                     dialog.close()
-                    finish()
+                    logs_shot()
                 later_rel(6000, grab)
+
+            def logs_shot():
+                from notex.ui.logauth_dialog import LogAuthDialog
+                log = files / "auth.log"
+                rows = []
+                for i in range(6):
+                    rows.append(f"Sep 27 04:0{i}:11 web sshd[10{i}]: Failed password for root from 203.0.113.5 "
+                                f"port 5{i}234 ssh2")
+                rows.append("Sep 27 04:07:00 web sshd[120]: Accepted password for root from 203.0.113.5 port 55250 ssh2")
+                rows.append("Sep 27 04:08:00 web useradd[2000]: new user: name=hacker, UID=0, GID=0, home=/root, "
+                            "shell=/bin/bash")
+                rows.append("Sep 27 04:08:05 web usermod[2001]: add 'hacker' to group 'sudo'")
+                rows.append("Sep 27 05:00:00 web sudo:    bob : TTY=pts/0 ; USER=root ; COMMAND=/bin/cat /etc/shadow")
+                log.write_text("\n".join(rows) + "\n", encoding="utf-8")
+                window.modules.set_enabled("logs", True)
+                dialog = LogAuthDialog(window, log)
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+
+                def grab():
+                    compose(window, dialog, "62-logauth", window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    pcap_shot()
+                later_rel(1200, grab)
+
+            def pcap_shot():
+                from test_pcapinfo import eth, tcp, udp, dns_query, client_hello, write_pcap
+                from notex.ui.pcap_dialog import PcapDialog
+                http = (b"GET /admin HTTP/1.1\r\nHost: intranet.example.com\r\nUser-Agent: Mozilla/5.0\r\n"
+                        b"Authorization: Basic YWRtaW46dG9vcg==\r\n\r\n")
+                pkts = [eth("10.0.0.10", "8.8.8.8", udp(50000, 53, dns_query("intranet.example.com"))),
+                        eth("10.0.0.10", "93.184.216.34", tcp(50001, 80, http)),
+                        eth("10.0.0.10", "1.1.1.1", tcp(50002, 443, client_hello("bank.example.com"))),
+                        eth("10.0.0.10", "192.168.1.9", tcp(50003, 21, b"USER root\r\nPASS toor\r\n"))]
+                write_pcap(files / "mitschnitt.pcap", pkts)
+                window.modules.set_enabled("pcap", True)
+                dialog = PcapDialog(window, files / "mitschnitt.pcap")
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+
+                def grab():
+                    compose(window, dialog, "63-pcap", window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    finish()
+                later_rel(1200, grab)
             ip_shot()
 
         def finish():

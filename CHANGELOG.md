@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [1.12.0] – unveröffentlicht
+## [1.12.0] – 2026-09-27
 
 ### Hinzugefügt
 - Modul Log-Auswertung (Standard aus, `Ctrl+Shift+Alt+L`): auth.log/secure (auch rotierte .gz) und Windows-.evtx

@@ -35,7 +35,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
 | 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
-| 1.12.0 | Block K: Log-Auswertung, PCAP | in Arbeit (K1+K2 fertig) |
+| 1.12.0 | Block K: Log-Auswertung, PCAP | fertig, Tests grün, lokal getaggt, kein Release |
 
 ## Erledigt
 
@@ -314,7 +314,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - J3 `core/scan_export.py`: PowerShell (TcpClient, ExecutionPolicy-Hinweis) und Bash (/dev/tcp, timeout, ping),
   gleiche Ziele/Ports, CSV. Test: bash -n immer, PowerShell-Parser wenn pwsh da (auf CI-Ubuntu/Windows vorhanden).
 - Keine neue Python-Abhängigkeit (nur Standardbibliothek) → Build unverändert.
-### 1.12.0 – Block K (in Arbeit)
+### 1.12.0 – Block K
 - K1 Log-Auswertung `core/logauth.py`: Linux-Syslog-Parser (prog-Kontext, da _SYSLOG den „prog:“-Präfix abtrennt;
   Regeln für sshd/sudo/su/useradd/userdel/usermod/passwd, rotierte .gz per gzip-Stream) und Windows-.evtx über das
   Paket **evtx** (Rust, MIT, abi3-Wheels Win/Linux ~1 MB). **Entscheidung gegen python-evtx**: dessen Dep `hexdump`
@@ -330,6 +330,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Zugangsdaten (FTP/Telnet/POP3/IMAP/SMTP-AUTH per Zeilen-Heuristik, IMAP-Tag beachtet). Tests mit selbst gebauten
   pcaps (dpkt.pcap.Writer). `ui/pcap_dialog.py` (sortierbare Tabellen, Zugangsdaten rot, RDAP je IP).
   ANALYSIS_MODULES um logs/pcap erweitert → Baum zeigt .evtx/.pcap, solange das Modul an ist.
+- Screenshots 62–63 (Log-Auswertung, PCAP-Übersicht).
 
 ## Offen
 
@@ -376,11 +377,27 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | Wikipedia-Quelle | REST `page/summary` (+ `redirect=true`), bei 404 `opensearch` → bester Treffer, Begriffsklärung über Wikitext-Bullets | summary liefert Beschreibung/Auszug/Bild kompakt; die Optionen einer Begriffsklärung stehen nur im Seiteninhalt |
 | Websuche | nur `QDesktopServices.openUrl`, nie ein Abruf durch Notex | Vorgabe: keine Scraping-/Such-API |
 
+## Abschluss Blöcke F–K
+
+Der Plan F–K ist vollständig umgesetzt (1.7.0–1.12.0), alle lokal getaggt, CI grün, kein Release (Besitzer entscheidet):
+
+- **F (1.7.0)** Modul-System (an/aus ohne Neustart) + Variablen.
+- **G (1.8.0)** Forensik-Basis: Hex-Lücken, Strings, eingebettete Dateien, Entropie.
+- **H (1.9.0)** Metadaten (EXIF/GPS, PDF, Office; Entfernen als geprüfte Kopie), YARA (Highlighting + Regel testen),
+  Zeitleiste & Beweismittel, IOCs entschärfen.
+- **I (1.10.0)** Port-Infos (IANA offline + Hover), IP-Konflikte (Übersicht, Subnetz-Auswertung), RDAP/ASN.
+- **J (1.11.0)** Netzwerk-Scanner (TCP-Connect, Banner, ARP-MAC, Report, Vergleich, Skript-Export PS/Bash).
+- **K (1.12.0)** Log-Auswertung (auth.log/secure/.gz, Windows-.evtx) und PCAP-Übersicht (dpkt).
+
+Neue Abhängigkeiten (alle MIT-verträglich, kein GPL/QtWebEngine): pypdf (BSD), yara-python (Apache/BSD),
+evtx (MIT, Rust-Wheels), dpkt (BSD). regex/PyYAML/cryptography wie bisher. Kein scapy.
+
+15 Module vorhanden: variables, hex, strings, embedded, entropy, metadata, yara, timeline, ioc, ports, ip_conflicts,
+rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
+
 ## Nächster Schritt
 
-Block G (1.8.0) fertig, lokal getaggt. **Gestoppt** – weiter mit Block H (1.9.0: Metadaten, YARA, Zeitleiste &
-Beweismittel, IOC entschärfen), sobald der Besitzer „weiter“ schreibt. Vorab zu klären in H2: yara-python nur, wenn
-es sich sauber in beide Builds integrieren lässt – sonst melden, bevor Alternativen gebaut werden.
+**Alle geplanten Blöcke (F–K) sind fertig.** Nichts weiter offen auf Entwicklerseite; auf neue Wünsche des Besitzers warten.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.

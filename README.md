@@ -572,6 +572,8 @@ und ist in beiden Builds unsicher; `evtx` bringt fertige Wheels ohne Transitiv-A
 
 ![Log-Auswertung](docs/62-logauth.png)
 
+![Log-Auswertung](docs/62-logauth.png)
+
 
 ## PCAP-Übersicht
 
@@ -588,6 +590,8 @@ im Baum auf eine `.pcap`/`.pcapng`. Die Datei wird gestreamt (dpkt, BSD – **ni
 **Ehrliche Grenzen**: Keine vollständige TCP-Reassemblierung – HTTP/TLS/Zugangsdaten werden je Paket aus der Nutzlast
 gelesen (die Anfrage steckt fast immer im ersten Datenpaket). Verschlüsselte Inhalte werden nicht entschlüsselt (bei
 TLS nur der SNI-Name). Kaputte Aufzeichnungen werden übersprungen, nicht abgebrochen.
+
+![PCAP-Übersicht](docs/63-pcap.png)
 
 ![PCAP-Übersicht](docs/63-pcap.png)
 
