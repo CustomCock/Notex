@@ -19,12 +19,18 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 | mdurl | 0.1.x | MIT | https://github.com/executablebooks/mdurl | `licenses/LICENSE-mdurl.txt` |
 | regex (mrab-regex) | 2024+ | Apache License 2.0 (Teile CNRI-Python) | https://github.com/mrabarnett/mrab-regex | `licenses/LICENSE-regex.txt` |
 | PyYAML | 6.0.3 | MIT License | https://pyyaml.org | `licenses/LICENSE-PyYAML.txt` |
+| pypdf | 6.19.0 | BSD 3-Clause | https://github.com/py-pdf/pypdf | `licenses/LICENSE-pypdf.txt` |
+| yara-python (mit libyara) | 4.5.4 | Apache License 2.0 (libyara: BSD 3-Clause) | https://github.com/VirusTotal/yara-python | `licenses/LICENSE-yara-python.txt` |
+| OpenSSL libcrypto (im Linux-Wheel von yara-python) | 1.1.1 | OpenSSL License / SSLeay License | https://www.openssl.org | `licenses/LICENSE-OpenSSL-1.1.txt` |
+| evtx (pyevtx-rs) | 0.13.1 | MIT License | https://github.com/omerbenamram/pyevtx-rs | `licenses/LICENSE-evtx.txt` |
+| dpkt | 1.9.8 | BSD 3-Clause | https://github.com/kbandla/dpkt | `licenses/LICENSE-dpkt.txt` |
 | cryptography (pyca) | 44–51 | Apache License 2.0 oder BSD 3-Clause (wahlweise) | https://cryptography.io | `licenses/LICENSE-cryptography.txt` |
 | OpenSSL (in cryptography enthalten) | 3.x | Apache License 2.0 | https://www.openssl.org | `licenses/LICENSE-cryptography.txt` (Apache-Text) |
 | cffi | 1.x/2.x | MIT | https://cffi.readthedocs.io | `licenses/LICENSE-cffi.txt` |
 | pycparser | 2.x/3.x | BSD 3-Clause | https://github.com/eliben/pycparser | `licenses/LICENSE-pycparser.txt` |
 | Inter (Schrift) | 4.1 | SIL Open Font License 1.1 | https://rsms.me/inter | `notex/assets/fonts/LICENSE-Inter.txt` |
 | JetBrains Mono (Schrift) | 2.304 | SIL Open Font License 1.1 | https://www.jetbrains.com/lp/mono | `notex/assets/fonts/LICENSE-JetBrainsMono.txt` |
+| IANA Service Name and Transport Protocol Port Number Registry (Daten) | Stand 2024-10 | frei für jeden Zweck (gemeinsame Erklärung IANA/IETF 2021, https://www.iana.org/help/licensing-terms) | https://www.iana.org/assignments/service-names-port-numbers | – |
 | Lucide Icons | 2026 | ISC | https://lucide.dev | `notex/assets/icons/LICENSE-Lucide.txt` |
 | Hunspell-Wörterbuch de_DE (frami, igerman98) | LibreOffice dictionaries | GPL v2 oder v3 | https://github.com/LibreOffice/dictionaries · https://www.j3e.de/ispell/igerman98 | `notex/dictionaries/LICENSE_de_DE_GPLv2.txt`, `README_de_DE.txt` |
 | Hunspell-Wörterbuch en_US (SCOWL) | 2020.12.07 | MIT/BSD-artig (SCOWL, Ispell, WordNet) | http://wordlist.sourceforge.net | `notex/dictionaries/README_en_US_LICENSE.txt` |

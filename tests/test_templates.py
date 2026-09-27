@@ -56,7 +56,8 @@ def test_default_files_and_listing(tmp_path: Path) -> None:
     (folder / "Eigene.txt").write_text("x", encoding="utf-8")
     (folder / ".versteckt.md").write_text("x", encoding="utf-8")
     (folder / "bild.png").write_bytes(b"x")
-    assert [p.name for p in list_templates(folder)] == ["Besprechung.md", "Eigene.txt", "Tagesnotiz.md", "Woche.md"]
+    assert [p.name for p in list_templates(folder)] == ["Besprechung.md", "Beweismittel.md", "Eigene.txt",
+                                                        "Tagesnotiz.md", "Woche.md", "YARA-Regel.yar", "Zeitleiste.md"]
     # zweiter Aufruf legt nichts neu an, auch nicht, wenn der Nutzer Vorlagen gelöscht hat
     (folder / "Woche.md").unlink()
     assert ensure_defaults(folder) == [] and not (folder / "Woche.md").exists()
@@ -68,3 +69,19 @@ def test_default_files_and_listing(tmp_path: Path) -> None:
 def test_default_file_name() -> None:
     assert default_file_name("Tagesnotiz.md", NOW) == "2026-09-26 Tagesnotiz.md"
     assert default_file_name("Liste.txt", NOW) == "2026-09-26 Liste.txt"
+
+
+def test_later_templates_arrive_once(tmp_path: Path) -> None:
+    from notex.core.templates import LATER_TEMPLATES
+    folder = tmp_path / "templates"
+    folder.mkdir()
+    (folder / "Woche.md").write_text("eigene", encoding="utf-8")        # alter Ordner aus früherer Version
+    installed: list[str] = []
+    created = ensure_defaults(folder, installed)
+    assert sorted(p.name for p in created) == sorted(LATER_TEMPLATES) and installed == list(LATER_TEMPLATES)
+    assert (folder / "Woche.md").read_text(encoding="utf-8") == "eigene"
+    (folder / "YARA-Regel.yar").unlink()                                 # vom Nutzer gelöscht → bleibt weg
+    assert ensure_defaults(folder, installed) == [] and not (folder / "YARA-Regel.yar").exists()
+    fresh: list[str] = []
+    ensure_defaults(tmp_path / "neu", fresh)                             # Erststart: alles, Liste gefüllt
+    assert fresh == list(LATER_TEMPLATES)

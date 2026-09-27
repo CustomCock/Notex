@@ -34,8 +34,8 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("strings", "Strings", "Druckbare Zeichenketten aus Binärdateien (ASCII, UTF-16)", "keine", False, "G"),
     ModuleInfo("embedded", "Eingebettete Dateien", "Dateien in Dateien finden und extrahieren", "keine", False, "G"),
     ModuleInfo("entropy", "Entropie", "Entropie-Kurve über eine Datei", "keine", False, "G"),
-    ModuleInfo("metadata", "Metadaten", "EXIF, PDF- und Office-Metadaten anzeigen und entfernen",
-               "Pillow, pypdf", False, "H"),
+    ModuleInfo("metadata", "Metadaten", "EXIF/GPS, PDF- und Office-Metadaten anzeigen und entfernen",
+               "pypdf", False, "H"),
     ModuleInfo("yara", "YARA", "YARA-Regeln hervorheben und gegen Dateien testen", "yara-python", False, "H"),
     ModuleInfo("timeline", "Zeitleiste & Beweismittel", "Zeitleisten-Notizen und Chain-of-Custody-Vorlage",
                "keine", False, "H"),
@@ -47,10 +47,20 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("rdap", "RDAP/ASN", "Inhaber, Netzblock und ASN zu IPs und Domains (nur auf Klick, Netzwerk)",
                "Netzwerk (nur auf Klick)", False, "I"),
     ModuleInfo("scanner", "Netzwerk-Scanner", "Hosts und offene Ports im eigenen Netz prüfen", "keine", False, "J"),
-    ModuleInfo("logs", "Log-Auswertung", "auth.log und Windows-Ereignisprotokolle auswerten", "python-evtx", False, "K"),
+    ModuleInfo("logs", "Log-Auswertung", "auth.log/secure (auch .gz) und Windows-.evtx auswerten", "evtx (nur für .evtx)", False, "K"),
     ModuleInfo("pcap", "PCAP-Übersicht", "Mitschnitte (.pcap/.pcapng) zusammenfassen", "dpkt", False, "K"),
 ]
 BY_KEY = {m.key: m for m in MODULES}
+ANALYSIS_MODULES = ("strings", "embedded", "entropy", "metadata", "logs", "pcap")   # arbeiten auf beliebigen (Binär-)Dateien
+
+
+def show_all_files(config: dict) -> bool:
+    """Baum zeigt alle Dateien statt nur der eingestellten Endungen: per Schalter oder automatisch, solange ein
+    Analyse-Modul an ist – sonst ließen sich .exe, .zip, .pcap … im Baum gar nicht anklicken."""
+    if config.get("tree_show_all") is True:
+        return True
+    state = config.get("modules", {})
+    return any(state.get(key, BY_KEY[key].default) is True for key in ANALYSIS_MODULES)
 
 
 def defaults() -> dict[str, bool]:

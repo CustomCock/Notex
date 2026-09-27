@@ -32,6 +32,10 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.6.0 | Alter Block F (verworfener Plan): Bilder, CSV, JSON/YAML, Hex/Dateityp/Hashes, Live-Logs, PDF | fertig, CI grün, lokal getaggt, bleibt (Besitzer) |
 | 1.7.0 | Neuer Block F: Modul-System, Variablen | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
 | 1.8.0 | Block G: Forensik-Basis (Hex-Lücken, Strings, Eingebettete Dateien, Entropie) | fertig, Tests grün, lokal getaggt, kein Release (Besitzer) |
+| 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
+| 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
+| 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
+| 1.12.0 | Block K: Log-Auswertung, PCAP | fertig, Tests grün, lokal getaggt, kein Release |
 
 ## Erledigt
 
@@ -226,6 +230,110 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Build-Check; Stand wie nach 1.6.0 (Windows ≈ 96,7 MB, Linux ≈ 92,6 MB).
 - Screenshots 50–53 (Hex mit Werte-Zeile + Kopiermenü, Strings, Eingebettete Dateien, Entropie).
 
+### 1.9.0 – Block H
+- Vorab (Rückfrage des Besitzers „wie benutze ich die Tools?“): Binärdateien waren im Baum unsichtbar (nur
+  eingestellte Endungen). `core/modules.show_all_files` – Baum zeigt alle Dateien per Schalter `tree_show_all` oder
+  automatisch, solange ein Analyse-Modul an ist; MainWindow.apply_tree_filter bei Modulwechsel und aus den Einstellungen.
+- **Besitzer (26.09.2026): H, I, J und K ohne Zwischenstopp nacheinander bauen**, Zusammenfassung erst am Ende.
+- H4 IOC entschärfen: `core/ioc.py` – Spans in fester Reihenfolge (URL → E-Mail → IPv6 → IPv4 → Domain), keine
+  Überlappung; Domain nur mit TLD aus Liste bzw. zwei Buchstaben, mehrdeutige ccTLDs (md, py, sh, so, rs …) erst ab
+  drei Teilen, Dateiendungen (exe, txt, pdf, zip …) nie; IPv6/IPv4 per ipaddress geprüft; URL: nur Host entschärft,
+  Pfad bleibt; schon Entschärftes wird erkannt. refang per Ersetzungstabelle (auch [dot], (.), {.}, [at], h[xx]p).
+  UI: MainWindow._activate_ioc (Bearbeiten → Umwandeln, Kontextmenü-Gruppe, Palette), Einstellung
+  `ioc.skip_code`. Nur im Editor-Dokument → .ntx-Regel erfüllt (nichts auf Platte).
+- H1 Metadaten: `core/metadata.py`, `ui/metadata_dialog.py`. **Entscheidung Bibliotheken:** Bilder mit eigenem
+  Parser (TIFF/EXIF-IFDs mit Grenzen- und Schleifenschutz, JPEG-Segmente per mmap, PNG-Chunks, WebP-RIFF, IPTC-IIM)
+  statt Pillow – Pillow kostet ~10 MB und kodiert JPEG beim Speichern neu; so bleibt das Entfernen verlustfrei.
+  PDF mit **pypdf 6.19.0** (BSD-3, reines Python, ~1 MB im Build): Info, XMP, Verschlüsselung; beim Entfernen
+  `compress_identical_objects(remove_unreferenced=True)` – sonst blieben Info/XMP als verwaiste Objekte in der
+  Datei (vom Test gefunden). Office über zipfile/ElementTree (XML > 8 MB oder mit `<!ENTITY` wird nicht geparst).
+  JPEG: echtes Bildende über SOS-Scan (Füllbytes FF00, RST, Segmente zwischen Scans) → Daten dahinter (MPF, Trailer)
+  werden gemeldet und entfernt; APP0/APP2-ICC/APP14 bleiben. Kopie mit open("xb"), danach verify() (liest die Kopie
+  neu). Grenzen: TIFF/HEIC nicht bereinigt; Namen im Office-/PDF-Inhalt bleiben (nur gemeldet).
+- H2 YARA: **yara-python 4.5.4** eingebunden – vorab geprüft: Wheels cp312 für win_amd64 und manylinux_2_17 (je
+  ~2–3 MB, Linux bündelt libcrypto 1.1 → Lizenz beigelegt), Apache-2.0/BSD-3 → MIT-verträglich; build.py Hidden
+  Import + check_dependencies. `core/yara_rules.py` (compile mit include_callback relativ zum Regelordner,
+  Fehlerzeile aus „line N“/„(N)“, scan über os.walk ohne Symlinks, Zeitlimit 60 s/Datei, Grenzen 20 000 Stellen,
+  200 je String). Lexer „yara“ aus Pygments (C-artige Blockkommentare), Config-Migration extensions_version 5
+  (.yar/.yara in Baum + Syntax). `ui/yara_dialog.py`, MainWindow._activate_yara/test_yara/mark_yara_error
+  (Editor.set_problem, gelöscht beim nächsten Tippen). FileTree.folder_menu_providers (neu, für Ordner).
+  Vorlagen: `LATER_TEMPLATES` + config templates.installed – neue Standardvorlagen einmalig in alte Ordner.
+- H3 Zeitleiste & Beweismittel: **Format-Entscheidung** Markdown + Frontmatter `notex: zeitleiste` + Tabelle
+  (statt eigenem Format): lesbar in Vorschau/anderen Editoren, diffbar im Verlauf, Pipes als `\|` maskiert. Zeiten
+  ISO 8601 mit Offset; keine IANA-Namen (Windows-Python ohne tzdata hat keine Zonen-DB) – Anzeige UTC / Systemzeit /
+  wie gespeichert. `core/timeline.py` (parse, add_entry chronologisch vor dem ersten späteren Eintrag,
+  detect_timestamp für ISO/CLF/deutsch/US/syslog/Datum/Epoch mit Falsch-Positiv-Tests, Export MD/CSV, append_row für
+  Beweismittel-Tabellen, find_timelines liest je .md max. 4 KB). .ntx-Regel: `can_take_from` sperrt die Übernahme aus
+  .ntx (Aktion ausgegraut). UI `ui/timeline_dialog.py`; Einfügen in offene Zeitleiste über den Editor (Undo), sonst
+  atomar in die Datei mit Original-Encoding/Zeilenenden. Vorlagen `Zeitleiste.md`, `Beweismittel.md` (LATER_TEMPLATES).
+
+- Screenshots 54–57 (Metadaten, YARA, Zeitleiste, IOC entschärft).
+- Build-Größe (CI-Build-Check, Artefakt-ZIP) nach H mit pypdf + yara-python: Windows ≈ 99,9 MB (vorher 96,7),
+  Linux ≈ 96,7 MB (vorher 92,6). Block I bringt keine Abhängigkeiten, nur ~150 KB Portdaten.
+
+### 1.10.0 – Block I
+- I1 Port-Infos: `core/ports.py`, Daten `assets/ports/iana-ports.tsv.gz` (11 721 Einträge, 149 KB, Bereiche als
+  start–ende), erzeugt mit `tools/update_ports.py` (reproduzierbares gzip, mtime=0). **Quelle:** iana.org ist in der
+  Arbeitsumgebung per Netzwerk-Policy gesperrt → CSV von einem GitHub-Spiegel (HackBugs/Computer-Networking,
+  neuester Eintrag 2024-10-08, Stichproben gegen bekannte Einträge geprüft); Lizenz: IANA/IETF-Erklärung 2021 „frei
+  für jeden Zweck“. Beim nächsten Lauf mit Netz `python tools/update_ports.py` direkt von iana.org. Eigene Tabelle
+  COMMON (~85 Dienste, Hinweise auf Deutsch) + ALIASES. Erkennung nur mit Kontext (Port-Wort, Liste nach „Ports“,
+  Host:Port mit IP/Domain/localhost/[IPv6], n/tcp, tcp/n, nmap), Falsch-Positiv-Tests (Jahr, Betrag, Uhrzeit,
+  Version, Pfad, Rechnungsnr., 16:9). `Editor.hover_providers` (neu, klassenweit) – Tooltip nur, wenn die Maus
+  wirklich auf der Zeile steht; gesperrte .ntx nie. `ui/ports_dialog.py`.
+- I2 IP-Konflikte: `core/ipmap.py` (extract je Zeile: Tabellen mit IP-/Namensspalte, hosts-Stil, „Name: IP“ mit
+  Rollen-Ausschluss; conflicts mit Kurzname-Vergleich; group /24 bzw. /64; usage mit Ausschlussbereichen
+  „a-b“, „a-Endoktett“, CIDR, Einzel-IP; IpIndex inkrementell über (mtime, Größe), nur .md/.txt → .ntx nie gelesen,
+  auch nicht aus offenen Editoren). UI `ui/ip_dialog.py`; Abgleich im AnalysisWorker auf einer Kopie des Index,
+  Übernahme im UI-Thread. Editor: `set_module_marks` (neu, je Modul eine Gruppe welliger Unterstreichungen).
+  „File-Watcher“ = file_saved/file_opened/status_changed der Tabs + inkrementeller Ordnerabgleich beim Öffnen der
+  Übersicht bzw. „Aktualisieren“ (Qt-Watcher auf ganzen Bäumen ist unter Windows unzuverlässig und teuer).
+  Konflikte werden mit Warn-Icon markiert, weil das Stylesheet Baum-Textfarben festlegt.
+- I3 RDAP/ASN: `core/rdap.py` (classify inkl. entschärfter Werte, local_reason – reserviert VOR privat prüfen, weil
+  Python 240.0.0.0/4 als „private“ führt; Bootstrap mit längstem Präfix und https bevorzugt; parse_ip/autnum/domain
+  inkl. verschachtelter Entities (Abuse unter Registrant), cidr0 oder summarize_address_range; Client mit injizierbarem
+  fetch/sleep/clock → Tests ohne Netz, Cache je URL nur im Speicher, 1 s je Host, 429 + Retry-After (> 30 s → Meldung)).
+  **Entscheidung ASN-Quelle: RIPEstat prefix-overview** (frei, ohne Schlüssel, weltweit aus RIS-BGP-Daten, JSON über
+  HTTPS) statt Team Cymru (DNS-TXT – bräuchte eine DNS-Bibliothek) oder ipinfo/ipapi (Schlüssel/Limits/Lizenz).
+  `ui/rdap_dialog.py` (QThread; beim Schließen wird nicht gewartet, der Thread hängt sich ans Fenster und räumt sich
+  weg). Kontextmenü zeigt private IPs ausgegraut mit Grund; .ntx → Rückfrage vor dem Senden.
+- Screenshots 58–60 (IP-Übersicht, Port nachschlagen, RDAP-Karte).
+- Screenshot 61 (Netzwerk-Scanner mit Beispieldaten).
+
+### 1.11.0 – Block J
+- J1 Scan-Engine `core/scan.py`: asyncio TCP-Connect (Connector injizierbar → Tests ohne Netz), Semaphore für
+  Parallelität, Host-Semaphore begrenzt gleichzeitige Hosts; parse_targets (IP/Name/CIDR/Bereich/Liste, dedupe,
+  Obergrenze), parse_ports (Profile top100/top1000, Listen/Bereiche), Banner (HTTP-Probe + Gruß-Dienste),
+  Host-Erkennung per TCP-Knock, optional System-ping über Executor; ping_alive und parse_arp robust gegen DE/EN und
+  Linux/Windows/macOS. to_dict/load, Markdown-Report, compare (neue/weg, offen/zu, Banner), as_ip_note.
+- **Umgebung: kein ping/arp, TCP nach außen wird vom Agent-Proxy abgefangen** → alle Netzpfade injizierbar, Tests
+  nutzen Fake-Reader/Writer; im Smoke-Test asyncio.open_connection gepatcht.
+- J2 UI `ui/scan_dialog.py`: ScanThread(QThread) trägt asyncio.run, Signale host_found/progress/finished/failed;
+  Tabelle live, Abbrechen, Speichern (JSON+MD in data/scans/), Vergleich, „An IP-Übersicht geben“
+  (ip_index.extra["scan"]), Skript-Export-Dialog. Bestätigung bei öffentlichen Zielen (merkbar „nicht mehr fragen“).
+- J3 `core/scan_export.py`: PowerShell (TcpClient, ExecutionPolicy-Hinweis) und Bash (/dev/tcp, timeout, ping),
+  gleiche Ziele/Ports, CSV. Test: bash -n immer, PowerShell-Parser wenn pwsh da (auf CI-Ubuntu/Windows vorhanden).
+- Keine neue Python-Abhängigkeit (nur Standardbibliothek) → Build unverändert.
+### 1.12.0 – Block K
+- K1 Log-Auswertung `core/logauth.py`: Linux-Syslog-Parser (prog-Kontext, da _SYSLOG den „prog:“-Präfix abtrennt;
+  Regeln für sshd/sudo/su/useradd/userdel/usermod/passwd, rotierte .gz per gzip-Stream) und Windows-.evtx über das
+  Paket **evtx** (Rust, MIT, abi3-Wheels Win/Linux ~1 MB). **Entscheidung gegen python-evtx**: dessen Dep `hexdump`
+  hat eine kaputte setup.py (baut auf neuem setuptools nicht) → in beiden Builds unsicher. Event-ID-Zuordnung als
+  reine Funktion auf dem Event-XML (parse_evtx_xml), ohne Bibliothek testbar. analyze() Dashboard (Fehlversuche
+  je IP/User, Erfolg-nach-Fehlversuch, Brute-Force, neue User/Gruppen/Dienste, log_cleared, lockouts, Stunden-
+  Zeitleiste). `ui/logauth_dialog.py` mit QPainter-Zeitleiste; MainWindow.add_prepared_timeline_entry verbindet die
+  Log-Zeile mit Modul H3. requirements/build/CI/Lizenzen: evtx 0.13.1, dpkt 1.9.8.
+- K2 PCAP-Übersicht `core/pcapinfo.py` mit **dpkt** (BSD, nicht scapy=GPL): Format-Erkennung (pcap/pcapng-Magic),
+  Streaming mit Fortschritt, robust gegen kaputte Records (überspringen und zählen). Datalink 1/101/113 behandelt.
+  Protokolle, Talker, Conversations, DNS (dpkt.dns), HTTP (dpkt.http.Request → Host/Pfad/UA + Basic-Auth),
+  eigener TLS-ClientHello-SNI-Parser (SNI als UTF-8, nicht idna – idna kennt kein errors="ignore"), Klartext-
+  Zugangsdaten (FTP/Telnet/POP3/IMAP/SMTP-AUTH per Zeilen-Heuristik, IMAP-Tag beachtet). Tests mit selbst gebauten
+  pcaps (dpkt.pcap.Writer). `ui/pcap_dialog.py` (sortierbare Tabellen, Zugangsdaten rot, RDAP je IP).
+  ANALYSIS_MODULES um logs/pcap erweitert → Baum zeigt .evtx/.pcap, solange das Modul an ist.
+- Screenshots 62–63 (Log-Auswertung, PCAP-Übersicht).
+- Build-Größe nach K (Build-Check-Artefakte, commit c8b5445): Windows ≈ 104,3 MB, Linux ≈ 101,8 MB (vorher nach H ≈ 99,9 / 96,7 MB; + evtx-Rust-Wheel und dpkt). CI Tests + Build-Check grün auf Win+Linux.
+- Fix: dpkt fehlte zunächst in requirements.txt (nur in build.py/CI/Lizenzen) → Build-Check rot; mit c8b5445 ergänzt, danach grün.
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -271,11 +379,27 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | Wikipedia-Quelle | REST `page/summary` (+ `redirect=true`), bei 404 `opensearch` → bester Treffer, Begriffsklärung über Wikitext-Bullets | summary liefert Beschreibung/Auszug/Bild kompakt; die Optionen einer Begriffsklärung stehen nur im Seiteninhalt |
 | Websuche | nur `QDesktopServices.openUrl`, nie ein Abruf durch Notex | Vorgabe: keine Scraping-/Such-API |
 
+## Abschluss Blöcke F–K
+
+Der Plan F–K ist vollständig umgesetzt (1.7.0–1.12.0), alle lokal getaggt, CI grün, kein Release (Besitzer entscheidet):
+
+- **F (1.7.0)** Modul-System (an/aus ohne Neustart) + Variablen.
+- **G (1.8.0)** Forensik-Basis: Hex-Lücken, Strings, eingebettete Dateien, Entropie.
+- **H (1.9.0)** Metadaten (EXIF/GPS, PDF, Office; Entfernen als geprüfte Kopie), YARA (Highlighting + Regel testen),
+  Zeitleiste & Beweismittel, IOCs entschärfen.
+- **I (1.10.0)** Port-Infos (IANA offline + Hover), IP-Konflikte (Übersicht, Subnetz-Auswertung), RDAP/ASN.
+- **J (1.11.0)** Netzwerk-Scanner (TCP-Connect, Banner, ARP-MAC, Report, Vergleich, Skript-Export PS/Bash).
+- **K (1.12.0)** Log-Auswertung (auth.log/secure/.gz, Windows-.evtx) und PCAP-Übersicht (dpkt).
+
+Neue Abhängigkeiten (alle MIT-verträglich, kein GPL/QtWebEngine): pypdf (BSD), yara-python (Apache/BSD),
+evtx (MIT, Rust-Wheels), dpkt (BSD). regex/PyYAML/cryptography wie bisher. Kein scapy.
+
+15 Module vorhanden: variables, hex, strings, embedded, entropy, metadata, yara, timeline, ioc, ports, ip_conflicts,
+rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
+
 ## Nächster Schritt
 
-Block G (1.8.0) fertig, lokal getaggt. **Gestoppt** – weiter mit Block H (1.9.0: Metadaten, YARA, Zeitleiste &
-Beweismittel, IOC entschärfen), sobald der Besitzer „weiter“ schreibt. Vorab zu klären in H2: yara-python nur, wenn
-es sich sauber in beide Builds integrieren lässt – sonst melden, bevor Alternativen gebaut werden.
+**Alle geplanten Blöcke (F–K) sind fertig.** Nichts weiter offen auf Entwicklerseite; auf neue Wünsche des Besitzers warten.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.

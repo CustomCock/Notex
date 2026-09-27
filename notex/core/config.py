@@ -63,6 +63,7 @@ DEFAULTS: dict[str, Any] = {
         "server_url": "http://localhost:8081",
         "allow_public": False,      # öffentliche LanguageTool-API nur nach ausdrücklicher Zustimmung
     },
+    "tree_show_all": False,   # Baum: alle Dateien statt nur der Endungen (automatisch an, solange ein Analyse-Modul an ist)
     "modules": {              # Module an/aus (siehe core/modules.py) – Standard: Variablen, Hex, Ports, IOC an
         "variables": True, "hex": True, "strings": False, "embedded": False, "entropy": False, "metadata": False,
         "yara": False, "timeline": False, "ioc": True, "ports": True, "ip_conflicts": False, "rdap": False,
@@ -92,6 +93,7 @@ DEFAULTS: dict[str, Any] = {
         "week_folder": "Wochen",            # Ordner in data/ für „Neue Woche“
         "week_name": "KW{{week}} {{year}}",  # Dateiname (ohne .md) mit Platzhaltern
         "week_template": "Woche.md",
+        "installed": [],                     # später ergänzte Standardvorlagen, die schon angelegt wurden
     },
     "encryption": {           # verschlüsselte Notizen (.ntx)
         "auto_lock_minutes": 5,   # nach so vielen Minuten ohne Eingabe sperren (0 = nie)
@@ -107,9 +109,35 @@ DEFAULTS: dict[str, Any] = {
         "whole_word": False,  # Chip „Wort“: nur ganze Wörter
         "variable_values": False,   # Chip „§“: auch in Variablenwerten suchen (Modul Variablen)
     },
+    "ip_conflicts": {         # Modul IP-Konflikte: zuletzt ausgewertetes Subnetz und Ausschlussbereiche
+        "network": "",
+        "exclusions": "",
+    },
+    "scan": {                 # Modul Netzwerk-Scanner: letzte Eingaben und eigene Portprofile
+        "last_target": "",
+        "timeout": 1.0,
+        "concurrency": 200,
+        "grab_banner": True,
+        "discover": True,
+        "use_ping": False,
+        "confirm_public": True,   # Rückfrage bei Zielen außerhalb privater Bereiche
+        "profiles": {},
+    },
+    "timeline": {             # Modul Zeitleiste: zuletzt benutzte Zeitleiste, Zeitanzeige (utc | local | original)
+        "last": "",
+        "mode": "utc",
+    },
+    "yara": {                 # Modul YARA: zuletzt benutzte Regel und Ziel
+        "last_rule": "",
+        "last_target": "",
+        "recursive": True,
+    },
     "strings": {              # Modul Strings: letzte Einstellungen des Dialogs
         "min_len": 4,
         "encodings": ["ascii", "utf16le"],
+    },
+    "ioc": {                  # Modul IOCs entschärfen (Umwandeln, Ctrl+Alt+D / Ctrl+Shift+Alt+D)
+        "skip_code": True,    # Code-Blöcke (``` und `inline`) unverändert lassen
     },
     "variables": {            # Modul Variablen – Definitionen liegen in variables.json neben der App
         "prefix": "§",
@@ -117,11 +145,11 @@ DEFAULTS: dict[str, Any] = {
     },
     "extensions": [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".sh", ".ps1", ".bat", ".yaml", ".yml",
                    ".xml", ".html", ".css", ".js", ".sql", ".ntx", ".tsv",
-                   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".pdf"],
-    "extensions_version": 4,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
+                   ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".pdf", ".yar", ".yara"],
+    "extensions_version": 5,  # Migration: neue Standard-Endungen werden einmalig ergänzt, eigene bleiben
     "syntax_highlighting": True,
     "syntax_extensions": [".py", ".json", ".ini", ".log", ".sh", ".ps1", ".bat", ".yaml", ".yml", ".xml",
-                          ".html", ".css", ".js", ".sql", ".md"],
+                          ".html", ".css", ".js", ".sql", ".md", ".yar", ".yara"],
     # Textschrift je Dateiendung ("" = Standardschrift des Themes). Offene Zuordnung: eigene Endungen erlaubt.
     "font_by_extension": {".py": "JetBrains Mono", ".json": "JetBrains Mono", ".csv": "JetBrains Mono",
                           ".log": "JetBrains Mono", ".ini": "JetBrains Mono", ".sh": "JetBrains Mono",
@@ -204,6 +232,11 @@ def migrate(config: dict[str, Any], raw: Any) -> dict[str, Any]:
         added = ([".ntx"] if raw_version < 3 else []) + [".tsv", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
                                                          ".svg", ".pdf"]
         config["extensions"] = list(config["extensions"]) + [e for e in added if e not in config["extensions"]]
+    if isinstance(raw, dict) and isinstance(raw_version, int) and 2 <= raw_version < 5:
+        # v1.9: YARA-Regeln im Baum und mit Syntax-Highlighting
+        for key in ("extensions", "syntax_extensions"):
+            if key in raw:
+                config[key] = list(config[key]) + [e for e in (".yar", ".yara") if e not in config[key]]
     config["extensions_version"] = DEFAULTS["extensions_version"]
     return config
 

@@ -680,16 +680,183 @@ def main() -> int:
             def entropy_shot():
                 window.show_entropy(sample)
                 dialog = window._analysis_dialogs["entropy"][-1]
-                dialog_shot(dialog, "53-entropy", finish)
+                dialog_shot(dialog, "53-entropy", lambda: block_h_shots(dialog_shot))
 
-            def finish():
-                window.close()
-                app.quit()
+        def block_h_shots(dialog_shot):
+            """Block H (1.9.0): Metadaten, YARA, Zeitleiste, IOC entschärfen."""
+            import sys as _sys
+            from notex.core import timeline as tl
+            _sys.path.insert(0, str(ROOT / "tests"))
+            from test_metadata import jpeg
+            for key in ("metadata", "yara", "timeline", "ioc"):
+                window.modules.set_enabled(key, True)
+            photo = files / "urlaub.jpg"
+            photo.write_bytes(jpeg())
+            rule = files / "c2-beispiel.yar"
+            rule.write_text('rule C2_Beispiel : c2\n{\n    meta:\n        author = "Notex"\n    strings:\n'
+                            '        $url = "update.example.com" ascii nocase\n        $mz  = { 4D 5A }\n'
+                            '        $reg = "CurrentVersion\\\\Run" ascii\n    condition:\n        $mz at 0 and any of '
+                            '($url, $reg)\n}\n', encoding="utf-8")
+            timeline_path = files / "Vorfall Webserver.md"
+            text = tl.new_text("Vorfall Webserver")
+            for when, source, what, tags in (
+                    ("2026-09-26T13:58:02+02:00", "proxy.log", "Download update.exe von update[.]example[.]com", "#malware"),
+                    ("2026-09-26T14:03:11+02:00", "auth.log", "Fehlgeschlagener Login root von 203.0.113.5", "#ssh #bruteforce"),
+                    ("2026-09-26T14:05:40+02:00", "auth.log", "Login root von 203.0.113.5 erfolgreich", "#ssh"),
+                    ("2026-09-26T12:07:00Z", "EDR", "Neuer Dienst „UpdSvc“ installiert", "#persistenz"),
+                    ("2026-09-26T14:20:00+02:00", "Analyst", "Host isoliert, Abbild gesichert (B-20260926-01)", "#reaktion")):
+                entry = tl.Entry(tl.parse_iso(when), source, what, tags.split())
+                text = tl.add_entry(text, entry)[0]
+            timeline_path.write_text(text, encoding="utf-8")
+
+            def metadata_shot():
+                window.show_metadata(photo)
+                dialog_shot(window._analysis_dialogs["metadata"][-1], "54-metadata", yara_shot)
+
+            def yara_shot():
+                window.tabs.open_file(rule)
+                window.test_yara(target=files)
+                dialog_shot(window._analysis_dialogs["yara"][-1], "55-yara", timeline_shot)
+
+            def timeline_shot():
+                window.tabs.open_file(timeline_path)
+                window.show_timeline()
+                dialog = window._analysis_dialogs["timeline"][-1]
+                dialog.mode.setCurrentIndex(1)
+                dialog_shot(dialog, "56-timeline", ioc_shot)
+
+            def ioc_shot():
+                note = files / "IOCs.md"
+                note.write_text("# IOCs aus dem Vorfall\n\n- C2: http://update.example.com/v2/gate.php\n"
+                                "- Angreifer: 203.0.113.5, 2001:db8::bad:1\n- Phishing von billing@example.org\n"
+                                "- Datei: update.exe (setup.py bleibt unverändert)\n\n```\n"
+                                "curl http://update.example.com/v2/pkg\n```\n", encoding="utf-8")
+                editor = window.tabs.open_file(note)
+                window.convert_iocs(True)
+                later_rel(400, lambda: (save(window, "57-ioc-defanged"), editor.document().setModified(False),
+                                        block_i_shots(dialog_shot)))
+            metadata_shot()
+
+        def block_i_shots(dialog_shot):
+            """Block I (1.10.0): IP-Übersicht, Port nachschlagen, RDAP-Karte (Beispieldaten, kein Netz)."""
+            from notex.core import rdap
+            from notex.ui.ports_dialog import PortDialog
+            from notex.ui.rdap_dialog import RdapDialog
+            from test_rdap import ROUTES, FakeNet
+            for key in ("ip_conflicts", "rdap"):
+                window.modules.set_enabled(key, True)
+            (files / "Netz Büro.md").write_text(
+                "# Netz Büro\n\n| Host | IP | Rolle |\n|---|---|---|\n| router | 10.20.0.1 | Gateway |\n"
+                "| fileserver | 10.20.0.5 | NAS |\n| drucker-og | 10.20.0.20 | |\n| backup | 10.20.0.30 | |\n",
+                encoding="utf-8")
+            (files / "Server.md").write_text("10.20.0.5   web-intern\n10.20.0.40  monitoring\n"
+                                             "10.20.1.10  vpn-gw\n", encoding="utf-8")
+
+            def ip_shot():
+                window.refresh_ip_index(full=True)
+                later_rel(800, open_ip)
+
+            def open_ip():
+                window.show_ip_overview()
+                dialog = window._analysis_dialogs["ip_conflicts"][-1]
+                dialog.network.setText("10.20.0.0/24")
+                dialog.exclusions.setText("10.20.0.100-10.20.0.199")
+                dialog_shot(dialog, "58-ip-overview", port_shot)
+
+            def port_shot():
+                dialog_shot(PortDialog(window, "445"), "59-port-lookup", rdap_shot)
+
+            def rdap_shot():
+                client = rdap.Client(FakeNet(ROUTES), lambda _s: None)
+                dialog_shot(RdapDialog(window, client, "8.8.8.8"), "60-rdap-card", scanner_shot)
+
+            def scanner_shot():
+                from test_scan import FakeReader, FakeWriter
+                from notex.core import scan as scanmod
+                from notex.ui.scan_dialog import ScanDialog
+                ports = {"192.168.1.5": {80: b"HTTP/1.1 200 OK\r\nServer: nginx/1.25\r\n\r\n<title>NAS</title>",
+                                         22: b"SSH-2.0-OpenSSH_9.6\r\n", 445: b""},
+                         "192.168.1.7": {3389: b""},
+                         "192.168.1.20": {80: b"HTTP/1.1 200 OK\r\nServer: lighttpd\r\n\r\n"}}
+
+                async def fake(ip, port, **k):
+                    table = ports.get(ip, {})
+                    if port not in table:
+                        raise ConnectionRefusedError()
+                    return FakeReader(table[port]), FakeWriter()
+                scanmod.asyncio.open_connection = fake
+                scanmod.arp_table = lambda runner=None: {"192.168.1.5": "AA:BB:CC:00:11:22",
+                                                         "192.168.1.7": "DE:AD:BE:EF:00:07"}
+                window.modules.set_enabled("scanner", True)
+                dialog = ScanDialog(window)
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+                dialog.target.setText("192.168.1.0/24")
+                dialog.ports.setEnabled(True)
+                dialog.ports.setText("22,80,443,445,3389")
+                dialog.profile.setCurrentIndex(2)
+                dialog.start()
+
+                def grab():
+                    compose(window, dialog, "61-scanner", window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    logs_shot()
+                later_rel(6000, grab)
+
+            def logs_shot():
+                from notex.ui.logauth_dialog import LogAuthDialog
+                log = files / "auth.log"
+                rows = []
+                for i in range(6):
+                    rows.append(f"Sep 27 04:0{i}:11 web sshd[10{i}]: Failed password for root from 203.0.113.5 "
+                                f"port 5{i}234 ssh2")
+                rows.append("Sep 27 04:07:00 web sshd[120]: Accepted password for root from 203.0.113.5 port 55250 ssh2")
+                rows.append("Sep 27 04:08:00 web useradd[2000]: new user: name=hacker, UID=0, GID=0, home=/root, "
+                            "shell=/bin/bash")
+                rows.append("Sep 27 04:08:05 web usermod[2001]: add 'hacker' to group 'sudo'")
+                rows.append("Sep 27 05:00:00 web sudo:    bob : TTY=pts/0 ; USER=root ; COMMAND=/bin/cat /etc/shadow")
+                log.write_text("\n".join(rows) + "\n", encoding="utf-8")
+                window.modules.set_enabled("logs", True)
+                dialog = LogAuthDialog(window, log)
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+
+                def grab():
+                    compose(window, dialog, "62-logauth", window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    pcap_shot()
+                later_rel(1200, grab)
+
+            def pcap_shot():
+                from test_pcapinfo import eth, tcp, udp, dns_query, client_hello, write_pcap
+                from notex.ui.pcap_dialog import PcapDialog
+                http = (b"GET /admin HTTP/1.1\r\nHost: intranet.example.com\r\nUser-Agent: Mozilla/5.0\r\n"
+                        b"Authorization: Basic YWRtaW46dG9vcg==\r\n\r\n")
+                pkts = [eth("10.0.0.10", "8.8.8.8", udp(50000, 53, dns_query("intranet.example.com"))),
+                        eth("10.0.0.10", "93.184.216.34", tcp(50001, 80, http)),
+                        eth("10.0.0.10", "1.1.1.1", tcp(50002, 443, client_hello("bank.example.com"))),
+                        eth("10.0.0.10", "192.168.1.9", tcp(50003, 21, b"USER root\r\nPASS toor\r\n"))]
+                write_pcap(files / "mitschnitt.pcap", pkts)
+                window.modules.set_enabled("pcap", True)
+                dialog = PcapDialog(window, files / "mitschnitt.pcap")
+                dialog.show()
+                dialog.move(window.geometry().center() - dialog.rect().center())
+
+                def grab():
+                    compose(window, dialog, "63-pcap", window.mapFromGlobal(dialog.geometry().topLeft()))
+                    dialog.close()
+                    finish()
+                later_rel(1200, grab)
+            ip_shot()
+
+        def finish():
+            window.close()
+            app.quit()
 
         shot_image()
 
     later(500, s_empty)
-    later(90000, app.quit)
+    later(150000, app.quit)
     code = app.exec()
     httpd.shutdown()
     httpd.server_close()

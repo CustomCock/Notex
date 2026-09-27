@@ -43,6 +43,7 @@ class LineNumberArea(QWidget):
 
 class Editor(QTextEdit):
     variables = None               # VariableService, solange das Modul „Variablen“ an ist (für alle Editoren)
+    hover_providers: list = []     # Module: Callable[[Editor, Zeilentext, Spalte], HTML | None] (z. B. Port-Infos)
     zoom_requested = Signal(int)   # +1 = größer, -1 = kleiner (Ctrl+Mausrad)
     files_dropped = Signal(list)   # Dateien aufs Blatt gezogen -> öffnen statt Pfad einfügen
     link_activated = Signal(object)   # LinkSpan bei Ctrl+Klick auf einen Wiki-Link
@@ -58,6 +59,7 @@ class Editor(QTextEdit):
         self.eol = text_file.eol
         self._search_selections: list[QTextEdit.ExtraSelection] = []
         self._problem_selections: list[QTextEdit.ExtraSelection] = []   # JSON/YAML-Fehler
+        self._module_marks: dict[str, list[QTextEdit.ExtraSelection]] = {}   # Module (z. B. IP-Konflikte)
         self._font_size = font_size
         self._font_family = STANDARD   # "" = Standardschrift; Ansichts-Einstellung, ändert nichts an der Datei
         self.language: str | None = None   # Rechtschreib-Sprache nur für diesen Tab (None = global)
@@ -328,6 +330,18 @@ class Editor(QTextEdit):
                 QToolTip.showText(event.globalPos(), variable_render.tooltip_text(self, hit[0]), self.viewport())
                 return True
             QToolTip.hideText()
+        if event.type() == QEvent.Type.ToolTip and Editor.hover_providers and not self.locked:
+            from PySide6.QtWidgets import QToolTip
+            cursor = self.cursorForPosition(event.pos())
+            rect = self.cursorRect(cursor)
+            if abs(rect.center().y() - event.pos().y()) <= rect.height():
+                block = cursor.block()
+                for provider in list(Editor.hover_providers):
+                    text = provider(self, block.text(), cursor.positionInBlock())
+                    if text:
+                        QToolTip.showText(event.globalPos(), text, self.viewport())
+                        return True
+            QToolTip.hideText()
         return super().viewportEvent(event)
 
     def createMimeDataFromSelection(self):
@@ -542,13 +556,35 @@ class Editor(QTextEdit):
             self._problem_selections.append(selection)
         self._refresh_extra_selections()
 
+    def set_module_marks(self, key: str, spans: list[tuple[int, int]], color: str | None = None) -> None:
+        """Stellen (Position, Länge) wellig unterstreichen – je Modul eine Gruppe; leere Liste räumt auf."""
+        if not spans and key not in self._module_marks:
+            return
+        group = []
+        for position, length in spans[:500]:
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(max(0, min(position, self.document().characterCount() - 1)))
+            cursor.setPosition(max(0, min(position + length, self.document().characterCount() - 1)),
+                               QTextCursor.MoveMode.KeepAnchor)
+            selection = QTextEdit.ExtraSelection()
+            selection.cursor = cursor
+            selection.format.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+            selection.format.setUnderlineColor(QColor(color or COLORS.danger))
+            group.append(selection)
+        if group:
+            self._module_marks[key] = group
+        else:
+            self._module_marks.pop(key, None)
+        self._refresh_extra_selections()
+
     def _refresh_extra_selections(self) -> None:
         current_line = QTextEdit.ExtraSelection()
         current_line.format.setBackground(QColor(COLORS.paper_line))
         current_line.format.setProperty(QTextCharFormat.Property.FullWidthSelection, True)
         current_line.cursor = self.textCursor()
         current_line.cursor.clearSelection()
-        selections = [current_line, *self._problem_selections, *self._search_selections]
+        marks = [sel for group in self._module_marks.values() for sel in group]
+        selections = [current_line, *marks, *self._problem_selections, *self._search_selections]
         # Der Treffer unter dem Cursor wird etwas kräftiger markiert
         cursor = self.textCursor()
         if cursor.hasSelection():

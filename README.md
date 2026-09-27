@@ -229,19 +229,23 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 | Variablen | an | – |
 | Hex & Dateianalyse (Hex-Ansicht, Dateityp, Prüfsummen) | an | – |
 | Strings, Eingebettete Dateien, Entropie | aus | – |
-| Metadaten | aus | Pillow, pypdf |
-| YARA | aus | yara-python |
+| Metadaten | aus | pypdf (gebündelt) |
+| YARA | aus | yara-python (gebündelt) |
 | Zeitleiste & Beweismittel | aus | – |
 | IOC entschärfen | an | – |
 | Port-Infos | an | – |
 | IP-Konflikte | aus | – |
 | RDAP/ASN | aus | Netzwerk (nur auf Klick) |
 | Netzwerk-Scanner | aus | – |
-| Log-Auswertung | aus | python-evtx |
-| PCAP-Übersicht | aus | dpkt |
+| Log-Auswertung | aus | evtx (gebündelt, nur für .evtx) |
+| PCAP-Übersicht | aus | dpkt (gebündelt) |
 
 Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
 öffnen Binärdateien wieder im Texteditor.
+
+Der Baum zeigt normalerweise nur die eingestellten Dateiendungen (Einstellungen → Editor → Baum). Solange eines der
+Analyse-Module Strings, Eingebettete Dateien, Entropie oder Metadaten an ist, zeigt er **alle Dateien** – damit sich auch
+`.exe`, `.zip` oder `.pcap` per Rechtsklick untersuchen lassen. Dauerhaft geht das über „Alle Dateien anzeigen“.
 
 ![Einstellungen → Module](docs/46-settings-modules.png)
 
@@ -397,6 +401,249 @@ Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **En
 - Gestreamt im Hintergrund mit Fortschritt und Abbrechen – auch für mehrere GB.
 
 ![Entropie](docs/53-entropy.png)
+
+
+## Metadaten
+
+Modul „Metadaten“ (Standard aus). Rechtsklick auf eine Datei im Baum → **Metadaten anzeigen …**, Menü Datei oder
+`Ctrl+Alt+M` (aktuelle Datei):
+
+- **Bilder** (JPEG, PNG, WebP, TIFF): EXIF mit Kamera, Objektiv, Seriennummern, Software, Aufnahme-/Änderungszeit,
+  Ausrichtung, **GPS** (Koordinaten, Höhe, Zeit – „In OpenStreetMap öffnen“ öffnet erst auf Klick den Browser),
+  eingebettetes Vorschaubild, XMP, IPTC, JPEG-Kommentare, PNG-Textfelder, Daten hinter dem Bildende.
+- **PDF**: Autor, Titel, Programm, Erzeuger, Erstell-/Änderungsdatum, eigene Felder, XMP; Anzahl der Speicherstände
+  (ältere Fassungen samt Metadaten stecken bei inkrementellem Speichern noch in der Datei).
+- **Office** (docx/xlsx/pptx): Autor, zuletzt geändert von, Revision, Zeiten, Firma, Vorlage, Bearbeitungszeit,
+  eigene Eigenschaften, Vorschaubild – und Namen, die im Inhalt stecken (Kommentar-Autoren, Änderungsverfolgung).
+- **Kopieren** (markierte Zeilen oder alle) und **Als Markdown einfügen** (Tabelle an der Cursorposition der Notiz).
+- **Metadaten entfernen …** zeigt vorher, was entfernt wird und was bleibt, legt eine **Kopie**
+  `<name>_ohne_Metadaten.<endung>` an (nie überschrieben, Original bleibt) und prüft sie danach. JPEG/PNG/WebP werden
+  dabei nicht neu kodiert – nur die Metadaten-Segmente fallen weg, die Bilddaten bleiben Byte für Byte gleich. PDFs
+  werden neu geschrieben (ohne Info, XMP und ältere Speicherstände). TIFF und verschlüsselte PDFs werden nur angezeigt.
+
+Grau = bleibt beim Entfernen (Formatangabe oder Teil des Inhalts), gelb = GPS.
+
+![Metadaten](docs/54-metadata.png)
+
+
+## YARA
+
+Modul „YARA“ (Standard aus, bringt yara-python mit). `.yar`/`.yara`-Dateien erscheinen im Baum und werden hervorgehoben;
+„Neue Datei aus Vorlage“ (`Ctrl+Shift+T`) bietet die Vorlage **YARA-Regel.yar**.
+
+- **Regel testen** (`Ctrl+Alt+Y`, Menü Datei, Palette „YARA-Regel testen“): nimmt die Regeln aus dem aktuellen Editor –
+  auch ungespeichert – und prüft eine Datei oder einen Ordner (Unterordner abschaltbar). Ohne offene Regel wird die
+  zuletzt benutzte Regeldatei genommen oder erfragt.
+- Rechtsklick im Baum: auf eine `.yar` → „YARA-Regel testen …“; auf jede andere Datei oder einen Ordner → „Mit
+  YARA-Regel prüfen …“.
+- Trefferliste: Regel, Datei, Offset, String-Bezeichner, Treffer (Text oder Hex); Tags und `meta` im Tooltip.
+  Doppelklick öffnet die Hex-Ansicht an der Stelle (Treffer markiert).
+- Syntaxfehler stehen mit Zeilennummer in der Statuszeile; im Editor springt der Cursor hin und die Zeile wird rot
+  unterwellt, bis du weitertippst. `include "x.yar"` wird relativ zum Ordner der Regeldatei aufgelöst.
+- Dateien werden nur gelesen (libyara mappt sie selbst, auch große), Zeitlimit 60 s je Datei, Symlinks werden nicht
+  verfolgt, höchstens 20 000 Trefferstellen.
+
+![YARA-Regel testen](docs/55-yara.png)
+
+
+## Zeitleiste und Beweismittel
+
+Modul „Zeitleiste & Beweismittel“ (Standard aus).
+
+**Zeitleisten** sind normale Markdown-Notizen mit einer Tabelle – lesbar in jeder Vorschau, im Verlauf
+vergleichbar, von Hand editierbar. Erkannt werden sie am Frontmatter:
+
+```markdown
+---
+notex: zeitleiste
+titel: Vorfall Webserver
+---
+| Zeit | Quelle | Beschreibung | Tags |
+|---|---|---|---|
+| 2026-09-26T14:03:11+02:00 | auth.log | Fehlgeschlagener Login root von 203.0.113.5 | #ssh #bruteforce |
+```
+
+- **Neue Zeitleiste**: Palette „Neue Zeitleiste“ (Vorlage `Zeitleiste.md`).
+- **Zur Zeitleiste hinzufügen** (`Ctrl+Alt+Z`, Rechtsklick im Editor): nimmt die aktuelle Zeile (oder die erste
+  markierte) und erkennt den Zeitstempel – ISO 8601/RFC 3339, syslog (`Sep 26 14:03:11`), Apache/nginx
+  (`[26/Sep/2026:14:03:11 +0200]`), deutsch (`26.09.2026 14:03`), US/Windows (`9/26/2026 2:03:11 PM`), Unix-Zeit am
+  Zeilenanfang. Ohne Zeitzone gilt die Systemzeit. Quelle = Dateiname, Beschreibung = Rest der Zeile; alles ist vor
+  dem Einfügen änderbar, Ziel-Zeitleiste wählbar (oder neu). Eingefügt wird chronologisch.
+- **Zeitleiste anzeigen** (`Ctrl+Shift+Alt+Z`): chronologische Liste mit Filter nach Quelle, Tag und Text; Zeit in
+  UTC, lokal oder wie gespeichert; Doppelklick springt zur Zeile; „Als Markdown kopieren“ und „CSV exportieren“
+  (jeweils die gefilterte Liste in der gewählten Zeitdarstellung).
+- In der Datei stehen Zeiten als ISO 8601 mit Offset. Bewusst keine Zonennamen wie „Europe/Berlin“ – Windows hat
+  dafür keine eingebaute Datenbank.
+- Aus verschlüsselten Notizen (`.ntx`) wird nichts übernommen (der Klartext landete sonst unverschlüsselt in der
+  Zeitleiste).
+
+**Beweismittel (Chain of Custody)**: Palette „Beweismittel: neu“ legt eine Notiz aus der Vorlage `Beweismittel.md` an
+(ID, Beschreibung, Fundort, Zeitpunkt, sichergestellt von, Art der Sicherung, Aufbewahrung, Prüfsummen, Übergaben).
+„Beweismittel: Prüfsummen einfügen …“ berechnet MD5, SHA-1 und SHA-256 einer gewählten Datei im Hintergrund und trägt
+sie in die Tabelle unter „Prüfsummen“ ein; „Beweismittel: Übergabe eintragen“ hängt eine Zeile mit der aktuellen Zeit
+an die Übergaben an und setzt den Cursor in „Von“.
+
+![Zeitleiste](docs/56-timeline.png)
+
+
+## Port-Infos
+
+Modul „Port-Infos“ (Standard an, rein offline). Fährt die Maus im Editor über eine Portangabe, zeigt ein Tooltip
+Dienst, Protokolle, einen kurzen Hinweis (z. B. „SMB – nie ins Internet“) und die IANA-Einträge.
+
+- Erkannt werden nur Angaben mit Kontext: `Port 3389`, `Ports: 22, 80, 443 und 8080`, `10.0.0.5:445`,
+  `https://host.example.com:8443`, `[::1]:5432`, `3389/tcp`, `tcp/445`, nmap-Zeilen wie `22/tcp open ssh`, Logzeilen
+  wie `… port 52344 ssh2`. Nackte Zahlen (Jahreszahlen, Beträge, Rechnungsnummern), Uhrzeiten und Versionen nie.
+- **Port nachschlagen** (`Ctrl+Alt+P`, Palette): Suche nach Nummer, Kurzname (`rdp`, `smb`, `winrm`) oder IANA-Name,
+  vorbelegt mit der Markierung bzw. dem Port unter dem Cursor; „Als Markdown einfügen“.
+- Daten: IANA „Service Name and Transport Protocol Port Number Registry“ (RFC 6335), mitgeliefert als
+  `notex/assets/ports/iana-ports.tsv.gz` (~150 KB), plus eine eigene Tabelle mit Hinweisen zu gut 80 gängigen Diensten.
+  Aktualisieren: `python tools/update_ports.py` (lädt die CSV von iana.org).
+
+![Port nachschlagen](docs/59-port-lookup.png)
+
+
+## IP-Übersicht und Konflikte
+
+Modul „IP-Konflikte“ (Standard aus). Sammelt IP-Zuordnungen aus allen `.md`/`.txt` in `data/` – verschlüsselte
+Notizen werden nie gelesen:
+
+- Markdown-Tabellen mit einer IP-Spalte (`IP`, `IP-Adresse`, `Adresse`, `IPv4`, `IPv6`) und einer Namensspalte
+  (`Host`, `Hostname`, `Name`, `Gerät`, `System`, `Server`, `Rechner`, `Client`),
+- Zeilen im hosts-Stil `10.0.0.5  fileserver` (auch als Listenpunkt, Kommentar mit `#` erlaubt),
+- `fileserver: 10.0.0.5` bzw. `fileserver = 10.0.0.5` (Rollen wie `Gateway:` oder `DNS:` zählen nicht als Host).
+
+**IP-Übersicht** (`Ctrl+Shift+Alt+I`, Menü Datei, Palette): nach Subnetz gruppiert (IPv4 /24, IPv6 /64),
+Konflikte (dieselbe IP bei verschiedenen Hosts; `fileserver` und `FileServer.corp.local` gelten als gleich) mit
+Warnsymbol und Tooltip, Doppelklick springt zur Stelle. Unten ein Subnetz eingeben (oder Gruppe anklicken) und
+optional Ausschlussbereiche wie den DHCP-Pool (`10.0.0.100-10.0.0.199, 10.0.0.1`): Notex zeigt nutzbare, belegte,
+ausgeschlossene und freie Adressen und kopiert die **nächste freie IP**.
+
+Im Editor werden Konflikt-IPs rot unterwellt, der Tooltip nennt die anderen Hosts. Das aktualisiert sich beim
+Speichern und beim Tippen (auch Ungespeichertes zählt); die Dateien werden inkrementell abgeglichen (nur Geänderte
+werden neu gelesen).
+
+![IP-Übersicht](docs/58-ip-overview.png)
+
+
+## RDAP und ASN
+
+Modul „RDAP/ASN“ (Standard aus; geht nur auf ausdrücklichen Klick ins Netz). Rechtsklick auf eine IP, Domain
+(auch aus URL/E-Mail, auch entschärft wie `evil[.]example[.]com`) oder AS-Nummer → **RDAP: …**, oder `Ctrl+Alt+R`
+bzw. Palette „RDAP / ASN abfragen“ (Markierung oder Wert unter dem Cursor, sonst Eingabefeld).
+
+- Die Karte zeigt Netzblock (CIDR), Name/Handle, Inhaber samt Adresse, Land, Abuse-Kontakt, Registrierungs- und
+  Änderungsdatum, das announcierte BGP-Präfix und die **ASN mit AS-Namen**; bei Domains Registrar, Status,
+  Nameserver, DNSSEC und Ablaufdatum. „Als Markdown einfügen“ hängt eine Tabelle samt Quelle und Abfragezeit an die
+  aktuelle Zeile, „Kopieren“ legt sie in die Zwischenablage.
+- Ablauf: IANA-Bootstrap (`data.iana.org/rdap/…`, RFC 9224) → zuständige Registry (ARIN, RIPE, APNIC, LACNIC,
+  AFRINIC, Registry der TLD). Die ASN zu einer IP kommt von der **RIPEstat Data API** (`stat.ripe.net`,
+  „prefix-overview“): kostenlos, ohne Schlüssel, weltweite BGP-Sicht; der AS-Name zusätzlich per RDAP.
+- **Private und reservierte Adressen** (RFC 1918, Loopback, Link-Local, CGNAT, Dokumentationsnetze, Multicast, ULA …)
+  erkennt Notex lokal und fragt sie nie ab.
+- Ergebnisse bleiben für die Sitzung im Speicher (nichts auf Platte); je Server mindestens 1 s Abstand, „429 Too
+  Many Requests“ wird mit Retry-After respektiert, Zeitlimit 10 s. Die Abfrage läuft im Hintergrund.
+- Aus verschlüsselten Notizen fragt Notex vor dem Senden nach.
+
+![RDAP-Karte](docs/60-rdap-card.png)
+
+
+## Log-Auswertung
+
+Modul „Log-Auswertung“ (Standard aus). Menü Datei → „Log-Auswertung …“, `Ctrl+Shift+Alt+L`, Palette oder Rechtsklick
+im Baum auf eine Log-Datei.
+
+- **Linux**: `auth.log`/`secure` inklusive rotierter `.gz` – sshd (Fehlversuche, erfolgreiche Anmeldung,
+  Schlüssel-Login, unbekannte Benutzer), sudo (Befehl und Fehlversuch), su, useradd/userdel/usermod, Gruppen,
+  Passwortänderungen.
+- **Windows**: `.evtx`-Ereignisprotokolle über das Paket **evtx** (Rust, MIT, vorgebaute Wheels für Windows und Linux)
+  – die Ereignisse 4624/4625 (mit Anmeldetyp), 4634, 4648, 4672, 4720, 4722–4726, 4728/4732/4756, 4740, 1102, 7045,
+  4688.
+- **Dashboard**: Fehlversuche je IP und Benutzer, erfolgreiche Anmeldung nach Fehlversuchen, Brute-Force-Verdacht ab
+  einer Schwelle, neue Benutzer, Gruppenänderungen, geleerte Protokolle, neue Dienste, Kontosperren; dazu eine
+  **Zeitleiste** (Fehlversuche rot, Erfolge grün je Stunde).
+- Jede Zeile ist filterbar (Art, „nur auffällige“, Textsuche); Doppelklick springt zur Quellzeile (auth.log),
+  Rechtsklick: „Zur Zeitleiste hinzufügen“ (Modul Zeitleiste), „RDAP zu <IP>“ (Modul RDAP), IP kopieren.
+- „Report einfügen/kopieren“ schreibt einen Markdown-Report. Große Logs werden gestreamt (Grenze 500 000 Ereignisse).
+
+Die Zuordnung der Windows-Event-IDs arbeitet auf dem gerenderten Event-XML und ist dadurch unabhängig von der
+Bibliothek testbar. **Entscheidung gegen python-evtx**: dessen Abhängigkeit `hexdump` baut auf neuem setuptools nicht
+und ist in beiden Builds unsicher; `evtx` bringt fertige Wheels ohne Transitiv-Abhängigkeit.
+
+![Log-Auswertung](docs/62-logauth.png)
+
+![Log-Auswertung](docs/62-logauth.png)
+
+
+## PCAP-Übersicht
+
+Modul „PCAP-Übersicht“ (Standard aus). Menü Datei → „PCAP-Übersicht …“, `Ctrl+Shift+Alt+K`, Palette oder Rechtsklick
+im Baum auf eine `.pcap`/`.pcapng`. Die Datei wird gestreamt (dpkt, BSD – **nicht** scapy).
+
+- **Übersicht**: Zeitraum, Paket- und Byte-Zahl, übersprungene (kaputte) Pakete.
+- **Reiter**: Protokollverteilung, Top-Verbindungen (A ↔ B, Pakete, Bytes), Top-Talker, DNS-Anfragen mit Antwort,
+  HTTP-Hosts/Pfade/User-Agents, TLS-SNI (Server-Name aus dem ClientHello) und – deutlich rot markiert –
+  **im Klartext übertragene Zugangsdaten** (FTP, Telnet, HTTP Basic, POP3, IMAP, SMTP AUTH).
+- Tabellen sind filter- und sortierbar; Rechtsklick auf eine IP: „RDAP zu <IP>“ (Modul RDAP), Zelle kopieren.
+- „Report einfügen/kopieren“ schreibt einen Markdown-Report.
+
+**Ehrliche Grenzen**: Keine vollständige TCP-Reassemblierung – HTTP/TLS/Zugangsdaten werden je Paket aus der Nutzlast
+gelesen (die Anfrage steckt fast immer im ersten Datenpaket). Verschlüsselte Inhalte werden nicht entschlüsselt (bei
+TLS nur der SNI-Name). Kaputte Aufzeichnungen werden übersprungen, nicht abgebrochen.
+
+![PCAP-Übersicht](docs/63-pcap.png)
+
+![PCAP-Übersicht](docs/63-pcap.png)
+
+
+## Netzwerk-Scanner
+
+Modul „Netzwerk-Scanner“ (Standard aus). **Nur für das eigene Netz** – Ziele außerhalb privater Bereiche verlangen
+eine Bestätigung (abschaltbar). Menü Datei → „Netzwerk-Scanner …“, `Ctrl+Shift+Alt+P` oder Palette.
+
+- **Ziele**: einzelne IP, Hostname, CIDR (`192.168.1.0/24`), Bereich (`10.0.0.1-10.0.0.50` oder `10.0.0.1-50`),
+  Liste – gemischt. Obergrenze mit Warnung (Standard 4096), Rückfrage ab 512 Zielen.
+- **Ports**: Profile Top-100 / Top-1000, eigene Listen (`22,80,443` oder `1-1024`), als **eigenes Profil speicherbar**.
+  Timeout und Parallelität einstellbar; optional „Banner lesen“, „Erst Hosts finden“, „auch System-ping“.
+- **Ergebnis**: Tabelle mit Host, Name (Reverse-DNS), MAC (aus der System-ARP-Tabelle), offenen Ports, Dienst (aus
+  dem Modul Port-Infos) und Banner. Live-Fortschritt, jederzeit abbrechbar – die Oberfläche bleibt bedienbar.
+- **Speichern**: JSON plus Markdown-Report in `data/scans/` mit Zeitstempel.
+- **Vergleich**: „Mit Scan vergleichen …“ zeigt neue/verschwundene Hosts, neu geöffnete/geschlossene Ports und
+  geänderte Banner gegenüber einem früheren Scan.
+- **An IP-Übersicht geben**: nutzt das Ergebnis als zusätzliche Quelle für das Modul IP-Konflikte.
+- **Skript-Export**: den konfigurierten Scan als eigenständiges **PowerShell**- (nur .NET-Bordmittel) oder
+  **Bash**-Skript (`/dev/tcp`, `timeout`, `ping`) speichern – gleiche Ziele/Ports, CSV-Ausgabe, mit
+  Ausführungshinweis im Header. Für Rechner ohne Notex.
+
+**Ehrliche Grenzen**: Es ist ein **TCP-Connect-Scan** (voller Handshake, keine Admin-Rechte). Kein SYN-/Stealth-Scan,
+keine Betriebssystem-Erkennung, kein UDP. „Host aktiv?“ ist heuristisch (TCP-Anklopfen, optional `ping`); eine
+Firewall, die alles verwirft, lässt einen Host tot wirken. Offene Ports gelten immer als Beleg, dass der Host lebt.
+
+![Netzwerk-Scanner](docs/61-scanner.png)
+
+
+## IOCs entschärfen
+
+Modul „IOC entschärfen“ (Standard an). Rechtsklick im Editor → **Umwandeln**, Menü Bearbeiten → Umwandeln oder
+Command Palette. Wirkt auf die Auswahl, ohne Auswahl auf die ganze Datei – ein Undo-Schritt.
+
+| Vorher | Entschärft (`Ctrl+Alt+D`) |
+|---|---|
+| `http://evil.example.com/a.php` | `hxxp://evil[.]example[.]com/a.php` (Punkte nur im Host) |
+| `evil.example.com`, `192.168.1.10:445` | `evil[.]example[.]com`, `192[.]168[.]1[.]10:445` |
+| `2001:db8::1` | `2001[:]db8[:][:]1` |
+| `admin@example.org` | `admin[@]example[.]org` |
+
+- `Ctrl+Shift+Alt+D` macht wieder scharf und versteht auch andere übliche Schreibweisen (`[dot]`, `(.)`, `{.}`,
+  `[at]`, `hxxps`, `h[xx]p`, `fxp`, `[://]`).
+- Erkannt werden URLs (http/https/ftp), Domains, IPv4, IPv6 (geprüft), E-Mails. Dateinamen wie `setup.py`,
+  `readme.md`, `evil.exe`, Versionsnummern und Uhrzeiten bleiben unverändert: Die Endung muss eine Top-Level-Domain
+  sein, mehrdeutige Endungen (`.md`, `.py`, `.sh` …) zählen erst ab drei Teilen (`cdn.evil.md`). Schon entschärfte
+  Werte werden nicht doppelt entschärft.
+- Code-Blöcke (``` und `inline`) bleiben standardmäßig unverändert (Einstellungen → Module).
+- Alles geschieht nur im Editor – bei verschlüsselten Notizen landet nichts im Klartext auf der Platte.
+
+![IOCs entschärft](docs/57-ioc-defanged.png)
 
 
 ## Live verfolgen (Logs)
@@ -722,7 +969,17 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+S | Strings extrahieren (Modul Strings) |
 | Ctrl+Alt+F | Eingebettete Dateien finden (Modul Eingebettete Dateien) |
 | Ctrl+Alt+E | Entropie anzeigen (Modul Entropie) |
+| Ctrl+Alt+M | Metadaten anzeigen / entfernen (Modul Metadaten) |
+| Ctrl+Alt+Y | YARA-Regel testen (Modul YARA) |
+| Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
+| Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
+| Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
+| Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
+| Ctrl+Shift+Alt+L | Log-Auswertung (Modul Log-Auswertung) |
+| Ctrl+Shift+Alt+K | PCAP-Übersicht (Modul PCAP-Übersicht) |
+| Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
+| Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
 | Ctrl+G / Ctrl+F / F3 / Esc (im Hex-Tab) | Gehe zu Offset / Suchen / Weitersuchen / Suche abbrechen |
 | Ctrl+G / Ctrl+F / F3 / Shift+F3 (im PDF-Tab) | Seite / Suchen / nächster / vorheriger Treffer |
 | Ctrl+Mausrad, Ctrl+Plus / Ctrl+Minus (im PDF-Tab) | PDF zoomen |

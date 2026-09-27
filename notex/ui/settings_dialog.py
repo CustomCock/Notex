@@ -509,6 +509,12 @@ class SettingsDialog(QDialog):
         self.extensions_edit.setToolTip("Dateiendungen, die im Baum erscheinen, mit Leerzeichen getrennt")
         self.extensions_edit.editingFinished.connect(self._extensions_changed)
         page.row("Dateiendungen", self.extensions_edit)
+        show_all = QCheckBox("Alle Dateien anzeigen (nicht nur die Endungen oben)")
+        show_all.setChecked(bool(self.config.get("tree_show_all", False)))
+        show_all.toggled.connect(lambda on: (self.config.__setitem__("tree_show_all", on), self.window_.apply_tree_filter()))
+        page.row("", show_all)
+        page.note("Solange eines der Analyse-Module (Strings, Eingebettete Dateien, Entropie) an ist, zeigt der Baum "
+                  "automatisch alle Dateien – damit sich auch .exe, .zip oder .pcap per Rechtsklick untersuchen lassen.")
         return page
 
     def _build_spelling(self) -> SettingsPage:
@@ -584,6 +590,14 @@ class SettingsDialog(QDialog):
             info.setWordWrap(True)
             page.row(box, info)
             self.module_boxes[module.key] = box
+        page.section("IOCs entschärfen")
+        ioc_cfg = self.config.setdefault("ioc", {})
+        self.ioc_skip_code = QCheckBox("Code-Blöcke (``` und `inline`) nicht umwandeln")
+        self.ioc_skip_code.setChecked(bool(ioc_cfg.get("skip_code", True)))
+        self.ioc_skip_code.toggled.connect(lambda on: ioc_cfg.__setitem__("skip_code", on))
+        page.add(self.ioc_skip_code)
+        page.note("Ctrl+Alt+D entschärft die Auswahl bzw. die ganze Datei (hxxp://, [.], [@], [:]), Ctrl+Shift+Alt+D "
+                  "macht sie wieder scharf. Dateinamen wie setup.py oder readme.md bleiben unverändert.")
         return page
 
     def _build_variables(self) -> SettingsPage:
@@ -763,7 +777,7 @@ class SettingsDialog(QDialog):
         parts = [p if p.startswith(".") else "." + p for p in self.extensions_edit.text().split() if p.strip(".")]
         if parts:
             self.config["extensions"] = sorted(set(p.lower() for p in parts))
-            self.window_.sidebar.tree.set_extensions(self.config["extensions"])
+            self.window_.apply_tree_filter()
         self.extensions_edit.setText(" ".join(self.config["extensions"]))
 
     def _reset_defaults(self) -> None:
@@ -857,10 +871,12 @@ class SettingsDialog(QDialog):
         self.manager.apply(self._snapshot_theme)
         for key in ("paper_mode", "extensions", "font_by_extension"):
             self.config[key] = self._snapshot_config[key]
+        if "ioc" in self._snapshot_config:
+            self.config["ioc"] = self._snapshot_config["ioc"]
         self.window_.tabs.apply_text_fonts()
         self.window_.tabs.set_paper_mode(self.config["paper_mode"])
         self.window_.paper_action.setChecked(self.config["paper_mode"])
-        self.window_.sidebar.tree.set_extensions(self.config["extensions"])
+        self.window_.apply_tree_filter()
         self.window_.tabs.set_font_size(self._snapshot_config["font_size"])
         registry = getattr(self.window_, "modules", None)
         if registry is not None:            # Module wirken sofort – beim Abbrechen über die Registry zurückdrehen

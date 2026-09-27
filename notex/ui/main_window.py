@@ -165,6 +165,8 @@ class MainWindow(QMainWindow):
         from notex.core.modules import ModuleRegistry
         self.modules = ModuleRegistry(self.config)
         self._install_modules()
+        self.modules.on_change(lambda _key, _on: self.apply_tree_filter())
+        self.apply_tree_filter()
         self.file_index.request_rescan()
         QTimer.singleShot(1500, self._check_association_path)
         # Zustand regelmäßig sichern: Absturz oder Neustart kostet höchstens die letzte Sekunde
@@ -884,6 +886,10 @@ class MainWindow(QMainWindow):
         return viewer.path if viewer is not None else None
 
     # ---- Module ---------------------------------------------------------------------------------
+    def apply_tree_filter(self) -> None:
+        from notex.core.modules import show_all_files
+        self.sidebar.tree.set_extensions(self.config["extensions"], show_all_files(self.config))
+
     def _install_modules(self) -> None:
         """Jedes Modul meldet einen Aktivator an; ausgeschaltete Module hängen nichts ein (siehe core/modules.py)."""
         self._editor_menu_providers: list = []
@@ -899,6 +905,18 @@ class MainWindow(QMainWindow):
         self.modules.contribute("entropy", lambda: self._activate_analysis(
             "entropy", "Entropie anzeigen …", "Ctrl+Alt+E", "activity", self.show_entropy,
             "entropie verschlüsselt komprimiert zufall kurve"))
+        self.modules.contribute("metadata", lambda: self._activate_analysis(
+            "metadata", "Metadaten anzeigen …", "Ctrl+Alt+M", "scan-eye", self.show_metadata,
+            "metadaten exif gps kamera autor pdf office docx entfernen bereinigen xmp iptc"))
+        self.modules.contribute("timeline", self._activate_timeline)
+        self.modules.contribute("ioc", self._activate_ioc)
+        self.modules.contribute("ports", self._activate_ports)
+        self.modules.contribute("ip_conflicts", self._activate_ip_conflicts)
+        self.modules.contribute("rdap", self._activate_rdap)
+        self.modules.contribute("scanner", self._activate_scanner)
+        self.modules.contribute("logs", self._activate_logs)
+        self.modules.contribute("pcap", self._activate_pcap)
+        self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
         """QAction für ein Modul: mit Shortcut am Fenster, optional im Menü vor dem Modul-Anker."""
@@ -1088,6 +1106,735 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             service.upsert(dialog.result_variable(), old_name=name)
 
+    # ---- Modul: Zeitleiste & Beweismittel --------------------------------------------------------
+    def _activate_timeline(self):
+        actions = [self._module_action("Zeitleiste anzeigen …", "Ctrl+Shift+Alt+Z", lambda: self.show_timeline(),
+                                       self.file_menu),
+                   self._action("Zur Zeitleiste hinzufügen …", "Ctrl+Alt+Z", lambda: self.add_to_timeline())]
+        self.edit_menu.addAction(actions[1])
+        keywords = "zeitleiste timeline forensik ereignis chronologie vorfall"
+        evidence = "beweismittel chain of custody sicherstellung forensik"
+        commands = {
+            "timeline:show": ("Zeitleiste anzeigen", lambda: self.show_timeline(), "Ctrl+Shift+Alt+Z", keywords),
+            "timeline:add": ("Zur Zeitleiste hinzufügen (aktuelle Zeile)", lambda: self.add_to_timeline(), "Ctrl+Alt+Z",
+                             keywords),
+            "timeline:new": ("Neue Zeitleiste", lambda: self.new_from_template("Zeitleiste.md"), "", keywords),
+            "evidence:new": ("Beweismittel: neu (Chain of Custody)", lambda: self.new_from_template("Beweismittel.md"),
+                             "", evidence),
+            "evidence:hashes": ("Beweismittel: Prüfsummen einfügen …", lambda: self.insert_evidence_hashes(), "",
+                                evidence + " prüfsumme hash sha256 md5"),
+            "evidence:handover": ("Beweismittel: Übergabe eintragen", lambda: self.add_handover(), "",
+                                  evidence + " übergabe"),
+        }
+        for key, (title, slot, shortcut, words) in commands.items():
+            self.registry.add(key, title, slot, category="Zeitleiste & Beweismittel", shortcut=shortcut, keywords=words)
+        self._editor_menu_providers.append(self._timeline_menu)
+        dialogs_open: list = self._analysis_dialogs.setdefault("timeline", [])
+
+        def undo() -> None:
+            self.edit_menu.removeAction(actions[1])
+            self._drop_actions(actions)
+            for key in commands:
+                self.registry.remove(key)
+            if self._timeline_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._timeline_menu)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def _timeline_menu(self, editor, menu) -> None:
+        from notex.core import timeline as tl
+        action = menu.addAction(icon("clock-4"), "Zur Zeitleiste hinzufügen …\tCtrl+Alt+Z",
+                                lambda: self.add_to_timeline(editor))
+        if not tl.can_take_from(editor.path):
+            action.setEnabled(False)
+            action.setToolTip("Aus verschlüsselten Notizen wird nichts in eine unverschlüsselte Zeitleiste kopiert")
+
+    def _timeline_candidates(self) -> list[Path]:
+        from notex.core import timeline as tl
+        found = tl.find_timelines(self.root)
+        last = Path(self.config.get("timeline", {}).get("last", "") or ".")
+        if last in found:
+            found.remove(last)
+            found.insert(0, last)
+        return found
+
+    def add_to_timeline(self, editor=None) -> None:
+        """Aktuelle Zeile (bzw. erste Zeile der Auswahl) als Eintrag vorschlagen – Zeit aus der Zeile erkannt."""
+        from notex.core import timeline as tl
+        from notex.ui.timeline_dialog import EntryDialog
+        editor = editor or self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Erst eine Datei öffnen und die Zeile anklicken", "info")
+            return
+        if not tl.can_take_from(editor.path):
+            self.toast.show_message("Aus verschlüsselten Notizen wird nichts in eine Zeitleiste kopiert", "lock")
+            return
+        cursor = editor.textCursor()
+        if cursor.hasSelection():
+            line = cursor.selection().toPlainText().strip().split("\n")[0]
+        else:
+            line = cursor.block().text()
+        is_timeline = tl.is_timeline(editor.toPlainText()[:4000])
+        entry = tl.entry_from_line("" if is_timeline else line, "" if is_timeline else editor.path.name)
+        candidates = self._timeline_candidates()
+        if is_timeline and editor.path not in candidates:
+            candidates.insert(0, editor.path)
+        dialog = EntryDialog(self, entry, candidates, editor.path if is_timeline else None)
+        if not dialog.exec():
+            return
+        target = dialog.target_path()
+        if target is None:
+            name = dialogs.ask_text(self, "Neue Zeitleiste", "Name:", "Zeitleiste")
+            if not name:
+                return
+            target = self.root / (name if name.lower().endswith(".md") else f"{name}.md")
+            if not fileops.is_within(target.resolve(), self.root.resolve()) or target.exists():
+                dialogs.warn(self, "Neue Zeitleiste", f"„{target.name}“ gibt es schon oder liegt außerhalb von data/.")
+                return
+            try:
+                fileops.atomic_write_bytes(target, tl.new_text(target.stem).encode("utf-8"))
+            except OSError as error:
+                dialogs.warn(self, "Neue Zeitleiste", str(error))
+                return
+            self.file_index.request_rescan()
+        self.add_timeline_entry(target, dialog.entry())
+
+    def add_prepared_timeline_entry(self, entry) -> None:
+        """Einen fertigen Zeitleisten-Eintrag (z. B. aus der Log-Auswertung) übernehmen: Ziel wählen, dann einfügen."""
+        from notex.ui.timeline_dialog import EntryDialog
+        if getattr(self, "modules", None) is not None and not self.modules.enabled("timeline"):
+            self.toast.show_message("Modul „Zeitleiste“ ist aus (Einstellungen → Module)", "info")
+            return
+        candidates = self._timeline_candidates()
+        dialog = EntryDialog(self, entry, candidates, candidates[0] if candidates else None)
+        if not dialog.exec():
+            return
+        target = dialog.target_path()
+        if target is None:
+            from notex.core import timeline as tl
+            name = dialogs.ask_text(self, "Neue Zeitleiste", "Name:", "Zeitleiste")
+            if not name:
+                return
+            target = self.root / (name if name.lower().endswith(".md") else f"{name}.md")
+            if not fileops.is_within(target.resolve(), self.root.resolve()) or target.exists():
+                dialogs.warn(self, "Neue Zeitleiste", f"„{target.name}“ gibt es schon oder liegt außerhalb von data/.")
+                return
+            try:
+                fileops.atomic_write_bytes(target, tl.new_text(target.stem).encode("utf-8"))
+            except OSError as error:
+                dialogs.warn(self, "Neue Zeitleiste", str(error))
+                return
+            self.file_index.request_rescan()
+        self.add_timeline_entry(target, dialog.entry())
+
+    def add_timeline_entry(self, path: Path, entry) -> None:
+        """In die Zeitleiste einfügen – offen: im Editor (ein Undo-Schritt), sonst direkt in die Datei."""
+        from notex.core import timeline as tl
+        self.config.setdefault("timeline", {})["last"] = str(path)
+        editor = self.tabs.editor_for(path)
+        if editor is not None:
+            new, _line = tl.add_entry(editor.toPlainText(), entry)
+            self.tabs.replace_text_keep_cursor(editor, new)
+        else:
+            try:
+                from notex.core.encoding import encode_text
+                original = read_text_file(path)
+                new, _line = tl.add_entry(original.text, entry)
+                fileops.atomic_write_bytes(path, encode_text(new, original.encoding, original.eol))
+            except (OSError, UnicodeDecodeError) as error:
+                dialogs.warn(self, "Zeitleiste", str(error))
+                return
+        self.toast.show_message(f"Eintrag in „{path.name}“ eingefügt ({tl.display(entry.time, 'utc')})", "clock-4")
+
+    def show_timeline(self) -> None:
+        from notex.core import timeline as tl
+        from notex.ui.timeline_dialog import TimelineDialog
+        editor = self.tabs.current_editor()
+        if editor is None or not tl.is_timeline(editor.toPlainText()[:4000]):
+            candidates = self._timeline_candidates()
+            if not candidates:
+                self.toast.show_message("Noch keine Zeitleiste – Palette „Neue Zeitleiste“", "info")
+                return
+            names = [str(p.relative_to(self.root)) if fileops.is_within(p, self.root) else str(p) for p in candidates]
+            chosen = names[0] if len(names) == 1 else dialogs.choose(self, "Zeitleiste anzeigen", "Zeitleiste:", names)
+            if chosen is None:
+                return
+            editor = self.tabs.open_file(candidates[names.index(chosen)])
+            if editor is None:
+                return
+        dialog = TimelineDialog(self, editor)
+        self._analysis_dialogs.setdefault("timeline", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("timeline", []).remove(d)
+                                if d in self._analysis_dialogs.get("timeline", []) else None)
+        dialog.show()
+
+    def _evidence_editor(self):
+        editor = self.tabs.current_editor()
+        if editor is None or self._in_data_view() or editor.isReadOnly() or getattr(editor, "locked", False):
+            self.toast.show_message("Erst die Beweismittel-Notiz öffnen (beschreibbar)", "info")
+            return None
+        return editor
+
+    def insert_evidence_hashes(self) -> None:
+        """Datei wählen, MD5/SHA-1/SHA-256 im Hintergrund berechnen, als Zeilen in „## Prüfsummen“ einfügen."""
+        from PySide6.QtWidgets import QFileDialog, QProgressDialog
+        from notex.core import hashing
+        from notex.ui.analysis_dialog import AnalysisWorker
+        editor = self._evidence_editor()
+        if editor is None:
+            return
+        chosen, _ = QFileDialog.getOpenFileName(self, "Prüfsummen berechnen für", str(self.root))
+        if not chosen:
+            return
+        path = Path(chosen)
+        progress = QProgressDialog(f"Prüfsummen für „{path.name}“ …", "Abbrechen", 0, 1000, self)
+        progress.setWindowTitle("Beweismittel")
+        progress.setMinimumDuration(400)
+        worker = AnalysisWorker(lambda report, cancelled: hashing.hash_file(path, ("md5", "sha1", "sha256"),
+                                                                            report, cancelled))
+        worker.progress.connect(progress.setValue)
+        progress.canceled.connect(lambda: setattr(worker, "cancel", True))
+
+        def done(result, error: str) -> None:
+            worker.wait()
+            progress.close()
+            self._hash_worker = None
+            if result is None:
+                if error:
+                    dialogs.warn(self, "Prüfsummen", error)
+                return
+            self._insert_hash_rows(editor, path, result)
+        worker.done.connect(done)
+        self._hash_worker = worker
+        worker.start()
+
+    _hash_worker = None
+
+    def _insert_hash_rows(self, editor, path: Path, digests: dict[str, str]) -> None:
+        from notex.core import hashing
+        from notex.core import timeline as tl
+        text = editor.toPlainText()
+        rows = [[hashing.LABELS[name], digests[name], path.name] for name in ("md5", "sha1", "sha256")]
+        placed = True
+        for row in rows:
+            result = tl.append_row(text, "Prüfsummen", row)
+            if result is None:
+                placed = False
+                break
+            text = result[0]
+        if placed:
+            self.tabs.replace_text_keep_cursor(editor, text)
+        else:                                     # keine Prüfsummen-Tabelle: an der Cursorposition einfügen
+            table = "| Algorithmus | Wert | Datei |\n|---|---|---|\n" + "".join(
+                "| " + " | ".join(tl.escape_cell(c) for c in row) + " |\n" for row in rows)
+            cursor = editor.textCursor()
+            editor._grouped(lambda: cursor.insertText(("\n" if cursor.positionInBlock() else "") + table))
+        self.toast.show_message(f"MD5, SHA-1, SHA-256 von „{path.name}“ eingefügt", "hash")
+
+    def add_handover(self) -> None:
+        from datetime import datetime
+        from notex.core import timeline as tl
+        editor = self._evidence_editor()
+        if editor is None:
+            return
+        now = datetime.now().astimezone().replace(second=0, microsecond=0)
+        result = tl.append_row(editor.toPlainText(), "Übergaben", [tl.iso(now), "", "", "", ""])
+        if result is None:
+            self.toast.show_message("Keine Tabelle unter „## Übergaben“ – Vorlage „Beweismittel“ nutzen", "info")
+            return
+        text, line = result
+        self.tabs.replace_text_keep_cursor(editor, text)
+        row = text.split("\n")[line]
+        editor.goto_line(line + 1, row.index(" | ", 2) + 3)          # Cursor in die Spalte „Von“
+
+    # ---- Modul: YARA ----------------------------------------------------------------------------
+    def _activate_yara(self):
+        """Regel testen: aktuelle .yar-Datei (auch ungespeichert) gegen Datei/Ordner; Baum: Regel oder Ziel."""
+        action = self._module_action("YARA-Regel testen …", "Ctrl+Alt+Y", lambda: self.test_yara(), self.file_menu)
+        self.registry.add("yara:test", "YARA-Regel testen", lambda: self.test_yara(), category="Dateianalyse",
+                          shortcut="Ctrl+Alt+Y", keywords="yara regel rule malware signatur prüfen scan")
+
+        def file_entry(menu, path: Path) -> None:
+            if path.suffix.lower() in (".yar", ".yara"):
+                menu.addAction(icon("bug-play"), "YARA-Regel testen …", lambda: self.test_yara(rule=path))
+            else:
+                menu.addAction(icon("bug-play"), "Mit YARA-Regel prüfen …", lambda: self.test_yara(target=path))
+
+        def folder_entry(menu, path: Path) -> None:
+            menu.addAction(icon("bug-play"), "Mit YARA-Regel prüfen …", lambda: self.test_yara(target=path))
+        tree = self.sidebar.tree
+        tree.menu_providers.append(file_entry)
+        tree.folder_menu_providers.append(folder_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault("yara", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("yara:test")
+            for providers, entry in ((tree.menu_providers, file_entry), (tree.folder_menu_providers, folder_entry)):
+                if entry in providers:
+                    providers.remove(entry)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def test_yara(self, rule: Path | None = None, target: Path | None = None) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        from notex.core import yara_rules
+        from notex.paths import data_dir
+        from notex.ui.yara_dialog import RULE_SUFFIXES, YaraDialog
+        if not yara_rules.available():
+            self.toast.show_message("yara-python fehlt in diesem Build – YARA nicht verfügbar", "info")
+            return
+        editor = None
+        if rule is None:
+            current = self.tabs.current_editor()
+            if current is not None and current.path.suffix.lower() in RULE_SUFFIXES:
+                rule, editor = current.path, current
+            else:
+                last = Path(self.config.get("yara", {}).get("last_rule", "") or ".")
+                if not (last.is_file() and last.suffix.lower() in RULE_SUFFIXES):
+                    chosen = QFileDialog.getOpenFileName(self, "YARA-Regeln wählen", str(data_dir()),
+                                                         "YARA-Regeln (*.yar *.yara)")[0]
+                    if not chosen:
+                        return
+                    last = Path(chosen)
+                rule = last
+        if editor is None:
+            editor = self.tabs.editor_for(rule)
+        dialog = YaraDialog(self, rule, target, editor)
+        self._analysis_dialogs.setdefault("yara", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("yara", []).remove(d)
+                                if d in self._analysis_dialogs.get("yara", []) else None)
+        dialog.show()
+
+    def mark_yara_error(self, editor, line: int | None) -> None:
+        """Syntaxfehler der Regel im Editor rot unterwellen und hinspringen; None räumt auf."""
+        if editor is None:
+            return
+        if getattr(editor, "_yara_error_hooked", False):
+            editor.textChanged.disconnect(self._clear_yara_error)
+            editor._yara_error_hooked = False
+        if line is None:
+            editor.set_problem(None)
+            return
+        block = editor.document().findBlockByNumber(max(0, line - 1))
+        if block.isValid():
+            text = block.text()
+            editor.set_problem(block.position() + len(text) - len(text.lstrip()))
+            editor.goto_line(line)
+            editor.textChanged.connect(self._clear_yara_error)
+            editor._yara_error_hooked = True
+
+    def _clear_yara_error(self) -> None:
+        editor = self.sender()
+        if editor is not None and getattr(editor, "_yara_error_hooked", False):
+            editor.set_problem(None)
+            editor.textChanged.disconnect(self._clear_yara_error)
+            editor._yara_error_hooked = False
+
+    # ---- Modul: Port-Infos ----------------------------------------------------------------------
+    def _activate_ports(self):
+        """Hover über Portangaben im Editor (offline) und „Port nachschlagen“."""
+        from notex.core import ports
+        from notex.ui.editor import Editor
+
+        def hover(_editor, line: str, column: int):
+            hit = ports.port_at(line, column)
+            if hit is None:
+                return None
+            info = ports.lookup(hit[0])
+            return ports.tooltip_html(info) if info else None
+        Editor.hover_providers.append(hover)
+        action = self._action("Port nachschlagen …", "Ctrl+Alt+P", lambda: self.lookup_port())
+        self.edit_menu.addAction(action)
+        self.registry.add("ports:lookup", "Port nachschlagen", lambda: self.lookup_port(), category="Netzwerk",
+                          shortcut="Ctrl+Alt+P", keywords="port dienst service iana tcp udp rdp smb nummer")
+
+        def undo() -> None:
+            if hover in Editor.hover_providers:
+                Editor.hover_providers.remove(hover)
+            self.edit_menu.removeAction(action)
+            self._drop_actions([action])
+            self.registry.remove("ports:lookup")
+        return undo
+
+    def lookup_port(self) -> None:
+        from notex.core import ports
+        from notex.ui.ports_dialog import PortDialog
+        term = ""
+        editor = self.tabs.current_editor()
+        if editor is not None and not getattr(editor, "locked", False):
+            cursor = editor.textCursor()
+            if cursor.hasSelection():
+                term = cursor.selectedText().strip()[:40]
+            else:
+                hit = ports.port_at(cursor.block().text(), cursor.positionInBlock())
+                term = str(hit[0]) if hit else ""
+        PortDialog(self, term).show()
+
+    # ---- Modul: IP-Konflikte --------------------------------------------------------------------
+    ip_index = None
+
+    def _activate_ip_conflicts(self):
+        """IP-Zuordnungen aus data/ (ohne .ntx) sammeln: Übersicht, Konflikte im Editor unterwellt + Tooltip."""
+        from notex.core import ipmap
+        from notex.ui.editor import Editor
+        self.ip_index = ipmap.IpIndex(self.root)
+        self._ip_conflicts: dict = {}
+        self._ip_timer = QTimer(self)
+        self._ip_timer.setSingleShot(True)
+        self._ip_timer.setInterval(800)
+        self._ip_timer.timeout.connect(lambda: self._mark_ip_conflicts(only_current=True))
+        action = self._module_action("IP-Übersicht …", "Ctrl+Shift+Alt+I", lambda: self.show_ip_overview(),
+                                     self.file_menu)
+        self.registry.add("ip:overview", "IP-Übersicht (Zuordnungen, Konflikte, freie Adressen)",
+                          lambda: self.show_ip_overview(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+I",
+                          keywords="ip adresse konflikt subnetz netz frei dhcp host zuordnung")
+
+        def hover(editor, line: str, column: int):
+            if not ipmap.IpIndex.eligible(editor.path):
+                return None
+            for item in ipmap.extract(line, editor.path):
+                start = line.find(item.ip)
+                if item.ip in self._ip_conflicts and start <= column <= start + len(item.ip):
+                    others = [f"{o.host} ({o.file.name}:{o.line + 1})" for o in self._ip_conflicts[item.ip]
+                              if not (o.file == editor.path and o.host == item.host)]
+                    import html
+                    return (f"<b>IP-Konflikt {html.escape(item.ip)}</b><br>auch vergeben an: "
+                            + html.escape(", ".join(others)))
+            return None
+        Editor.hover_providers.append(hover)
+        self.tabs.status_changed.connect(self._ip_timer.start)
+        self.tabs.file_saved.connect(self._ip_file_saved)
+        self.tabs.file_opened.connect(self._ip_timer.start)
+        self.refresh_ip_index(full=True)
+        dialogs_open: list = self._analysis_dialogs.setdefault("ip_conflicts", [])
+
+        def undo() -> None:
+            if hover in Editor.hover_providers:
+                Editor.hover_providers.remove(hover)
+            self.tabs.status_changed.disconnect(self._ip_timer.start)
+            self.tabs.file_saved.disconnect(self._ip_file_saved)
+            self.tabs.file_opened.disconnect(self._ip_timer.start)
+            self._ip_timer.stop()
+            self._drop_actions([action])
+            self.registry.remove("ip:overview")
+            for editor in self.tabs.editors():
+                editor.set_module_marks("ip_conflicts", [])
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+            self.ip_index = None
+        return undo
+
+    def refresh_ip_index(self, full: bool = False) -> None:
+        """Abgleich im Hintergrund (liest nur geänderte Dateien), danach Übersicht und Markierungen aktualisieren."""
+        from notex.core import ipmap
+        from notex.ui.analysis_dialog import AnalysisWorker
+        index = self.ip_index
+        if index is None or getattr(self, "_ip_worker", None) is not None:
+            return
+        snapshot = dict(index.files)
+
+        def job(_progress, _cancelled):
+            copy = ipmap.IpIndex(index.root, index.limit)
+            copy.files = snapshot
+            copy.refresh()
+            return copy.files
+
+        def done(result, _error: str) -> None:
+            worker.wait()
+            self._ip_worker = None
+            if result is not None and self.ip_index is index:
+                index.files = result
+                self._mark_ip_conflicts()
+        worker = AnalysisWorker(job)
+        worker.done.connect(done)
+        self._ip_worker = worker
+        worker.start()
+
+    _ip_worker = None
+
+    def _ip_file_saved(self, path: Path) -> None:
+        if self.ip_index is not None and self.ip_index.update_file(path):
+            self._mark_ip_conflicts()
+
+    def _ip_assignments(self) -> list:
+        """Index + ungespeicherter Text offener Editoren (nie .ntx)."""
+        override = {e.path: e.toPlainText() for e in self.tabs.editors()
+                    if e.document().isModified() and not getattr(e, "encrypted", False)}
+        return self.ip_index.assignments(override)
+
+    def _mark_ip_conflicts(self, only_current: bool = False) -> None:
+        from notex.core import ipmap
+        if self.ip_index is None:
+            return
+        assignments = self._ip_assignments()
+        self._ip_conflicts = ipmap.conflicts(assignments)
+        editors = [self.tabs.current_editor()] if only_current else list(self.tabs.editors())
+        for editor in editors:
+            if editor is None:
+                continue
+            if getattr(editor, "locked", False) or not ipmap.IpIndex.eligible(editor.path):
+                editor.set_module_marks("ip_conflicts", [])
+                continue
+            spans = []
+            document = editor.document()
+            for item in ipmap.extract(editor.toPlainText(), editor.path):
+                if item.ip in self._ip_conflicts:
+                    block = document.findBlockByNumber(item.line)
+                    column = block.text().find(item.ip)
+                    if column >= 0:
+                        spans.append((block.position() + column, len(item.ip)))
+            editor.set_module_marks("ip_conflicts", spans)
+        for dialog in self._analysis_dialogs.get("ip_conflicts", []):
+            dialog.show_assignments(assignments)
+
+    def show_ip_overview(self) -> None:
+        from notex.ui.ip_dialog import IpOverviewDialog
+        if self.ip_index is None:
+            return
+        dialog = IpOverviewDialog(self)
+        self._analysis_dialogs.setdefault("ip_conflicts", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("ip_conflicts", []).remove(d)
+                                if d in self._analysis_dialogs.get("ip_conflicts", []) else None)
+        dialog.show_assignments(self._ip_assignments())
+        dialog.show()
+        self.refresh_ip_index()
+
+    # ---- Modul: RDAP/ASN -------------------------------------------------------------------------
+    _rdap_client = None
+
+    def _activate_rdap(self):
+        """RDAP/ASN nur auf ausdrücklichen Klick: Palette/Kürzel und Kontextmenü für IP, Domain oder AS-Nummer."""
+        action = self._action("RDAP / ASN abfragen …", "Ctrl+Alt+R", lambda: self.rdap_lookup())
+        self.edit_menu.addAction(action)
+        self.registry.add("rdap:lookup", "RDAP / ASN abfragen (IP, Domain, AS-Nummer)", lambda: self.rdap_lookup(),
+                          category="Netzwerk", shortcut="Ctrl+Alt+R",
+                          keywords="rdap whois asn inhaber netzblock abuse registrar ip domain")
+        self._editor_menu_providers.append(self._rdap_menu)
+
+        def undo() -> None:
+            self.edit_menu.removeAction(action)
+            self._drop_actions([action])
+            self.registry.remove("rdap:lookup")
+            if self._rdap_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._rdap_menu)
+        return undo
+
+    def _rdap_menu(self, editor, menu) -> None:
+        from notex.core import rdap
+        cursor = editor.textCursor()
+        token = rdap.token_at(cursor.block().text(), cursor.positionInBlock()) if not cursor.hasSelection() else \
+            cursor.selectedText().strip()[:120]
+        if not token:
+            return
+        try:
+            kind, value = rdap.classify(token)
+        except rdap.RdapError:
+            return
+        reason = rdap.local_reason(value) if kind == "ip" else None
+        label = f"RDAP: {token}" + (f" ({reason} – keine Abfrage)" if reason else "")
+        action = menu.addAction(icon("globe-lock"), label + "\tCtrl+Alt+R", lambda: self.rdap_lookup(token, editor))
+        action.setEnabled(reason is None)
+
+    def rdap_lookup(self, query: str | None = None, editor=None) -> None:
+        from notex.core import rdap
+        from notex.ui.rdap_dialog import RdapDialog
+        editor = editor or self.tabs.current_editor()
+        if query is None and editor is not None and not getattr(editor, "locked", False):
+            cursor = editor.textCursor()
+            query = cursor.selectedText().strip()[:120] if cursor.hasSelection() else \
+                (rdap.token_at(cursor.block().text(), cursor.positionInBlock()) or "")
+        if query and editor is not None and rdap.needs_confirmation(editor.path):
+            if not dialogs.confirm(self, "RDAP-Abfrage", f"„{query}“ stammt aus einer verschlüsselten Notiz und wird "
+                                   "an öffentliche Registries (IANA, RIR, RIPEstat) gesendet. Trotzdem abfragen?"):
+                return
+        if self._rdap_client is None:
+            self._rdap_client = rdap.Client()          # Sitzungs-Cache für die Laufzeit der App
+        RdapDialog(self, self._rdap_client, query or "", editor).show()
+
+    # ---- Modul: Netzwerk-Scanner ----------------------------------------------------------------
+    def _activate_scanner(self):
+        """Scanner nur auf ausdrücklichen Start; öffentliche Ziele verlangen eine Bestätigung."""
+        action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner(),
+                                     self.file_menu)
+        self.registry.add("scan:open", "Netzwerk-Scanner (Hosts und offene Ports im eigenen Netz)",
+                          lambda: self.open_scanner(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+P",
+                          keywords="scan scanner netzwerk port host offen tcp nmap discovery")
+        dialogs_open: list = self._analysis_dialogs.setdefault("scanner", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("scan:open")
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def open_scanner(self) -> None:
+        from notex.ui.scan_dialog import ScanDialog
+        dialog = ScanDialog(self)
+        self._analysis_dialogs.setdefault("scanner", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("scanner", []).remove(d)
+                                if d in self._analysis_dialogs.get("scanner", []) else None)
+        dialog.show()
+
+    # ---- Modul: Log-Auswertung -------------------------------------------------------------------
+    def _activate_logs(self):
+        action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log(),
+                                     self.file_menu)
+        self.registry.add("logs:open", "Log-Auswertung (auth.log, secure, .evtx)", lambda: self.analyze_log(),
+                          category="Sicherheit", shortcut="Ctrl+Shift+Alt+L",
+                          keywords="log auth secure evtx anmeldung login brute force ereignis windows linux")
+
+        def tree_entry(menu, path: Path) -> None:
+            if self._is_log_file(path):
+                menu.addAction(icon("scroll-text"), "Log-Auswertung …", lambda: self.analyze_log(path))
+        self.sidebar.tree.menu_providers.append(tree_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault("logs", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("logs:open")
+            if tree_entry in self.sidebar.tree.menu_providers:
+                self.sidebar.tree.menu_providers.remove(tree_entry)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    @staticmethod
+    def _is_log_file(path: Path) -> bool:
+        name = path.name.lower()
+        return (name.endswith(".evtx") or name.endswith(".log") or name.endswith(".log.gz")
+                or "auth" in name or "secure" in name or name.endswith(".gz"))
+
+    def analyze_log(self, path: Path | None = None) -> None:
+        from notex.core import logauth
+        from notex.ui.logauth_dialog import LogAuthDialog
+        target = self._analysis_target(path)
+        if target is None:
+            return
+        if target.suffix.lower() == ".evtx" and not logauth.evtx_available():
+            self.toast.show_message("Für .evtx fehlt das Paket „evtx“ in diesem Build", "info")
+            return
+        dialog = LogAuthDialog(self, target)
+        self._analysis_dialogs.setdefault("logs", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("logs", []).remove(d)
+                                if d in self._analysis_dialogs.get("logs", []) else None)
+        dialog.show()
+
+    # ---- Modul: PCAP-Übersicht -------------------------------------------------------------------
+    def _activate_pcap(self):
+        action = self._module_action("PCAP-Übersicht …", "Ctrl+Shift+Alt+K", lambda: self.analyze_pcap(),
+                                     self.file_menu)
+        self.registry.add("pcap:open", "PCAP-Übersicht (Protokolle, DNS, HTTP, TLS, Klartext-Zugangsdaten)",
+                          lambda: self.analyze_pcap(), category="Sicherheit", shortcut="Ctrl+Shift+Alt+K",
+                          keywords="pcap pcapng netzwerk mitschnitt wireshark dns http tls sni zugangsdaten")
+
+        def tree_entry(menu, path: Path) -> None:
+            if path.suffix.lower() in (".pcap", ".pcapng", ".cap"):
+                menu.addAction(icon("radar"), "PCAP-Übersicht …", lambda: self.analyze_pcap(path))
+        self.sidebar.tree.menu_providers.append(tree_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault("pcap", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("pcap:open")
+            if tree_entry in self.sidebar.tree.menu_providers:
+                self.sidebar.tree.menu_providers.remove(tree_entry)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def analyze_pcap(self, path: Path | None = None) -> None:
+        from notex.core import pcapinfo
+        from notex.ui.pcap_dialog import PcapDialog
+        target = self._analysis_target(path)
+        if target is None:
+            return
+        try:
+            import dpkt  # noqa: F401
+        except ImportError:
+            self.toast.show_message("Für PCAP fehlt das Paket „dpkt“ in diesem Build", "info")
+            return
+        dialog = PcapDialog(self, target)
+        self._analysis_dialogs.setdefault("pcap", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("pcap", []).remove(d)
+                                if d in self._analysis_dialogs.get("pcap", []) else None)
+        dialog.show()
+
+    # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
+    def _activate_ioc(self):
+        """Umwandeln: IOCs (URLs, Domains, IPs, E-Mails) in Auswahl oder Datei entschärfen bzw. scharf machen."""
+        submenu = self.edit_menu.addMenu("Umwandeln")
+        actions = [self._action("IOCs entschärfen", "Ctrl+Alt+D", lambda: self.convert_iocs(True)),
+                   self._action("IOCs wieder scharf machen", "Ctrl+Shift+Alt+D", lambda: self.convert_iocs(False))]
+        for action in actions:
+            submenu.addAction(action)
+        keywords = "ioc defang refang entschärfen hxxp url domain ip e-mail bericht ticket"
+        self.registry.add("ioc:defang", "IOCs entschärfen (Auswahl oder Datei)", lambda: self.convert_iocs(True),
+                          category="Umwandeln", shortcut="Ctrl+Alt+D", keywords=keywords)
+        self.registry.add("ioc:refang", "IOCs wieder scharf machen (Auswahl oder Datei)", lambda: self.convert_iocs(False),
+                          category="Umwandeln", shortcut="Ctrl+Shift+Alt+D", keywords=keywords)
+        self._editor_menu_providers.append(self._ioc_menu)
+
+        def undo() -> None:
+            for action in actions:
+                self.removeAction(action)
+                action.deleteLater()
+            self.edit_menu.removeAction(submenu.menuAction())
+            submenu.deleteLater()
+            self.registry.remove("ioc:defang")
+            self.registry.remove("ioc:refang")
+            if self._ioc_menu in self._editor_menu_providers:
+                self._editor_menu_providers.remove(self._ioc_menu)
+        return undo
+
+    def _ioc_menu(self, editor, menu) -> None:
+        writable = not editor.isReadOnly() and not getattr(editor, "locked", False)
+        scope = "Auswahl" if editor.textCursor().hasSelection() else "Datei"
+        submenu = menu.addMenu(icon("shield"), "Umwandeln")
+        submenu.addAction(f"IOCs entschärfen ({scope})\tCtrl+Alt+D", lambda: self.convert_iocs(True, editor)).setEnabled(writable)
+        submenu.addAction(f"IOCs wieder scharf machen ({scope})\tCtrl+Shift+Alt+D",
+                          lambda: self.convert_iocs(False, editor)).setEnabled(writable)
+
+    def convert_iocs(self, defang: bool, editor=None) -> None:
+        """Auswahl (oder ganze Datei) umwandeln – ein Undo-Schritt, alles nur im Editor (auch bei .ntx nichts auf Platte)."""
+        from notex.core import ioc
+        editor = editor or self.tabs.current_editor()
+        if editor is None or self._in_data_view():
+            self.toast.show_message("Erst eine Textdatei öffnen", "info")
+            return
+        if editor.isReadOnly() or getattr(editor, "locked", False):
+            self.toast.show_message("Die Datei ist schreibgeschützt oder gesperrt", "lock")
+            return
+        skip_code = bool(self.config.get("ioc", {}).get("skip_code", True))
+        convert = ioc.defang if defang else ioc.refang
+        cursor = editor.textCursor()
+        if cursor.hasSelection():
+            start = cursor.selectionStart()
+            new, count = convert(cursor.selection().toPlainText(), skip_code=skip_code)
+            if count:
+                editor._grouped(lambda: cursor.insertText(new))
+                cursor.setPosition(start)
+                cursor.setPosition(start + len(new), QTextCursor.MoveMode.KeepAnchor)
+                editor.setTextCursor(cursor)
+        else:
+            new, count = convert(editor.toPlainText(), skip_code=skip_code)
+            if count:
+                self.tabs.replace_text_keep_cursor(editor, new)
+        if not count:
+            self.toast.show_message("Keine IOCs gefunden" if defang else "Nichts Entschärftes gefunden", "info")
+            return
+        what = "entschärft" if defang else "wieder scharf gemacht"
+        self.toast.show_message(f"{count} Stelle(n) {what} – Ctrl+Z macht es rückgängig", "shield")
+
     def _activate_analysis(self, key: str, title: str, shortcut: str, icon_name: str, opener, keywords: str):
         """Gemeinsamer Aktivator für Datei-Analysen: Menü Datei, Palette, Kürzel, Baum-Kontextmenü."""
         action = self._module_action(title, shortcut, lambda: opener(), self.file_menu)
@@ -1130,6 +1877,10 @@ class MainWindow(QMainWindow):
     def show_entropy(self, path: Path | None = None) -> None:
         from notex.ui.entropy_dialog import EntropyDialog
         self._open_analysis("entropy", lambda target: EntropyDialog(self, target), path)
+
+    def show_metadata(self, path: Path | None = None) -> None:
+        from notex.ui.metadata_dialog import MetadataDialog
+        self._open_analysis("metadata", lambda target: MetadataDialog(self, target), path)
 
     def show_in_hex(self, path: Path, offset: int, length: int = 1) -> None:
         """Sprung aus Strings/Eingebettete Dateien/Entropie an eine Stelle der Datei (Modul Hex & Dateianalyse)."""
@@ -1658,7 +2409,8 @@ class MainWindow(QMainWindow):
         from notex.core.templates import ensure_defaults
         folder = app_root() / "templates"
         try:
-            ensure_defaults(folder)
+            installed = self.config.setdefault("templates", {}).setdefault("installed", [])
+            ensure_defaults(folder, installed)
         except OSError:
             pass
         return folder
@@ -1693,6 +2445,12 @@ class MainWindow(QMainWindow):
                 return
         try:
             template = (folder / name).read_text(encoding="utf-8-sig")
+        except FileNotFoundError:
+            from notex.core.templates import DEFAULT_TEMPLATES
+            template = DEFAULT_TEMPLATES.get(name)
+            if template is None:
+                dialogs.warn(self, "Vorlage", f"Vorlage „{name}“ nicht gefunden")
+                return
         except (OSError, UnicodeDecodeError) as error:
             dialogs.warn(self, "Vorlage", str(error))
             return

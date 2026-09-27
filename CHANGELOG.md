@@ -2,6 +2,69 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.12.0] – 2026-09-27
+
+### Hinzugefügt
+- Modul Log-Auswertung (Standard aus, `Ctrl+Shift+Alt+L`): auth.log/secure (auch rotierte .gz) und Windows-.evtx
+  (Paket evtx, Rust/MIT) mit Dashboard (Fehlversuche je IP/Benutzer, Erfolg nach Fehlversuchen, Brute-Force-Verdacht,
+  neue Benutzer/Gruppen/Dienste, geleerte Protokolle, Kontosperren), Zeitleiste (QPainter), Filter, Sprung zur Quelle,
+  „Zur Zeitleiste hinzufügen“, RDAP für IPs, Markdown-Report; große Logs gestreamt
+- Modul PCAP-Übersicht (Standard aus, `Ctrl+Shift+Alt+K`): .pcap/.pcapng streamen (dpkt) – Zeitraum, Protokolle,
+  Top-Verbindungen/-Talker, DNS, HTTP (Hosts/Pfade/User-Agents), TLS-SNI und im Klartext übertragene Zugangsdaten
+  (FTP/Telnet/HTTP Basic/POP3/IMAP/SMTP AUTH) rot markiert; Tabellen filter-/sortierbar, RDAP je IP, Markdown-Report;
+  kaputte Aufzeichnungen werden übersprungen
+- Abhängigkeiten evtx 0.13.1 (MIT, Wheels) und dpkt 1.9.8 (BSD-3) hinzugefügt
+
+## [1.11.0] – 2026-09-27
+
+### Hinzugefügt
+- Modul Netzwerk-Scanner (Standard aus, `Ctrl+Shift+Alt+P`): TCP-Connect-Scan im eigenen Netz (asyncio, ohne
+  Admin-Rechte, Windows und Linux gleich), Host-Erkennung (TCP-Anklopfen, optional System-ping), Banner für
+  HTTP/SSH/FTP/SMTP u. a., Reverse-DNS, MAC aus der ARP-Tabelle; Ziele als IP/Hostname/CIDR/Bereich/Liste mit
+  Obergrenze und Bestätigung für öffentliche Ziele; speicherbare Portprofile; Ergebnis als Tabelle, Speichern als
+  JSON + Markdown-Report in data/scans/, Scan-Vergleich, Übergabe an die IP-Übersicht
+- Skript-Export des Scans als eigenständiges PowerShell- und Bash-Skript (nur Bordmittel, CSV-Ausgabe); CI prüft die
+  erzeugten Skripte auf Syntax (bash -n, PowerShell-Parser)
+
+## [1.10.0] – 2026-09-26
+
+### Hinzugefügt
+- Modul Port-Infos (Standard an): Tooltip über Portangaben im Editor (Port 3389, :443, 3389/tcp, tcp/445,
+  Portlisten, nmap-Zeilen) mit Dienst, Hinweis und IANA-Einträgen – ohne Treffer auf Jahreszahlen, Beträge oder
+  Uhrzeiten; „Port nachschlagen“ (`Ctrl+Alt+P`) nach Nummer oder Name; IANA-Portliste offline mitgeliefert
+- Editor: allgemeine Hover-Schnittstelle für Module
+- Modul IP-Konflikte: IP-Zuordnungen aus Tabellen und „IP Host“/„Host: IP“ in allen Notizen (ohne .ntx),
+  IP-Übersicht nach Subnetz (`Ctrl+Shift+Alt+I`) mit Konflikten, Sprung zur Stelle, Subnetz-Auswertung mit
+  Ausschlussbereichen und „Nächste freie IP kopieren“; Konflikte im Editor unterwellt
+- Modul RDAP/ASN (nur auf Klick): Karte zu IP, Domain oder AS-Nummer über den IANA-Bootstrap (Netzblock, Inhaber,
+  Land, Abuse-Kontakt, Daten; Registrar/Nameserver bei Domains), ASN über RIPEstat; private/reservierte Adressen
+  werden nie abgefragt; Sitzungs-Cache, Mindestabstand und Retry-After; „Als Markdown einfügen“ (`Ctrl+Alt+R`)
+
+## [1.9.0] – 2026-09-26
+
+### Hinzugefügt
+- Modul Metadaten (`Ctrl+Alt+M`): EXIF inkl. GPS (OpenStreetMap nur auf Klick), XMP, IPTC, PNG-Text; PDF-Info, XMP
+  und Speicherstände; Office-Eigenschaften und Namen aus Kommentaren/Änderungsverfolgung. Kopieren, als Markdown
+  einfügen, „Metadaten entfernen“ als geprüfte Kopie (Bilder verlustfrei ohne Neukodierung)
+- Abhängigkeit pypdf 6.19.0 (BSD-3, reines Python) für PDF-Metadaten
+- Modul YARA (`Ctrl+Alt+Y`): Syntax-Highlighting für .yar/.yara, „Regel testen“ gegen Datei oder Ordner (rekursiv)
+  mit Trefferliste (Regel, Datei, Offset, String, Treffer), Doppelklick → Hex-Ansicht, Syntaxfehler mit Zeile im
+  Editor markiert; Baum-Kontextmenü auch für Ordner; Vorlage „YARA-Regel.yar“
+- Modul Zeitleiste & Beweismittel: Zeitleisten-Notizen (Markdown mit Frontmatter), „Zur Zeitleiste hinzufügen“
+  (`Ctrl+Alt+Z`) mit Zeitstempel-Erkennung aus Log-/Textzeilen, Ansicht mit Filtern und UTC/lokal (`Ctrl+Shift+Alt+Z`),
+  Export als Markdown-Tabelle und CSV; Vorlage „Beweismittel.md“ (Chain of Custody) mit „Prüfsummen einfügen“ und
+  „Übergabe eintragen“
+- Vorlagen: später hinzugekommene Standardvorlagen landen einmalig auch in bestehenden `templates/`-Ordnern
+- Abhängigkeit yara-python 4.5.4 (Apache-2.0, libyara BSD-3; Linux-Wheel mit OpenSSL-1.1-libcrypto)
+- Modul IOC entschärfen (Standard an): Rechtsklick → Umwandeln, `Ctrl+Alt+D` / `Ctrl+Shift+Alt+D` – URLs, Domains,
+  IPv4/IPv6 und E-Mails in Auswahl oder Datei entschärfen (hxxp, [.], [@], [:]) und wieder scharf machen; Dateinamen,
+  Versionen und schon Entschärftes bleiben unverändert, Code-Blöcke optional ausgenommen
+
+### Verbessert
+- Baum zeigt alle Dateien, solange ein Analyse-Modul (Strings, Eingebettete Dateien, Entropie) an ist, oder per
+  Schalter „Alle Dateien anzeigen“ – vorher waren .exe/.zip/.pcap im Baum unsichtbar und nicht per Rechtsklick
+  erreichbar
+
 ## [1.8.0] – 2026-09-26
 
 ### Hinzugefügt

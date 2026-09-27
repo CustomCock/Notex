@@ -7,3 +7,7 @@ markdown-it-py>=3.0,<5   # Markdown-Vorschau (CommonMark + Tabellen), reines Pyt
 regex>=2024.5.15   # Suche: Timeout pro Regex-Match gegen katastrophales Backtracking (Apache-2.0)
 cryptography>=44,<52   # verschlüsselte Notizen: AES-256-GCM + Argon2id (Apache-2.0/BSD)
 PyYAML==6.0.3   # JSON/YAML: YAML prüfen/formatieren, nur safe_load/safe_dump (MIT); exakt gepinnt
+pypdf==6.19.0   # Modul Metadaten: PDF-Info/XMP lesen und entfernen, reines Python (BSD-3); exakt gepinnt
+yara-python==4.5.4   # Modul YARA: Regeln testen; Wheels für Windows und Linux (Apache-2.0, libyara BSD-3); exakt gepinnt
+evtx==0.13.1   # Modul Log-Auswertung: Windows-.evtx lesen; Rust-Wheels (abi3) für Win/Linux, keine Build-Schritte (MIT)
+dpkt==1.9.8   # Modul PCAP-Übersicht: .pcap/.pcapng lesen, reines Python, py3-none-any-Wheel (BSD-3)
