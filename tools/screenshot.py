@@ -828,21 +828,17 @@ def main() -> int:
                 later_rel(1200, grab)
 
             def pcap_shot():
-                from test_pcapinfo import eth, tcp, udp, dns_query, client_hello, write_pcap
+                import shutil as _shutil
                 from notex.ui.pcap_dialog import PcapDialog
-                http = (b"GET /admin HTTP/1.1\r\nHost: intranet.example.com\r\nUser-Agent: Mozilla/5.0\r\n"
-                        b"Authorization: Basic YWRtaW46dG9vcg==\r\n\r\n")
-                pkts = [eth("10.0.0.10", "8.8.8.8", udp(50000, 53, dns_query("intranet.example.com"))),
-                        eth("10.0.0.10", "93.184.216.34", tcp(50001, 80, http)),
-                        eth("10.0.0.10", "1.1.1.1", tcp(50002, 443, client_hello("bank.example.com"))),
-                        eth("10.0.0.10", "192.168.1.9", tcp(50003, 21, b"USER root\r\nPASS toor\r\n"))]
-                write_pcap(files / "mitschnitt.pcap", pkts)
+                fixture = ROOT / "tests" / "fixtures" / "beispiel_traffic.pcap"
+                _shutil.copyfile(fixture, files / "beispiel_traffic.pcap")
                 window.modules.set_enabled("pcap", True)
-                dialog = PcapDialog(window, files / "mitschnitt.pcap")
+                dialog = PcapDialog(window, files / "beispiel_traffic.pcap")
                 dialog.show()
                 dialog.move(window.geometry().center() - dialog.rect().center())
 
                 def grab():
+                    dialog.tabs.setCurrentWidget(dialog.t_hosts)
                     compose(window, dialog, "63-pcap", window.mapFromGlobal(dialog.geometry().topLeft()))
                     dialog.close()
                     finish()

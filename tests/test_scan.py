@@ -207,3 +207,71 @@ def test_ping_fallback_marks_host_alive() -> None:
     hosts = run(scan.scan([scan.Target("10.0.0.5")], config, connect=connect,
                           pinger=lambda ip: ip == "10.0.0.5"))
     assert hosts[0].alive and hosts[0].reason == "ping"
+
+
+# ---- L1: Scanner darf nach dem ersten Host nicht hängen ------------------------------------------------------------
+def test_reverse_dns_runs_in_thread_and_does_not_block(monkeypatch) -> None:
+    """Ein langsamer (blockierender) Resolver darf den Event-Loop nicht serialisieren – 12 Hosts parallel."""
+    import time as _time
+    connect = make_connect({f"10.0.0.{n}": {80: b""} for n in range(1, 13)})
+
+    def slow_resolver(ip: str) -> str:
+        _time.sleep(0.5)                      # blockierender Namensdienst (wie socket.gethostbyaddr)
+        return f"host-{ip.split('.')[-1]}"
+    targets = [scan.Target(f"10.0.0.{n}") for n in range(1, 13)]
+    config = scan.ScanConfig(ports=[80], timeout=0.3, discover=True, reverse_dns=True, resolve_timeout=2.0)
+    start = _time.monotonic()
+    hosts = run(scan.scan(targets, config, connect=connect, resolver=slow_resolver))
+    elapsed = _time.monotonic() - start
+    assert all(h.hostname.startswith("host-") for h in hosts)
+    assert elapsed < 4.0                      # seriell wären es 12 × 0,5 s = 6 s; parallel im Thread deutlich weniger
+
+
+def test_reverse_dns_timeout_never_hangs() -> None:
+    import time as _time
+    connect = make_connect({"10.0.0.5": {80: b""}})
+
+    def stuck_resolver(ip: str) -> str:
+        _time.sleep(1.5)                       # deutlich länger als resolve_timeout
+        return "spät"
+    config = scan.ScanConfig(ports=[80], timeout=0.3, reverse_dns=True, resolve_timeout=0.2)
+    start = _time.monotonic()
+    hosts = run(scan.scan([scan.Target("10.0.0.5")], config, connect=connect, resolver=stuck_resolver))
+    assert hosts[0].hostname == "" and hosts[0].alive          # Timeout → kein Name, aber Host da
+    assert _time.monotonic() - start < 3.0
+
+
+def test_scan_continues_when_wait_closed_hangs() -> None:
+    """Ein Writer, dessen wait_closed nie zurückkehrt, darf den Scan nicht blockieren (Windows-ProactorLoop)."""
+    class HangingWriter(FakeWriter):
+        async def wait_closed(self):
+            await asyncio.sleep(30)
+    async def connect(ip, port, timeout):
+        if port != 80:
+            raise ConnectionRefusedError()
+        return FakeReader(b""), HangingWriter()
+    import time as _time
+    targets = [scan.Target(f"10.0.0.{n}") for n in range(1, 6)]
+    config = scan.ScanConfig(ports=[80], timeout=0.3, reverse_dns=False, discover=True)
+    start = _time.monotonic()
+    hosts = run(scan.scan(targets, config, connect=connect))
+    assert len(hosts) == 5 and all(h.alive for h in hosts) and _time.monotonic() - start < 4.0
+
+
+def test_cancel_stops_during_port_probes() -> None:
+    calls = []
+    async def counting_connect(ip, port, timeout):
+        calls.append(port)
+        await asyncio.sleep(0.02)
+        raise ConnectionRefusedError()
+    cancel = {"v": False}
+    async def driver():
+        task = asyncio.ensure_future(scan.scan([scan.Target("10.0.0.5")],
+                                               scan.ScanConfig(ports=list(range(1, 200)), timeout=0.3, concurrency=10,
+                                                               discover=False, reverse_dns=False),
+                                               connect=counting_connect, cancelled=lambda: cancel["v"]))
+        await asyncio.sleep(0.05)
+        cancel["v"] = True
+        await task
+    run(driver())
+    assert len(calls) < 199                   # Abbruch verhindert, dass alle 199 Ports geprobt werden

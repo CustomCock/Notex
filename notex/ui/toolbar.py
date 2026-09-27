@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLineEdit, QMenu, QSizePolicy, QToolButton, QVBoxLayout, QWidget
 
@@ -26,6 +26,11 @@ from notex.ui.widgets import FadeButton
 
 HANDLE_HEIGHT = 14
 GROUP_GAP = 10           # Abstand zwischen Gruppen – statt harter Trennlinien
+
+# Encoding-/Zeilenende-Optionen zentral, damit Button-Menü und Überlaufmenü je EIGENE QActions bauen
+# (dieselbe QAction in zwei Menüs führt beim Leeren des Überlaufmenüs zu Abstürzen)
+ENCODINGS = [("UTF-8", "utf-8"), ("UTF-8 mit BOM", "utf-8-sig"), ("cp1252 (Windows)", "cp1252")]
+EOLS = [("LF (Unix)", "\n"), ("CRLF (Windows)", "\r\n")]
 
 # Gruppen: (Name, [Aktions-Schlüssel oder "widget:<name>"]); "md:" markiert die Markdown-Gruppe
 GROUPS: list[tuple[str, list[str]]] = [
@@ -95,6 +100,8 @@ class EditorToolbar(QFrame):
         self.overflow_menu = style_menu(QMenu(self.overflow))
         self.overflow.setMenu(self.overflow_menu)
         self.overflow.hide()
+        self._hidden: list[tuple[str, list[QAction]]] = []   # zuletzt ausgeblendete Gruppen (Menü wird lazy gebaut)
+        self.overflow_menu.aboutToShow.connect(self._build_overflow_menu)
         self.strip_layout.addStretch(1)
         self.strip_layout.addWidget(self.overflow)
 
@@ -161,15 +168,22 @@ class EditorToolbar(QFrame):
             return self.size_edit
         if name == "encoding":
             self.encoding_button = MenuButton("Encoding der Datei beim Speichern")
-            for label, value in (("UTF-8", "utf-8"), ("UTF-8 mit BOM", "utf-8-sig"), ("cp1252 (Windows)", "cp1252")):
-                self.encoding_button.menu_.addAction(label, lambda v=value: self.tabs.set_encoding(v))
+            for label, value in ENCODINGS:
+                self.encoding_button.menu_.addAction(label, lambda v=value: self._change_encoding(v))
             return self.encoding_button
         if name == "eol":
             self.eol_button = MenuButton("Zeilenende der Datei beim Speichern")
-            for label, value in (("LF (Unix)", "\n"), ("CRLF (Windows)", "\r\n")):
-                self.eol_button.menu_.addAction(label, lambda v=value: self.tabs.set_eol(v))
+            for label, value in EOLS:
+                self.eol_button.menu_.addAction(label, lambda v=value: self._change_eol(v))
             return self.eol_button
         return None
+
+    def _change_encoding(self, value: str) -> None:
+        # Relayout NICHT synchron aus dem Menü heraus auslösen (sync ändert Button-Text → Layout → clear())
+        self.tabs.set_encoding(value)
+
+    def _change_eol(self, value: str) -> None:
+        self.tabs.set_eol(value)
 
     # ---- Zustand aus dem Editor -------------------------------------------------------
     def sync(self, editor) -> None:
@@ -240,10 +254,17 @@ class EditorToolbar(QFrame):
     # ---- Überlauf -------------------------------------------------------------------
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._relayout()
+        self._schedule_relayout()
+
+    def _schedule_relayout(self) -> None:
+        """Relayout nie synchron aus einem Menü-/Sync-Aufruf heraus – sonst würde ein offenes Menü verändert."""
+        if not getattr(self, "_relayout_pending", False):
+            self._relayout_pending = True
+            QTimer.singleShot(0, self._relayout)
 
     def _relayout(self) -> None:
-        """Gruppen von hinten ausblenden, bis alles passt; ausgeblendete Aktionen ins „…“-Menü."""
+        """Gruppen von hinten ausblenden, bis alles passt; welche verborgen sind, merkt sich das „…“-Menü."""
+        self._relayout_pending = False
         margins = self.strip_layout.contentsMargins()
         available = self.width() - margins.left() - margins.right() - self.overflow.sizeHint().width() - GROUP_GAP
         used = 0
@@ -256,23 +277,28 @@ class EditorToolbar(QFrame):
             else:
                 group.setVisible(False)
                 hidden.append((name, group_actions))
+        self._hidden = hidden
+        self.overflow.setVisible(bool(hidden))
+        # Menü selbst wird erst in aboutToShow gebaut (nie hier leeren – könnte ein offenes Menü treffen)
+
+    def _build_overflow_menu(self) -> None:
+        """Das „…“-Menü frisch aus den zuletzt ausgeblendeten Gruppen aufbauen (mit EIGENEN QActions)."""
         self.overflow_menu.clear()
-        for name, group_actions in hidden:
+        for name, group_actions in self._hidden:
             if name == "Textschrift":
                 self.overflow_menu.addAction(icon("type"), "Textschrift …", lambda: self.tabs.open_font_settings())
                 continue
             if name == "Datei":
                 editor = self.tabs.current_editor()
                 if editor is not None:
-                    encoding = self.overflow_menu.addMenu(icon("file-type"), "Encoding / Zeilenende")
-                    for action in self.encoding_button.menu_.actions() + [None] + self.eol_button.menu_.actions():
-                        if action is None:
-                            encoding.addSeparator()
-                        else:
-                            encoding.addAction(action)
+                    submenu = self.overflow_menu.addMenu(icon("file-type"), "Encoding / Zeilenende")
+                    for label, value in ENCODINGS:
+                        submenu.addAction(label, lambda v=value: self._change_encoding(v))
+                    submenu.addSeparator()
+                    for label, value in EOLS:
+                        submenu.addAction(label, lambda v=value: self._change_eol(v))
                 continue
             section = self.overflow_menu.addSection(name)
             section.setEnabled(False)
             for action in group_actions:
                 self.overflow_menu.addAction(action)
-        self.overflow.setVisible(bool(hidden))
