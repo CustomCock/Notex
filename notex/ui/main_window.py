@@ -50,6 +50,11 @@ from notex.ui.recent_dialog import RecentDialog
 from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 
 
+def _native(shortcut: str) -> str:
+    """Tastenkürzel plattformgerecht anzeigen („Strg+Alt+M"), leer bei leerem Kürzel."""
+    return QKeySequence(shortcut).toString(QKeySequence.SequenceFormat.NativeText) if shortcut else ""
+
+
 def _register_viewers() -> None:
     """Viewer-Tabs (Bild, später Hex/PDF) bei den Tab-Gruppen anmelden."""
     from notex.ui.editor_tabs import EditorTabs
@@ -239,6 +244,9 @@ class MainWindow(QMainWindow):
         tree = self.sidebar.tree
         file_menu = self.menuBar().addMenu("&Datei")
         file_menu.addAction(self._action("Neue Datei", "Ctrl+N", lambda: tree.create_file(tree.folder_for(tree.selected_path()))))
+        self.new_typed_menu = file_menu.addMenu("Neue Datei nach Typ")
+        self.new_typed_menu.setIcon(icon("file-plus"))
+        self.new_typed_menu.aboutToShow.connect(lambda: self._build_new_menu(self.new_typed_menu))
         file_menu.addAction(self._action("Neuer Ordner", "Ctrl+Shift+N", lambda: tree.create_folder(tree.folder_for(tree.selected_path()))))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Datei öffnen …", "Ctrl+O", self.open_file_dialog))
@@ -262,6 +270,10 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))
+        export_menu = file_menu.addMenu("Exportieren")
+        export_menu.setIcon(icon("file-output"))
+        export_menu.addAction(self._action("Als PDF …", None, lambda: self.export_current("pdf")))
+        export_menu.addAction(self._action("Als HTML …", None, lambda: self.export_current("html")))
         file_menu.addAction(self._action("Tab schließen", "Ctrl+W", self.tabs.close_current))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Einstellungen …", "Ctrl+,", self.open_settings))
@@ -292,6 +304,10 @@ class MainWindow(QMainWindow):
         self.grammar_action = self._action("Grammatik prüfen (LanguageTool)", "Shift+F7", self.toggle_grammar, checkable=True)
         self.grammar_action.setChecked(self.config["grammar"]["enabled"])
         edit_menu.addAction(self.grammar_action)
+
+        self.tools_menu = self.menuBar().addMenu("&Werkzeuge")
+        self.tools_menu.aboutToShow.connect(lambda: self._build_tools_menu(self.tools_menu, self._current_file_kind()))
+        self._action("Werkzeug-Übersicht …", "Ctrl+Shift+W", self.show_tool_overview)
 
         view_menu = self.menuBar().addMenu("&Ansicht")
         self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
@@ -935,8 +951,8 @@ class MainWindow(QMainWindow):
         from notex.ui.editor_tabs import EditorTabs
         from notex.ui.hex_view import HexPage
         EditorTabs.register_viewer("hex", HexPage)
-        actions = [self._module_action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex(), self.file_menu),
-                   self._module_action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums(), self.file_menu)]
+        actions = [self._module_action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()),
+                   self._module_action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums())]
         self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
                           shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
         self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),
@@ -1108,8 +1124,7 @@ class MainWindow(QMainWindow):
 
     # ---- Modul: Zeitleiste & Beweismittel --------------------------------------------------------
     def _activate_timeline(self):
-        actions = [self._module_action("Zeitleiste anzeigen …", "Ctrl+Shift+Alt+Z", lambda: self.show_timeline(),
-                                       self.file_menu),
+        actions = [self._module_action("Zeitleiste anzeigen …", "Ctrl+Shift+Alt+Z", lambda: self.show_timeline()),
                    self._action("Zur Zeitleiste hinzufügen …", "Ctrl+Alt+Z", lambda: self.add_to_timeline())]
         self.edit_menu.addAction(actions[1])
         keywords = "zeitleiste timeline forensik ereignis chronologie vorfall"
@@ -1352,7 +1367,7 @@ class MainWindow(QMainWindow):
     # ---- Modul: YARA ----------------------------------------------------------------------------
     def _activate_yara(self):
         """Regel testen: aktuelle .yar-Datei (auch ungespeichert) gegen Datei/Ordner; Baum: Regel oder Ziel."""
-        action = self._module_action("YARA-Regel testen …", "Ctrl+Alt+Y", lambda: self.test_yara(), self.file_menu)
+        action = self._module_action("YARA-Regel testen …", "Ctrl+Alt+Y", lambda: self.test_yara())
         self.registry.add("yara:test", "YARA-Regel testen", lambda: self.test_yara(), category="Dateianalyse",
                           shortcut="Ctrl+Alt+Y", keywords="yara regel rule malware signatur prüfen scan")
 
@@ -1488,8 +1503,7 @@ class MainWindow(QMainWindow):
         self._ip_timer.setSingleShot(True)
         self._ip_timer.setInterval(800)
         self._ip_timer.timeout.connect(lambda: self._mark_ip_conflicts(only_current=True))
-        action = self._module_action("IP-Übersicht …", "Ctrl+Shift+Alt+I", lambda: self.show_ip_overview(),
-                                     self.file_menu)
+        action = self._module_action("IP-Übersicht …", "Ctrl+Shift+Alt+I", lambda: self.show_ip_overview())
         self.registry.add("ip:overview", "IP-Übersicht (Zuordnungen, Konflikte, freie Adressen)",
                           lambda: self.show_ip_overview(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+I",
                           keywords="ip adresse konflikt subnetz netz frei dhcp host zuordnung")
@@ -1660,8 +1674,7 @@ class MainWindow(QMainWindow):
     # ---- Modul: Netzwerk-Scanner ----------------------------------------------------------------
     def _activate_scanner(self):
         """Scanner nur auf ausdrücklichen Start; öffentliche Ziele verlangen eine Bestätigung."""
-        action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner(),
-                                     self.file_menu)
+        action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner())
         self.registry.add("scan:open", "Netzwerk-Scanner (Hosts und offene Ports im eigenen Netz)",
                           lambda: self.open_scanner(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+P",
                           keywords="scan scanner netzwerk port host offen tcp nmap discovery")
@@ -1685,11 +1698,14 @@ class MainWindow(QMainWindow):
 
     # ---- Modul: Log-Auswertung -------------------------------------------------------------------
     def _activate_logs(self):
-        action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log(),
-                                     self.file_menu)
-        self.registry.add("logs:open", "Log-Auswertung (auth.log, secure, .evtx)", lambda: self.analyze_log(),
+        action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log())
+        self.registry.add("logs:open", "Log-Auswertung (beliebige Logs, auth.log, .evtx)", lambda: self.analyze_log(),
                           category="Sicherheit", shortcut="Ctrl+Shift+Alt+L",
-                          keywords="log auth secure evtx anmeldung login brute force ereignis windows linux")
+                          keywords="log auth secure evtx setupact anmeldung login brute force ereignis windows linux "
+                                   "fehler warnung error warning allgemein app dienst mailstore")
+        self.registry.add("logs:generic", "Log-Auswertung: allgemein (Stufen, Fehler, Muster)",
+                          lambda: self.analyze_log(mode="generic"), category="Sicherheit",
+                          keywords="log allgemein generisch stufen fehler warnung muster app dienst setupact")
 
         def tree_entry(menu, path: Path) -> None:
             if self._is_log_file(path):
@@ -1710,19 +1726,27 @@ class MainWindow(QMainWindow):
     @staticmethod
     def _is_log_file(path: Path) -> bool:
         name = path.name.lower()
-        return (name.endswith(".evtx") or name.endswith(".log") or name.endswith(".log.gz")
-                or "auth" in name or "secure" in name or name.endswith(".gz"))
+        return (name.endswith((".evtx", ".log", ".log.gz", ".gz", ".out", ".trace", ".journal"))
+                or "log" in name or "auth" in name or "secure" in name or name in ("syslog", "messages", "dmesg"))
 
-    def analyze_log(self, path: Path | None = None) -> None:
+    def analyze_log(self, path: Path | None = None, mode: str = "auto") -> None:
         from notex.core import logauth
         from notex.ui.logauth_dialog import LogAuthDialog
+        from notex.ui.loggeneric_dialog import GenericLogDialog
         target = self._analysis_target(path)
         if target is None:
             return
         if target.suffix.lower() == ".evtx" and not logauth.evtx_available():
             self.toast.show_message("Für .evtx fehlt das Paket „evtx“ in diesem Build", "info")
             return
-        dialog = LogAuthDialog(self, target)
+        # Auto: Anmelde-/Sicherheits-Logs bekommen das Sicherheits-Dashboard, alles andere die allgemeine Auswertung.
+        if mode == "generic":
+            use_auth = False
+        elif mode == "auth":
+            use_auth = True
+        else:
+            use_auth = logauth.looks_like_auth(target)
+        dialog = LogAuthDialog(self, target) if use_auth else GenericLogDialog(self, target)
         self._analysis_dialogs.setdefault("logs", []).append(dialog)
         dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("logs", []).remove(d)
                                 if d in self._analysis_dialogs.get("logs", []) else None)
@@ -1730,8 +1754,7 @@ class MainWindow(QMainWindow):
 
     # ---- Modul: PCAP-Übersicht -------------------------------------------------------------------
     def _activate_pcap(self):
-        action = self._module_action("PCAP-Übersicht …", "Ctrl+Shift+Alt+K", lambda: self.analyze_pcap(),
-                                     self.file_menu)
+        action = self._module_action("PCAP-Übersicht …", "Ctrl+Shift+Alt+K", lambda: self.analyze_pcap())
         self.registry.add("pcap:open", "PCAP-Übersicht (Protokolle, DNS, HTTP, TLS, Klartext-Zugangsdaten)",
                           lambda: self.analyze_pcap(), category="Sicherheit", shortcut="Ctrl+Shift+Alt+K",
                           keywords="pcap pcapng netzwerk mitschnitt wireshark dns http tls sni zugangsdaten")
@@ -1837,7 +1860,7 @@ class MainWindow(QMainWindow):
 
     def _activate_analysis(self, key: str, title: str, shortcut: str, icon_name: str, opener, keywords: str):
         """Gemeinsamer Aktivator für Datei-Analysen: Menü Datei, Palette, Kürzel, Baum-Kontextmenü."""
-        action = self._module_action(title, shortcut, lambda: opener(), self.file_menu)
+        action = self._module_action(title, shortcut, lambda: opener())
         self.registry.add(f"analysis:{key}", title.replace(" …", ""), lambda: opener(), category="Dateianalyse",
                           shortcut=shortcut, keywords=keywords)
 
@@ -1890,6 +1913,211 @@ class MainWindow(QMainWindow):
         viewer = self.tabs.open_viewer(Path(path), "hex")
         if viewer is not None:
             viewer.select_range(offset, length)
+
+    # ---- Werkzeuge (zentrale Registry, siehe core/tools.py) -------------------------------------
+    def _current_file_kind(self) -> str:
+        from notex.core import tools
+        return tools.file_kind(self._current_file())
+
+    def _enabled_modules(self) -> set:
+        from notex.core import tools
+        return tools.enabled_modules(self.config)
+
+    def _build_tools_menu(self, menu, kind: str, only_applicable: bool = False) -> None:
+        """Menü „Werkzeuge" (bzw. Toolbar-/Baum-Ableger) aus der Registry bauen – Kategorien als Untermenüs.
+        Nicht passende Werkzeuge sind ausgegraut (Tooltip: warum); abgeschaltete Module erscheinen gar nicht."""
+        from notex.core import tools
+        menu.clear()
+        menu.setToolTipsVisible(True)
+        enabled = self._enabled_modules()
+        groups = tools.grouped(enabled)
+        if not groups:
+            action = menu.addAction("Keine Werkzeuge aktiv – Einstellungen → Module")
+            action.setEnabled(False)
+        for _key, label, group_tools in groups:
+            visible = [t for t in group_tools if tools.applies(t, kind)] if only_applicable else group_tools
+            if not visible:
+                continue
+            submenu = menu.addMenu(label)
+            for tool in visible:
+                ok = tools.applies(tool, kind)
+                action = submenu.addAction(icon(tool.icon), tool.name + (f"\t{_native(tool.shortcut)}"
+                                                                         if tool.shortcut else ""))
+                action.setEnabled(ok)
+                if not ok:
+                    action.setToolTip("Passt nicht zur aktuellen Datei" if kind != "none"
+                                      else "Erst eine Datei öffnen oder im Baum auswählen")
+                else:
+                    action.setToolTip(tool.description)
+                action.triggered.connect(lambda _c=False, cmd=tool.command: self._run_tool(cmd))
+        menu.addSeparator()
+        menu.addAction(icon("layout-grid"), "Werkzeug-Übersicht …\t" + _native("Ctrl+Shift+W"),
+                       self.show_tool_overview)
+
+    def _run_tool(self, command: str) -> None:
+        entry = self.registry.get(command)
+        if entry is not None and entry.callback is not None:
+            entry.callback()
+        else:                                   # Modul aus oder Kommando (noch) nicht registriert
+            from notex.core import tools
+            tool = tools.BY_COMMAND.get(command)
+            if tool and tool.module and tool.module not in self._enabled_modules():
+                self.toast.show_message(f"Modul für „{tool.name}“ ist aus (Einstellungen → Module)", "info")
+
+    def show_tool_overview(self) -> None:
+        from notex.ui.tool_overview import ToolOverviewDialog
+        ToolOverviewDialog(self).show()
+
+    def _tools_tree_menu(self, menu, path: Path) -> None:
+        from notex.core import tools
+        submenu = menu.addMenu(icon("wrench"), "Werkzeuge")
+        self._build_tools_menu(submenu, tools.file_kind(path), only_applicable=True)
+
+    def _build_toolbar_tools_menu(self, menu) -> None:
+        """Werkzeuge-Menü für die Blatt-Leiste: nur Werkzeuge, die zur aktuellen Datei passen."""
+        self._build_tools_menu(menu, self._current_file_kind(), only_applicable=True)
+
+    def _build_new_menu(self, menu, folder: Path | None = None) -> None:
+        """„Neu"-Menü aus den Dateityp-Vorlagen bauen (Startinhalt + Zeilenende)."""
+        from notex.core import newfile
+        menu.clear()
+        for ftype in newfile.TYPES:
+            action = menu.addAction(icon(ftype.icon), f"{ftype.label}  ({ftype.extension})")
+            action.setToolTip(ftype.description)
+            action.triggered.connect(lambda _c=False, key=ftype.key, f=folder: self.new_file_of_type(key, f))
+        menu.setToolTipsVisible(True)
+        menu.addSeparator()
+        eol_menu = menu.addMenu(icon("corner-down-left"), "Zeilenende für neue Dateien")
+        current = self.config.get("new_file_eol", "lf")
+        for key, label in newfile.EOL_LABELS:
+            item = eol_menu.addAction(label)
+            item.setCheckable(True)
+            item.setChecked(current == key)
+            item.triggered.connect(lambda _c=False, k=key: self.config.__setitem__("new_file_eol", k))
+
+    def new_file_of_type(self, key: str, folder: Path | None = None) -> None:
+        """Neue Datei eines Typs anlegen: Endung, Startinhalt und Zeilenende aus core/newfile."""
+        from notex.core import newfile, fileops
+        from notex.ui import dialogs
+        ftype = newfile.BY_KEY.get(key)
+        if ftype is None:
+            return
+        tree = self.sidebar.tree
+        folder = folder or tree.folder_for(tree.selected_path())
+        if not tree._guard_write(folder, "Eine Datei anlegen"):
+            return
+        name = dialogs.ask_text(self, "Neue Datei", "Dateiname:", newfile.suggested_name(key))
+        if not name:
+            return
+        if not Path(name).suffix:
+            name += ftype.extension
+        try:
+            path = fileops.create_file(folder, name)
+            eol = self.config.get("new_file_eol", "lf")
+            data = newfile.encode_content(ftype.starter, eol)
+            if data:
+                path.write_bytes(data)                 # Bytes: Zeilenende exakt wie gewählt, keine Übersetzung
+        except OSError as error:
+            dialogs.warn(self, "Neue Datei", str(error))
+            return
+        if tree.is_notes_root():
+            tree.expand(tree.index_for(folder))
+            tree.select_path(path)
+        self.tabs.open_file(path)
+        self._place_new_cursor(path, newfile.cursor_offset(ftype.starter))
+
+    def _place_new_cursor(self, path: Path, offset: int) -> None:
+        """Cursor an die Marker-Stelle der Vorlage setzen (nur im Texteditor, wenn sinnvoll)."""
+        if offset <= 0:
+            return
+        editor = self.tabs.current_editor()
+        if editor is None:
+            return
+        from PySide6.QtGui import QTextCursor
+        cursor = editor.textCursor()
+        cursor.setPosition(min(offset, len(editor.toPlainText())))
+        editor.setTextCursor(cursor)
+
+    def _export_values(self) -> dict | None:
+        """Variablenwerte für den Export – nur wenn das Modul Variablen an ist."""
+        service = getattr(self, "variable_service", None)
+        if service is not None and "variables" in self._enabled_modules():
+            return dict(service.values)
+        return None
+
+    def _export_prefix(self) -> str:
+        service = getattr(self, "variable_service", None)
+        return service.prefix if service is not None else "§"
+
+    def _logo_path(self) -> Path:
+        import notex
+        return Path(notex.__file__).resolve().parent / "assets" / "notex.png"
+
+    def _logo_data_uri(self) -> str:
+        import base64
+        try:
+            data = self._logo_path().read_bytes()
+        except OSError:
+            return ""
+        return "data:image/png;base64," + base64.b64encode(data).decode("ascii")
+
+    def export_current(self, fmt: str) -> None:
+        """Aktuelle Textnotiz nach PDF oder HTML exportieren (Variablen aufgelöst, .ntx nur nach Rückfrage)."""
+        from PySide6.QtWidgets import QFileDialog
+        from notex.core import export as core_export
+        from notex.ui import export_service, dialogs
+        editor = self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Nur Textnotizen lassen sich exportieren", "info")
+            return
+        path = editor.path
+        content = editor.toPlainText()
+        name = path.name if path is not None else "Notiz.txt"
+        if path is not None and fileops.is_encrypted_path(path):
+            if not dialogs.confirm(
+                    self, "Verschlüsselte Notiz exportieren",
+                    "Der Export schreibt den Klartext dieser verschlüsselten Notiz in eine unverschlüsselte Datei.",
+                    informative="Nur fortfahren, wenn der Zielort sicher ist.",
+                    yes="Trotzdem exportieren", danger=True):
+                return
+        stem = path.stem if path is not None else "Notiz"
+        kind = core_export.kind_for(name)
+        values = self._export_values()
+        prefix = self._export_prefix()
+        meta = core_export.ExportMeta(title=stem)
+        target_dir = path.parent if path is not None else self.root
+        if fmt == "pdf":
+            out, _ = QFileDialog.getSaveFileName(self, "Als PDF exportieren",
+                                                 str(target_dir / f"{stem}.pdf"), "PDF (*.pdf)")
+            if not out:
+                return
+            try:
+                export_service.export_pdf(Path(out), content, kind, meta, name=name, values=values,
+                                          prefix=prefix, logo_path=self._logo_path())
+            except Exception as error:                       # noqa: BLE001 – dem Nutzer den Fehler zeigen
+                export_service.warn(self, str(error))
+                return
+            self.toast.show_message(f"PDF exportiert · {Path(out).name}", "check")
+        else:
+            out, _ = QFileDialog.getSaveFileName(self, "Als HTML exportieren",
+                                                 str(target_dir / f"{stem}.html"), "HTML (*.html *.htm)")
+            if not out:
+                return
+            try:
+                export_service.export_html(Path(out), content, kind, meta, name=name, values=values,
+                                           prefix=prefix, logo_data_uri=self._logo_data_uri())
+            except OSError as error:
+                export_service.warn(self, str(error))
+                return
+            self.toast.show_message(f"HTML exportiert · {Path(out).name}", "check")
+
+    def _pin_current_folder(self) -> None:
+        """Den aktuell im Baum gewählten Ordner (bzw. den angezeigten Wurzelordner) an den Schnellzugriff heften."""
+        tree = self.sidebar.tree
+        selected = tree.selected_path()
+        folder = tree.folder_for(selected) if selected is not None else tree.root
+        self.sidebar._pin_folder(folder)
+        self.toast.show_message(f"An Schnellzugriff angeheftet · {Path(folder).name}")
 
     def _analysis_target(self, path: Path | None) -> Path | None:
         """Datei für ein Analyse-Werkzeug: übergeben, sonst der aktuelle Tab, sonst die Auswahl im Baum."""
@@ -2056,6 +2284,7 @@ class MainWindow(QMainWindow):
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
         self.tabs.context_menu_hook = self._extend_context_menu
         self.tabs.image_hook = self._insert_images
+        self.tabs.tools_menu_builder = self._build_toolbar_tools_menu
 
     # ---- Linux-Desktop-Integration ----------------------------------------------------------
     def _linux_integration(self):
@@ -3072,6 +3301,33 @@ class MainWindow(QMainWindow):
         self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
                           category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
+        self.registry.add("doc:templates", "Neue Datei aus Vorlage", lambda: self.new_from_template(), category="Datei",
+                          shortcut="Ctrl+Shift+T", keywords="vorlage template neu dokument")
+        self.registry.add("tools:overview", "Werkzeug-Übersicht", self.show_tool_overview, category="Werkzeuge",
+                          shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
+        self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
+        self.sidebar.tree.new_menu_builder = self._build_new_menu        # „Neue Datei nach Typ" im Baum-Kontextmenü
+        self.registry.add("export:pdf", "Exportieren: als PDF …", lambda: self.export_current("pdf"),
+                          category="Datei", keywords="export pdf drucken bericht ausgeben")
+        self.registry.add("export:html", "Exportieren: als HTML …", lambda: self.export_current("html"),
+                          category="Datei", keywords="export html webseite ausgeben")
+        from notex.core import newfile as _newfile
+        for _ft in _newfile.TYPES:
+            self.registry.add(f"new:{_ft.key}", f"Neue Datei: {_ft.label}",
+                              lambda _c=False, k=_ft.key: self.new_file_of_type(k),
+                              category="Datei", keywords=f"neu datei {_ft.label} {_ft.extension}")
+        self.registry.add("explorer:notes", "Explorer: Notizen anzeigen",
+                          lambda: self.sidebar._on_place_selected(self.sidebar.tree.notes_root),
+                          category="Ansicht", keywords="explorer baum notizen ort data")
+        self.registry.add("explorer:thispc", "Explorer: Persönlicher Ordner (Dieser PC)",
+                          lambda: self.sidebar._on_place_selected(Path.home()),
+                          category="Ansicht", keywords="explorer dieser pc laufwerk home persönlich ordner")
+        self.registry.add("explorer:hidden", "Explorer: Versteckte Dateien umschalten",
+                          lambda: self.sidebar._set_show_hidden(not self.sidebar.tree.show_hidden),
+                          category="Ansicht", keywords="versteckt hidden punktdateien dotfiles anzeigen")
+        self.registry.add("explorer:pin", "Explorer: aktuellen Ordner anheften",
+                          self._pin_current_folder,
+                          category="Ansicht", keywords="schnellzugriff anheften pin ordner favorit")
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
 

@@ -96,6 +96,7 @@ class EditorTabs(QTabWidget):
             self.line_numbers = shared.line_numbers
             self.context_menu_hook = shared.context_menu_hook
             self.image_hook = shared.image_hook
+            self.tools_menu_builder = shared.tools_menu_builder
         else:
             self.checker = SpellChecker(user_dictionary=app_root() / "user_dictionary.txt")
             self.checker.set_language(self.config.get("spellcheck", {}).get("language", "de"))
@@ -112,6 +113,7 @@ class EditorTabs(QTabWidget):
             self.line_numbers = bool(self.config.get("line_numbers", True))
             self.context_menu_hook = None          # setzt das Hauptfenster (Text + Nachschlagen im Kontextmenü)
             self.image_hook = None                 # setzt das Hauptfenster (Bilder einfügen → assets/)
+            self.tools_menu_builder = None         # setzt das Hauptfenster (Werkzeuge-Menü der Blatt-Leiste)
         self.setAcceptDrops(True)
         self.tab_bar = EditorTabBar()
         self.setTabBar(self.tab_bar)

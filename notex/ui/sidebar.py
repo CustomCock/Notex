@@ -12,11 +12,12 @@ from typing import Any
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QSplitter, QStackedWidget, QVBoxLayout, QWidget
 
 from notex.core.search import SearchOptions, SearchResult, parse_query
 from notex.ui.file_tree import FileTree
 from notex.ui.open_files import OpenFilesSection
+from notex.ui.places_panel import PlacesPanel
 from notex.ui.search_results import SearchResults
 from notex.ui.search_worker import SearchWorker
 from notex.ui.widgets import Chip, IconButton, SearchField
@@ -67,11 +68,29 @@ class Sidebar(QWidget):
         checks.addStretch()
 
         self.open_files = OpenFilesSection()
-        self.tree = FileTree(root, config["extensions"])
+        self.tree = FileTree(root, config["extensions"], show_hidden=bool(config.get("tree_show_hidden", False)))
+        self.places = PlacesPanel(root, config)
+
+        # Orte oben, Datei-Baum darunter – über einen Splitter in der Höhe verstellbar
+        self.explorer = QSplitter(Qt.Orientation.Vertical)
+        self.explorer.setObjectName("ExplorerSplitter")
+        self.explorer.setChildrenCollapsible(False)
+        self.explorer.setHandleWidth(6)
+        self.explorer.addWidget(self.places)
+        self.explorer.addWidget(self.tree)
+        self.explorer.setStretchFactor(0, 0)
+        self.explorer.setStretchFactor(1, 1)
+        self.explorer.setSizes([150, 500])
+
         self.results = SearchResults()
         self.stack = QStackedWidget()
-        self.stack.addWidget(self.tree)
+        self.stack.addWidget(self.explorer)
         self.stack.addWidget(self.results)
+
+        # Orte ↔ Baum verbinden
+        self.places.place_selected.connect(self._on_place_selected)
+        self.tree.root_changed.connect(self.places.set_current_path)
+        self.places.set_current_path(root)
 
         # Fußzeile mit Zahnrad
         self.settings_button = IconButton("settings", "Einstellungen  Ctrl+,")
@@ -110,11 +129,39 @@ class Sidebar(QWidget):
         self.tree.file_activated.connect(lambda path: self.open_requested.emit(path, None))
         self.results.open_requested.connect(self.open_requested)
 
+        # Schnellzugriff anheften/entfernen und versteckte Dateien schalten (Config wird per Autosave gesichert)
+        self.tree.pin_requested.connect(self._pin_folder)
+        self.places.pin_removed.connect(self._unpin_folder)
+        self.tree.show_hidden_toggled.connect(self._set_show_hidden)
+
         # Esc leert die Suche – egal ob Feld oder Trefferliste den Fokus hat
         for widget in (self.search_field.input, self.results):
             shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), widget)
             shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
             shortcut.activated.connect(self.clear_search)
+
+    # ---- Orte / Schnellzugriff -------------------------------------------------
+    def _on_place_selected(self, path: Path) -> None:
+        if self.search_field.text().strip():        # aus der Suche zurück zum Baum
+            self.clear_search()
+        self.tree.set_root(path)
+        self.places.set_current_path(path)
+
+    def _pin_folder(self, path: Path) -> None:
+        from notex.core import places
+        if places.add_pinned(self.config, path):
+            self.places.refresh()
+            self.places.set_current_path(self.tree.root)
+
+    def _unpin_folder(self, path: Path) -> None:
+        from notex.core import places
+        if places.remove_pinned(self.config, path):
+            self.places.refresh()
+            self.places.set_current_path(self.tree.root)
+
+    def _set_show_hidden(self, show: bool) -> None:
+        self.config["tree_show_hidden"] = bool(show)
+        self.tree.set_hidden(show)
 
     # ---- Öffentlich -----------------------------------------------------------
     def retheme(self) -> None:
@@ -124,6 +171,7 @@ class Sidebar(QWidget):
         self.search_field.retheme()
         self.settings_button.setIcon(icon("settings"))
         self.tree.retheme()
+        self.places.retheme()
         self.results.viewport().update()
 
     def focus_search(self) -> None:

@@ -37,6 +37,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.12.0 | Block K: Log-Auswertung, PCAP | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.12.1 | Block L: Fehlerbehebung (Scanner, Encoding-Menü, JPEG-Metadaten, PCAP-Auswertung) | fertig, Tests grün, lokal getaggt |
+| 1.13.0 | Block M: Werkzeuge-Menü, Explorer-Orte, Neu nach Typ, App-Icon, PDF/HTML-Export, allgemeine Log-Auswertung | fertig, Tests grün, lokal getaggt |
 
 ## Erledigt
 
@@ -351,6 +352,40 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Sollwerte per Test festgeschrieben. `ui/pcap_dialog.py` mit Reitern und „Stream folgen“ (Text/Hex).
 - Screenshot 63 (PCAP) auf die neue Auswertung aktualisiert.
 
+### 1.13.0 – Block M
+- **Besitzer-Wunsch beim App-Icon:** Variante A (Notizblatt) gewählt, ergänzt um einen Terminal-Prompt `>_` im Akzent.
+- M1 Werkzeuge: `core/tools.py` – zentrale, Qt-freie Registry (Tool = command/name/category/module/kinds/needs_file/
+  shortcut/icon/description); `file_kind`, `applies`, `grouped`, `enabled_modules`. Menü „Werkzeuge“ in der Menüleiste
+  (aboutToShow baut aus der Registry, Kategorien als Untermenüs, nicht passende ausgegraut, Module aus = weg),
+  Werkzeug-Übersicht (`ui/tool_overview.py`, `Ctrl+Shift+W`), „Werkzeuge“-Button in der Blatt-Leiste (Hook
+  `tools_menu_builder` über EditorArea/EditorTabs/Toolbar), Baum-Kontextmenü. Analyse-/Netzwerk-/Log-Einträge nur noch
+  im Werkzeuge-Menü (nicht mehr doppelt im Datei-Menü); Kürzel bleiben über die window-weiten QActions.
+- M2 Explorer-Orte: `core/places.py` (Qt-frei) – Notizen/Schnellzugriff/Dieser PC, Laufwerke plattformabhängig
+  (Windows-Buchstaben, Unix `/` + `/media`,`/mnt`,`/run/media`,`/Volumes`), `is_system_path` (konservativ),
+  `add/remove/is_pinned`. `ui/places_panel.py` (QTreeWidget) über dem Baum (Splitter). `FileTree` re-rootbar
+  (`set_root`, `set_hidden`, `_guard_write` warnt außerhalb der Notizen, in Systemordnern deutlich); Persistenz des
+  Aufklapp-Zustands bleibt für data/ erhalten. Config: `tree_show_hidden`, `quick_access`.
+- M3 Neu nach Typ: `core/newfile.py` (Qt-frei) – Typen mit Startinhalt + Cursor-Marker, `build_content`/`encode_content`
+  mit Zeilenende LF/CRLF (Config `new_file_eol`). Untermenü im Datei- und Baum-Kontextmenü, je Typ Palette-Befehl;
+  Datei wird als Bytes geschrieben (Zeilenende exakt), Cursor springt an die Marke. Öffnen wählt die Ansicht weiter
+  über `filetype.detect` (Text/Hex/Bild/PDF/CSV …).
+- M4 App-Icon: `assets/notex.svg` ersetzt (Notizblatt mit `>_`), `tools/make_icon.py` erzeugt `notex.png` (256) und
+  `notex.ico` (7 Größen); drei Entwürfe liegen in `docs/icon-varianten/`. Fenster-Icon, Leeransicht, Linux-Desktop
+  und Windows-Build nutzen dieselbe Quelle.
+- M5 Export: `core/export.py` (Qt-frei) baut HTML (Markdown gerendert, CSV als Tabelle, sonst `<pre>`; Variablen
+  aufgelöst; Kopf mit Logo/Titel/Meta, Fußzeile, Druck-CSS). `ui/export_service.py` – HTML schreiben; PDF über
+  QPdfWriter + QTextDocument seitenweise, Kopf/Fuß/Logo je Seite mit QPainter. **Wichtig:** QTextDocument rechnet in
+  96 dpi, der PDF-Maler in Geräte-dpi → Maler beim Zeichnen des Körpers um `resolution/96` skalieren, sonst wird der
+  Text winzig. .ntx nur nach Rückfrage.
+- M6 Allgemeine Logs (Wunsch des Besitzers „jede Log auswerten“): `core/loggeneric.py` (Qt-frei) – je Zeile
+  Zeitstempel (über `timeline.detect_timestamp`), Stufe (ERROR/WARN/INFO/DEBUG, deutsch+englisch, in `[..]`/`:`),
+  Quelle (`[name]`, `prog[pid]`, `name:`), Meldung; `template()` verdichtet Zahlen/Pfade/IDs zu Mustern.
+  `analyze_generic` → Stufen, Fehler/Warnungen, häufigste Muster, aktivste Quellen, Zeitspanne, Stunden-Zeitleiste.
+  `ui/loggeneric_dialog.py` (Filter, Tabelle, Diagramm, Report). `logauth.looks_like_auth` wählt automatisch zwischen
+  Sicherheits-Dashboard und allgemeiner Auswertung; Palette-Befehl erzwingt die allgemeine Sicht.
+- Neue Qt-freie Tests: `test_tools`, `test_places`, `test_newfile`, `test_export`, `test_loggeneric` und Ergänzungen
+  in `test_logauth`. Keine neuen Abhängigkeiten (QtPdf war ab Block F im Build). Alle Tests grün (offscreen).
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -416,7 +451,12 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Alle geplanten Blöcke (F–K) sind fertig.** Nichts weiter offen auf Entwicklerseite; auf neue Wünsche des Besitzers warten.
+**Blöcke F–K und L abgeschlossen; Block M (1.13.0) fertig.** Aus dem Plan „L–P“ stehen noch aus:
+- **N (1.14.0)** eigener IP-/Netzwerk-Scanner als Ersatz für „Advanced IP Scanner“ (OUI-Liste NICHT aus Wiresharks manuf/GPL).
+- **O (1.15.0)** Fragebögen/Vorlagen (passwortlose Spalten, keine Zugangsdaten erfassen).
+- **P (1.16.0)** Inventar/Docusnap-artig (nie Passwörter/Schlüssel/Tokens erfassen).
+
+Nach jedem Block anhalten und zusammenfassen; erst bei „weiter“ fortfahren.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
