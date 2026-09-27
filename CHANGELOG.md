@@ -9,6 +9,10 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   (Paket evtx, Rust/MIT) mit Dashboard (Fehlversuche je IP/Benutzer, Erfolg nach Fehlversuchen, Brute-Force-Verdacht,
   neue Benutzer/Gruppen/Dienste, geleerte Protokolle, Kontosperren), Zeitleiste (QPainter), Filter, Sprung zur Quelle,
   „Zur Zeitleiste hinzufügen“, RDAP für IPs, Markdown-Report; große Logs gestreamt
+- Modul PCAP-Übersicht (Standard aus, `Ctrl+Shift+Alt+K`): .pcap/.pcapng streamen (dpkt) – Zeitraum, Protokolle,
+  Top-Verbindungen/-Talker, DNS, HTTP (Hosts/Pfade/User-Agents), TLS-SNI und im Klartext übertragene Zugangsdaten
+  (FTP/Telnet/HTTP Basic/POP3/IMAP/SMTP AUTH) rot markiert; Tabellen filter-/sortierbar, RDAP je IP, Markdown-Report;
+  kaputte Aufzeichnungen werden übersprungen
 - Abhängigkeiten evtx 0.13.1 (MIT, Wheels) und dpkt 1.9.8 (BSD-3) hinzugefügt
 
 ## [1.11.0] – 2026-09-27

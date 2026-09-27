@@ -51,7 +51,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("pcap", "PCAP-Übersicht", "Mitschnitte (.pcap/.pcapng) zusammenfassen", "dpkt", False, "K"),
 ]
 BY_KEY = {m.key: m for m in MODULES}
-ANALYSIS_MODULES = ("strings", "embedded", "entropy", "metadata")   # arbeiten auf beliebigen (Binär-)Dateien
+ANALYSIS_MODULES = ("strings", "embedded", "entropy", "metadata", "logs", "pcap")   # arbeiten auf beliebigen (Binär-)Dateien
 
 
 def show_all_files(config: dict) -> bool:

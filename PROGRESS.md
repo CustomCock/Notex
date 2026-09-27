@@ -35,7 +35,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
 | 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
-| 1.12.0 | Block K: Log-Auswertung, PCAP | in Arbeit (K1 fertig) |
+| 1.12.0 | Block K: Log-Auswertung, PCAP | in Arbeit (K1+K2 fertig) |
 
 ## Erledigt
 
@@ -323,6 +323,13 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   je IP/User, Erfolg-nach-Fehlversuch, Brute-Force, neue User/Gruppen/Dienste, log_cleared, lockouts, Stunden-
   Zeitleiste). `ui/logauth_dialog.py` mit QPainter-Zeitleiste; MainWindow.add_prepared_timeline_entry verbindet die
   Log-Zeile mit Modul H3. requirements/build/CI/Lizenzen: evtx 0.13.1, dpkt 1.9.8.
+- K2 PCAP-Übersicht `core/pcapinfo.py` mit **dpkt** (BSD, nicht scapy=GPL): Format-Erkennung (pcap/pcapng-Magic),
+  Streaming mit Fortschritt, robust gegen kaputte Records (überspringen und zählen). Datalink 1/101/113 behandelt.
+  Protokolle, Talker, Conversations, DNS (dpkt.dns), HTTP (dpkt.http.Request → Host/Pfad/UA + Basic-Auth),
+  eigener TLS-ClientHello-SNI-Parser (SNI als UTF-8, nicht idna – idna kennt kein errors="ignore"), Klartext-
+  Zugangsdaten (FTP/Telnet/POP3/IMAP/SMTP-AUTH per Zeilen-Heuristik, IMAP-Tag beachtet). Tests mit selbst gebauten
+  pcaps (dpkt.pcap.Writer). `ui/pcap_dialog.py` (sortierbare Tabellen, Zugangsdaten rot, RDAP je IP).
+  ANALYSIS_MODULES um logs/pcap erweitert → Baum zeigt .evtx/.pcap, solange das Modul an ist.
 
 ## Offen
 

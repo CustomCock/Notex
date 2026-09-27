@@ -915,6 +915,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("rdap", self._activate_rdap)
         self.modules.contribute("scanner", self._activate_scanner)
         self.modules.contribute("logs", self._activate_logs)
+        self.modules.contribute("pcap", self._activate_pcap)
         self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1725,6 +1726,47 @@ class MainWindow(QMainWindow):
         self._analysis_dialogs.setdefault("logs", []).append(dialog)
         dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("logs", []).remove(d)
                                 if d in self._analysis_dialogs.get("logs", []) else None)
+        dialog.show()
+
+    # ---- Modul: PCAP-Übersicht -------------------------------------------------------------------
+    def _activate_pcap(self):
+        action = self._module_action("PCAP-Übersicht …", "Ctrl+Shift+Alt+K", lambda: self.analyze_pcap(),
+                                     self.file_menu)
+        self.registry.add("pcap:open", "PCAP-Übersicht (Protokolle, DNS, HTTP, TLS, Klartext-Zugangsdaten)",
+                          lambda: self.analyze_pcap(), category="Sicherheit", shortcut="Ctrl+Shift+Alt+K",
+                          keywords="pcap pcapng netzwerk mitschnitt wireshark dns http tls sni zugangsdaten")
+
+        def tree_entry(menu, path: Path) -> None:
+            if path.suffix.lower() in (".pcap", ".pcapng", ".cap"):
+                menu.addAction(icon("radar"), "PCAP-Übersicht …", lambda: self.analyze_pcap(path))
+        self.sidebar.tree.menu_providers.append(tree_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault("pcap", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("pcap:open")
+            if tree_entry in self.sidebar.tree.menu_providers:
+                self.sidebar.tree.menu_providers.remove(tree_entry)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    def analyze_pcap(self, path: Path | None = None) -> None:
+        from notex.core import pcapinfo
+        from notex.ui.pcap_dialog import PcapDialog
+        target = self._analysis_target(path)
+        if target is None:
+            return
+        try:
+            import dpkt  # noqa: F401
+        except ImportError:
+            self.toast.show_message("Für PCAP fehlt das Paket „dpkt“ in diesem Build", "info")
+            return
+        dialog = PcapDialog(self, target)
+        self._analysis_dialogs.setdefault("pcap", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("pcap", []).remove(d)
+                                if d in self._analysis_dialogs.get("pcap", []) else None)
         dialog.show()
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------

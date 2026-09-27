@@ -238,7 +238,7 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 | RDAP/ASN | aus | Netzwerk (nur auf Klick) |
 | Netzwerk-Scanner | aus | – |
 | Log-Auswertung | aus | evtx (gebündelt, nur für .evtx) |
-| PCAP-Übersicht | aus | dpkt |
+| PCAP-Übersicht | aus | dpkt (gebündelt) |
 
 Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
 öffnen Binärdateien wieder im Texteditor.
@@ -571,6 +571,25 @@ Bibliothek testbar. **Entscheidung gegen python-evtx**: dessen Abhängigkeit `he
 und ist in beiden Builds unsicher; `evtx` bringt fertige Wheels ohne Transitiv-Abhängigkeit.
 
 ![Log-Auswertung](docs/62-logauth.png)
+
+
+## PCAP-Übersicht
+
+Modul „PCAP-Übersicht“ (Standard aus). Menü Datei → „PCAP-Übersicht …“, `Ctrl+Shift+Alt+K`, Palette oder Rechtsklick
+im Baum auf eine `.pcap`/`.pcapng`. Die Datei wird gestreamt (dpkt, BSD – **nicht** scapy).
+
+- **Übersicht**: Zeitraum, Paket- und Byte-Zahl, übersprungene (kaputte) Pakete.
+- **Reiter**: Protokollverteilung, Top-Verbindungen (A ↔ B, Pakete, Bytes), Top-Talker, DNS-Anfragen mit Antwort,
+  HTTP-Hosts/Pfade/User-Agents, TLS-SNI (Server-Name aus dem ClientHello) und – deutlich rot markiert –
+  **im Klartext übertragene Zugangsdaten** (FTP, Telnet, HTTP Basic, POP3, IMAP, SMTP AUTH).
+- Tabellen sind filter- und sortierbar; Rechtsklick auf eine IP: „RDAP zu <IP>“ (Modul RDAP), Zelle kopieren.
+- „Report einfügen/kopieren“ schreibt einen Markdown-Report.
+
+**Ehrliche Grenzen**: Keine vollständige TCP-Reassemblierung – HTTP/TLS/Zugangsdaten werden je Paket aus der Nutzlast
+gelesen (die Anfrage steckt fast immer im ersten Datenpaket). Verschlüsselte Inhalte werden nicht entschlüsselt (bei
+TLS nur der SNI-Name). Kaputte Aufzeichnungen werden übersprungen, nicht abgebrochen.
+
+![PCAP-Übersicht](docs/63-pcap.png)
 
 
 ## Netzwerk-Scanner
@@ -953,6 +972,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
 | Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
 | Ctrl+Shift+Alt+L | Log-Auswertung (Modul Log-Auswertung) |
+| Ctrl+Shift+Alt+K | PCAP-Übersicht (Modul PCAP-Übersicht) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |
