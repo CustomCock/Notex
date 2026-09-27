@@ -50,6 +50,11 @@ from notex.ui.recent_dialog import RecentDialog
 from notex.ui.winapi import apply_dark_titlebar, bring_to_front
 
 
+def _native(shortcut: str) -> str:
+    """Tastenkürzel plattformgerecht anzeigen („Strg+Alt+M"), leer bei leerem Kürzel."""
+    return QKeySequence(shortcut).toString(QKeySequence.SequenceFormat.NativeText) if shortcut else ""
+
+
 def _register_viewers() -> None:
     """Viewer-Tabs (Bild, später Hex/PDF) bei den Tab-Gruppen anmelden."""
     from notex.ui.editor_tabs import EditorTabs
@@ -292,6 +297,10 @@ class MainWindow(QMainWindow):
         self.grammar_action = self._action("Grammatik prüfen (LanguageTool)", "Shift+F7", self.toggle_grammar, checkable=True)
         self.grammar_action.setChecked(self.config["grammar"]["enabled"])
         edit_menu.addAction(self.grammar_action)
+
+        self.tools_menu = self.menuBar().addMenu("&Werkzeuge")
+        self.tools_menu.aboutToShow.connect(lambda: self._build_tools_menu(self.tools_menu, self._current_file_kind()))
+        self._action("Werkzeug-Übersicht …", "Ctrl+Shift+W", self.show_tool_overview)
 
         view_menu = self.menuBar().addMenu("&Ansicht")
         self.sidebar_action = self._action("Seitenleiste", "Ctrl+B", self.toggle_sidebar, checkable=True)
@@ -935,8 +944,8 @@ class MainWindow(QMainWindow):
         from notex.ui.editor_tabs import EditorTabs
         from notex.ui.hex_view import HexPage
         EditorTabs.register_viewer("hex", HexPage)
-        actions = [self._module_action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex(), self.file_menu),
-                   self._module_action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums(), self.file_menu)]
+        actions = [self._module_action("Als Hex öffnen", "Ctrl+Shift+Alt+H", lambda: self.open_as_hex()),
+                   self._module_action("Prüfsummen …", "Ctrl+Shift+Alt+C", lambda: self.show_checksums())]
         self.registry.add("file:hex", "Als Hex öffnen", lambda: self.open_as_hex(), category="Datei",
                           shortcut="Ctrl+Shift+Alt+H", keywords="hex binär bytes hexdump offset")
         self.registry.add("file:checksums", "Prüfsummen (MD5, SHA-1, SHA-256, SHA-512)", lambda: self.show_checksums(),
@@ -1108,8 +1117,7 @@ class MainWindow(QMainWindow):
 
     # ---- Modul: Zeitleiste & Beweismittel --------------------------------------------------------
     def _activate_timeline(self):
-        actions = [self._module_action("Zeitleiste anzeigen …", "Ctrl+Shift+Alt+Z", lambda: self.show_timeline(),
-                                       self.file_menu),
+        actions = [self._module_action("Zeitleiste anzeigen …", "Ctrl+Shift+Alt+Z", lambda: self.show_timeline()),
                    self._action("Zur Zeitleiste hinzufügen …", "Ctrl+Alt+Z", lambda: self.add_to_timeline())]
         self.edit_menu.addAction(actions[1])
         keywords = "zeitleiste timeline forensik ereignis chronologie vorfall"
@@ -1352,7 +1360,7 @@ class MainWindow(QMainWindow):
     # ---- Modul: YARA ----------------------------------------------------------------------------
     def _activate_yara(self):
         """Regel testen: aktuelle .yar-Datei (auch ungespeichert) gegen Datei/Ordner; Baum: Regel oder Ziel."""
-        action = self._module_action("YARA-Regel testen …", "Ctrl+Alt+Y", lambda: self.test_yara(), self.file_menu)
+        action = self._module_action("YARA-Regel testen …", "Ctrl+Alt+Y", lambda: self.test_yara())
         self.registry.add("yara:test", "YARA-Regel testen", lambda: self.test_yara(), category="Dateianalyse",
                           shortcut="Ctrl+Alt+Y", keywords="yara regel rule malware signatur prüfen scan")
 
@@ -1488,8 +1496,7 @@ class MainWindow(QMainWindow):
         self._ip_timer.setSingleShot(True)
         self._ip_timer.setInterval(800)
         self._ip_timer.timeout.connect(lambda: self._mark_ip_conflicts(only_current=True))
-        action = self._module_action("IP-Übersicht …", "Ctrl+Shift+Alt+I", lambda: self.show_ip_overview(),
-                                     self.file_menu)
+        action = self._module_action("IP-Übersicht …", "Ctrl+Shift+Alt+I", lambda: self.show_ip_overview())
         self.registry.add("ip:overview", "IP-Übersicht (Zuordnungen, Konflikte, freie Adressen)",
                           lambda: self.show_ip_overview(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+I",
                           keywords="ip adresse konflikt subnetz netz frei dhcp host zuordnung")
@@ -1660,8 +1667,7 @@ class MainWindow(QMainWindow):
     # ---- Modul: Netzwerk-Scanner ----------------------------------------------------------------
     def _activate_scanner(self):
         """Scanner nur auf ausdrücklichen Start; öffentliche Ziele verlangen eine Bestätigung."""
-        action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner(),
-                                     self.file_menu)
+        action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner())
         self.registry.add("scan:open", "Netzwerk-Scanner (Hosts und offene Ports im eigenen Netz)",
                           lambda: self.open_scanner(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+P",
                           keywords="scan scanner netzwerk port host offen tcp nmap discovery")
@@ -1685,8 +1691,7 @@ class MainWindow(QMainWindow):
 
     # ---- Modul: Log-Auswertung -------------------------------------------------------------------
     def _activate_logs(self):
-        action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log(),
-                                     self.file_menu)
+        action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log())
         self.registry.add("logs:open", "Log-Auswertung (auth.log, secure, .evtx)", lambda: self.analyze_log(),
                           category="Sicherheit", shortcut="Ctrl+Shift+Alt+L",
                           keywords="log auth secure evtx anmeldung login brute force ereignis windows linux")
@@ -1730,8 +1735,7 @@ class MainWindow(QMainWindow):
 
     # ---- Modul: PCAP-Übersicht -------------------------------------------------------------------
     def _activate_pcap(self):
-        action = self._module_action("PCAP-Übersicht …", "Ctrl+Shift+Alt+K", lambda: self.analyze_pcap(),
-                                     self.file_menu)
+        action = self._module_action("PCAP-Übersicht …", "Ctrl+Shift+Alt+K", lambda: self.analyze_pcap())
         self.registry.add("pcap:open", "PCAP-Übersicht (Protokolle, DNS, HTTP, TLS, Klartext-Zugangsdaten)",
                           lambda: self.analyze_pcap(), category="Sicherheit", shortcut="Ctrl+Shift+Alt+K",
                           keywords="pcap pcapng netzwerk mitschnitt wireshark dns http tls sni zugangsdaten")
@@ -1837,7 +1841,7 @@ class MainWindow(QMainWindow):
 
     def _activate_analysis(self, key: str, title: str, shortcut: str, icon_name: str, opener, keywords: str):
         """Gemeinsamer Aktivator für Datei-Analysen: Menü Datei, Palette, Kürzel, Baum-Kontextmenü."""
-        action = self._module_action(title, shortcut, lambda: opener(), self.file_menu)
+        action = self._module_action(title, shortcut, lambda: opener())
         self.registry.add(f"analysis:{key}", title.replace(" …", ""), lambda: opener(), category="Dateianalyse",
                           shortcut=shortcut, keywords=keywords)
 
@@ -1890,6 +1894,69 @@ class MainWindow(QMainWindow):
         viewer = self.tabs.open_viewer(Path(path), "hex")
         if viewer is not None:
             viewer.select_range(offset, length)
+
+    # ---- Werkzeuge (zentrale Registry, siehe core/tools.py) -------------------------------------
+    def _current_file_kind(self) -> str:
+        from notex.core import tools
+        return tools.file_kind(self._current_file())
+
+    def _enabled_modules(self) -> set:
+        from notex.core import tools
+        return tools.enabled_modules(self.config)
+
+    def _build_tools_menu(self, menu, kind: str, only_applicable: bool = False) -> None:
+        """Menü „Werkzeuge" (bzw. Toolbar-/Baum-Ableger) aus der Registry bauen – Kategorien als Untermenüs.
+        Nicht passende Werkzeuge sind ausgegraut (Tooltip: warum); abgeschaltete Module erscheinen gar nicht."""
+        from notex.core import tools
+        menu.clear()
+        menu.setToolTipsVisible(True)
+        enabled = self._enabled_modules()
+        groups = tools.grouped(enabled)
+        if not groups:
+            action = menu.addAction("Keine Werkzeuge aktiv – Einstellungen → Module")
+            action.setEnabled(False)
+        for _key, label, group_tools in groups:
+            visible = [t for t in group_tools if tools.applies(t, kind)] if only_applicable else group_tools
+            if not visible:
+                continue
+            submenu = menu.addMenu(label)
+            for tool in visible:
+                ok = tools.applies(tool, kind)
+                action = submenu.addAction(icon(tool.icon), tool.name + (f"\t{_native(tool.shortcut)}"
+                                                                         if tool.shortcut else ""))
+                action.setEnabled(ok)
+                if not ok:
+                    action.setToolTip("Passt nicht zur aktuellen Datei" if kind != "none"
+                                      else "Erst eine Datei öffnen oder im Baum auswählen")
+                else:
+                    action.setToolTip(tool.description)
+                action.triggered.connect(lambda _c=False, cmd=tool.command: self._run_tool(cmd))
+        menu.addSeparator()
+        menu.addAction(icon("layout-grid"), "Werkzeug-Übersicht …\t" + _native("Ctrl+Shift+W"),
+                       self.show_tool_overview)
+
+    def _run_tool(self, command: str) -> None:
+        entry = self.registry.get(command)
+        if entry is not None and entry.callback is not None:
+            entry.callback()
+        else:                                   # Modul aus oder Kommando (noch) nicht registriert
+            from notex.core import tools
+            tool = tools.BY_COMMAND.get(command)
+            if tool and tool.module and tool.module not in self._enabled_modules():
+                self.toast.show_message(f"Modul für „{tool.name}“ ist aus (Einstellungen → Module)", "info")
+
+    def show_tool_overview(self) -> None:
+        from notex.ui.tool_overview import ToolOverviewDialog
+        ToolOverviewDialog(self).show()
+
+    def _tools_tree_menu(self, menu, path: Path) -> None:
+        from notex.core import tools
+        submenu = menu.addMenu(icon("wrench"), "Werkzeuge")
+        self._build_tools_menu(submenu, tools.file_kind(path), only_applicable=True)
+
+    def _build_toolbar_tools_menu(self, menu) -> None:
+        """Werkzeuge-Menü für die Blatt-Leiste: nur Werkzeuge, die zur aktuellen Datei passen."""
+        self._build_tools_menu(menu, self._current_file_kind(), only_applicable=True)
 
     def _analysis_target(self, path: Path | None) -> Path | None:
         """Datei für ein Analyse-Werkzeug: übergeben, sonst der aktuelle Tab, sonst die Auswahl im Baum."""
@@ -2056,6 +2123,7 @@ class MainWindow(QMainWindow):
         self.tabs.open_font_settings = lambda: self.open_settings("Schrift")
         self.tabs.context_menu_hook = self._extend_context_menu
         self.tabs.image_hook = self._insert_images
+        self.tabs.tools_menu_builder = self._build_toolbar_tools_menu
 
     # ---- Linux-Desktop-Integration ----------------------------------------------------------
     def _linux_integration(self):
@@ -3072,6 +3140,11 @@ class MainWindow(QMainWindow):
         self.registry.add("view:text", "Ansicht: Als Text bearbeiten", lambda: self.set_preview_mode("edit"),
                           category="Ansicht", keywords="csv json yaml text roh quelltext")
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
+        self.registry.add("doc:templates", "Neue Datei aus Vorlage", lambda: self.new_from_template(), category="Datei",
+                          shortcut="Ctrl+Shift+T", keywords="vorlage template neu dokument")
+        self.registry.add("tools:overview", "Werkzeug-Übersicht", self.show_tool_overview, category="Werkzeuge",
+                          shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
+        self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
 

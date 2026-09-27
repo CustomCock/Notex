@@ -102,7 +102,16 @@ class EditorToolbar(QFrame):
         self.overflow.hide()
         self._hidden: list[tuple[str, list[QAction]]] = []   # zuletzt ausgeblendete Gruppen (Menü wird lazy gebaut)
         self.overflow_menu.aboutToShow.connect(self._build_overflow_menu)
+
+        # „Werkzeuge"-Button: nur die Werkzeuge, die zur aktuellen Datei passen (Inhalt aus der zentralen Registry)
+        self.tools_button = MenuButton("Werkzeuge – Aktionen, die zur aktuellen Datei passen")
+        self.tools_button.setText("Werkzeuge")
+        self.tools_button.setIcon(icon("wrench"))
+        self.tools_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.tools_button.menu_.aboutToShow.connect(self._build_tools_button_menu)
+
         self.strip_layout.addStretch(1)
+        self.strip_layout.addWidget(self.tools_button)
         self.strip_layout.addWidget(self.overflow)
 
         self.handle = QToolButton()
@@ -250,6 +259,18 @@ class EditorToolbar(QFrame):
     def retheme(self) -> None:
         self._update_handle()
         self.overflow.setIcon(icon("ellipsis"))
+        self.tools_button.setIcon(icon("wrench"))
+
+    def _build_tools_button_menu(self) -> None:
+        """Das Werkzeuge-Menü der Blatt-Leiste aus der Registry bauen (nur passende Werkzeuge)."""
+        menu = self.tools_button.menu_
+        builder = getattr(self.tabs, "tools_menu_builder", None)
+        if builder is not None:
+            builder(menu)
+        else:
+            menu.clear()
+            action = menu.addAction("Keine Werkzeuge verfügbar")
+            action.setEnabled(False)
 
     # ---- Überlauf -------------------------------------------------------------------
     def resizeEvent(self, event) -> None:
