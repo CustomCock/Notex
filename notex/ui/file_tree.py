@@ -19,7 +19,7 @@ from PySide6.QtGui import QColor, QDropEvent, QPainter
 from PySide6.QtWidgets import (QAbstractItemView, QFileSystemModel, QLabel, QMenu, QStyledItemDelegate,
                                QStyleOptionViewItem, QTreeView)
 
-from notex.core import fileops
+from notex.core import fileops, places
 from notex.theme.icons import LucideIconProvider, icon, pixmap
 from notex.theme.theme import style_menu
 from notex.theme.tokens import COLORS, DURATION, LAYOUT, RADIUS, SPACING
@@ -54,12 +54,19 @@ class FileTree(QTreeView):
     open_hex_requested = Signal(Path)     # Kontextmenü „Als Hex öffnen“
     checksums_requested = Signal(Path)    # Kontextmenü „Prüfsummen …“
     follow_requested = Signal(Path)       # Kontextmenü „Live verfolgen“
+    root_changed = Signal(Path)           # der angezeigte Wurzelordner wurde gewechselt (Ort im Explorer)
+    pin_requested = Signal(Path)          # Kontextmenü „An Schnellzugriff anheften“
+    show_hidden_toggled = Signal(bool)    # Kontextmenü „Versteckte Dateien anzeigen“
 
-    def __init__(self, root: Path, extensions: list[str]) -> None:
+    def __init__(self, root: Path, extensions: list[str], show_hidden: bool = False) -> None:
         super().__init__()
         self.menu_providers: list = []    # Callable[[QMenu, Path], None] – Module hängen Einträge ein
         self.folder_menu_providers: list = []   # dasselbe für Ordner (z. B. YARA über einen Ordner)
-        self.root = Path(root)
+        self.notes_root = Path(root)      # der Notiz-Ordner (data/) – immer beschreibbar
+        self.root = self.notes_root       # aktuell angezeigte Wurzel (kann ein anderer Ort sein)
+        self._extensions = list(extensions)
+        self._show_all = False            # alle Dateien statt nur der Endungen (Module/Orte)
+        self.show_hidden = bool(show_hidden)
         self._expanded: set[str] = set()
         self._hover_row = QModelIndex()
         self._hover_prev = QModelIndex()
@@ -69,7 +76,7 @@ class FileTree(QTreeView):
 
         self.model_ = QFileSystemModel(self)
         self.model_.setIconProvider(LucideIconProvider())
-        self.model_.setFilter(QDir.Filter.AllDirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
+        self.model_.setFilter(self._dir_filter())
         self.model_.setNameFilters([f"*{ext}" for ext in extensions])
         self.model_.setNameFilterDisables(False)  # nicht passende Dateien ausblenden statt ausgrauen
         self.model_.setReadOnly(False)            # nötig für Umbenennen per F2
@@ -144,8 +151,43 @@ class FileTree(QTreeView):
             return self.root
         return path if path.is_dir() else path.parent
 
+    def _dir_filter(self) -> QDir.Filter:
+        flags = QDir.Filter.AllDirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot
+        if self.show_hidden:
+            flags |= QDir.Filter.Hidden | QDir.Filter.System
+        return flags
+
+    def _apply_name_filters(self) -> None:
+        # Ausserhalb des Notiz-Ordners immer alle Dateien zeigen – dort sind die Endungs-Filter sinnlos.
+        show_all = self._show_all or self.root != self.notes_root
+        self.model_.setNameFilters(["*"] if show_all else [f"*{ext}" for ext in self._extensions])
+
     def set_extensions(self, extensions: list[str], show_all: bool = False) -> None:
-        self.model_.setNameFilters(["*"] if show_all else [f"*{ext}" for ext in extensions])
+        self._extensions = list(extensions)
+        self._show_all = bool(show_all)
+        self._apply_name_filters()
+
+    def set_hidden(self, show: bool) -> None:
+        """Versteckte Dateien/Ordner ein- oder ausblenden."""
+        self.show_hidden = bool(show)
+        self.model_.setFilter(self._dir_filter())
+
+    def is_notes_root(self) -> bool:
+        return self.root == self.notes_root
+
+    def set_root(self, path: Path) -> None:
+        """Den angezeigten Wurzelordner wechseln (Ort im Explorer)."""
+        path = Path(path)
+        if path == self.root:
+            return
+        self.root = path
+        # _expanded ist die Merkliste für data/ (Config) und wird beim Wechsel NICHT geleert,
+        # damit der gespeicherte Aufklapp-Zustand des Notiz-Ordners erhalten bleibt.
+        self.model_.setRootPath(str(path))
+        self.setRootIndex(self.model_.index(str(path)))
+        self._apply_name_filters()
+        self._update_hint()
+        self.root_changed.emit(path)
 
     def retheme(self) -> None:
         self.setIndentation(LAYOUT.tree_indent)
@@ -167,11 +209,13 @@ class FileTree(QTreeView):
 
     # ---- Auf-/Zuklappzustand ------------------------------------------------
     def _on_expanded(self, index: QModelIndex) -> None:
-        self._expanded.add(self._relative(self.path_at(index)))
+        if self.is_notes_root():          # nur im Notiz-Ordner merken (die Config-Liste gilt für data/)
+            self._expanded.add(self._relative(self.path_at(index)))
         self._rotate_chevron(index, 90.0)
 
     def _on_collapsed(self, index: QModelIndex) -> None:
-        self._expanded.discard(self._relative(self.path_at(index)))
+        if self.is_notes_root():
+            self._expanded.discard(self._relative(self.path_at(index)))
         self._rotate_chevron(index, 0.0)
 
     def _rotate_chevron(self, index: QModelIndex, target: float) -> None:
@@ -296,6 +340,9 @@ class FileTree(QTreeView):
             return
         if target.is_file():
             target = target.parent
+        if not self._guard_write(target, "Hierher verschieben/kopieren"):
+            event.ignore()
+            return
 
         for url in event.mimeData().urls():
             source = Path(url.toLocalFile())
@@ -348,7 +395,9 @@ class FileTree(QTreeView):
                 for provider in self.menu_providers:      # Module (z. B. Hex & Dateianalyse) hängen sich hier ein
                     provider(menu, path)
                 menu.addSeparator()
-            elif self.folder_menu_providers:
+            else:
+                menu.addAction(icon("bookmark"), "An Schnellzugriff anheften",
+                               lambda: self.pin_requested.emit(path))
                 for provider in self.folder_menu_providers:
                     provider(menu, path)
                 menu.addSeparator()
@@ -356,9 +405,32 @@ class FileTree(QTreeView):
             menu.addAction(icon("trash"), "In den Papierkorb\tEntf", self.delete_selected)
         menu.addSeparator()
         menu.addAction(icon("external-link"), "Im Explorer anzeigen", lambda: fileops.reveal_in_file_manager(path or self.root))
+        hidden = menu.addAction(icon("eye"), "Versteckte Dateien anzeigen")
+        hidden.setCheckable(True)
+        hidden.setChecked(self.show_hidden)
+        hidden.toggled.connect(self.show_hidden_toggled.emit)
         return menu
 
+    def _guard_write(self, path: Path, action: str) -> bool:
+        """Vor Schreibzugriffen ausserhalb des Notiz-Ordners warnen (Systemordner besonders deutlich)."""
+        if places.is_within(path, self.notes_root):
+            return True
+        name = Path(path).name or str(path)
+        if places.is_system_path(path):
+            return dialogs.confirm(
+                self, "Systemordner",
+                f"„{name}“ liegt in einem geschützten Systembereich.",
+                informative=f"{action} kann Windows/Linux beschädigen. Nur fortfahren, wenn du sicher bist.",
+                yes="Trotzdem fortfahren", danger=True)
+        return dialogs.confirm(
+            self, "Ausserhalb der Notizen",
+            f"„{name}“ liegt ausserhalb des Notiz-Ordners.",
+            informative=f"{action} wirkt direkt auf das Dateisystem.",
+            yes="Fortfahren")
+
     def create_file(self, folder: Path) -> None:
+        if not self._guard_write(folder, "Eine Datei anlegen"):
+            return
         name = dialogs.ask_text(self, "Neue Datei", "Dateiname:", fileops.unique_path(folder, "Neu", ".txt").name)
         if not name:
             return
@@ -372,6 +444,8 @@ class FileTree(QTreeView):
         self.file_activated.emit(path)
 
     def create_folder(self, folder: Path) -> None:
+        if not self._guard_write(folder, "Einen Ordner anlegen"):
+            return
         name = dialogs.ask_text(self, "Neuer Ordner", "Ordnername:", fileops.unique_path(folder, "Neuer Ordner").name)
         if not name:
             return
@@ -385,8 +459,12 @@ class FileTree(QTreeView):
 
     def rename_selected(self) -> None:
         index = self.currentIndex()
-        if index.isValid():
-            self.edit(index)  # Inline-Editor; das Modell benennt um und feuert fileRenamed
+        if not index.isValid():
+            return
+        path = self.path_at(index)
+        if path is not None and not self._guard_write(path, "Umbenennen"):
+            return
+        self.edit(index)  # Inline-Editor; das Modell benennt um und feuert fileRenamed
 
     def _on_model_renamed(self, folder: str, old_name: str, new_name: str) -> None:
         old, new = Path(folder) / old_name, Path(folder) / new_name
@@ -408,8 +486,11 @@ class FileTree(QTreeView):
         if path is None:
             return
         kind = "Ordner" if path.is_dir() else "Datei"
-        if not dialogs.confirm(self, "In den Papierkorb", f"{kind} „{path.name}“ in den Papierkorb verschieben?",
-                               yes="In den Papierkorb", danger=True):
+        if places.is_within(path, self.notes_root):
+            if not dialogs.confirm(self, "In den Papierkorb", f"{kind} „{path.name}“ in den Papierkorb verschieben?",
+                                   yes="In den Papierkorb", danger=True):
+                return
+        elif not self._guard_write(path, "In den Papierkorb verschieben"):
             return
         try:
             fileops.move_to_trash(path)

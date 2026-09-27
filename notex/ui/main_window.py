@@ -1958,6 +1958,14 @@ class MainWindow(QMainWindow):
         """Werkzeuge-Menü für die Blatt-Leiste: nur Werkzeuge, die zur aktuellen Datei passen."""
         self._build_tools_menu(menu, self._current_file_kind(), only_applicable=True)
 
+    def _pin_current_folder(self) -> None:
+        """Den aktuell im Baum gewählten Ordner (bzw. den angezeigten Wurzelordner) an den Schnellzugriff heften."""
+        tree = self.sidebar.tree
+        selected = tree.selected_path()
+        folder = tree.folder_for(selected) if selected is not None else tree.root
+        self.sidebar._pin_folder(folder)
+        self.toast.show_message(f"An Schnellzugriff angeheftet · {Path(folder).name}")
+
     def _analysis_target(self, path: Path | None) -> Path | None:
         """Datei für ein Analyse-Werkzeug: übergeben, sonst der aktuelle Tab, sonst die Auswahl im Baum."""
         path = path or self._current_file() or self.sidebar.tree.selected_path()
@@ -3145,6 +3153,18 @@ class MainWindow(QMainWindow):
         self.registry.add("tools:overview", "Werkzeug-Übersicht", self.show_tool_overview, category="Werkzeuge",
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
+        self.registry.add("explorer:notes", "Explorer: Notizen anzeigen",
+                          lambda: self.sidebar._on_place_selected(self.sidebar.tree.notes_root),
+                          category="Ansicht", keywords="explorer baum notizen ort data")
+        self.registry.add("explorer:thispc", "Explorer: Persönlicher Ordner (Dieser PC)",
+                          lambda: self.sidebar._on_place_selected(Path.home()),
+                          category="Ansicht", keywords="explorer dieser pc laufwerk home persönlich ordner")
+        self.registry.add("explorer:hidden", "Explorer: Versteckte Dateien umschalten",
+                          lambda: self.sidebar._set_show_hidden(not self.sidebar.tree.show_hidden),
+                          category="Ansicht", keywords="versteckt hidden punktdateien dotfiles anzeigen")
+        self.registry.add("explorer:pin", "Explorer: aktuellen Ordner anheften",
+                          self._pin_current_folder,
+                          category="Ansicht", keywords="schnellzugriff anheften pin ordner favorit")
         self._action("Quick Open", "Ctrl+P", lambda: self.show_palette("files"))
         self._action("Command Palette", "Ctrl+Shift+P", lambda: self.show_palette("commands"))
 
