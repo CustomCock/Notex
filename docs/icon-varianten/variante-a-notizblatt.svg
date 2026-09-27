@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Variante A – „Notizblatt": ein helles Blatt mit umgeknickter Ecke im Akzent und Textzeilen.
+       Klar als Text-/Notiz-Editor lesbar, ruhig und sachlich. Hintergrund wie gehabt (#1e1e1e, rx56). -->
+  <defs>
+    <linearGradient id="a_paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6f7f8"/>
+      <stop offset="1" stop-color="#d9dde2"/>
+    </linearGradient>
+    <linearGradient id="a_fold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9fb0c4"/>
+      <stop offset="1" stop-color="#5f6f84"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#1e1e1e"/>
+
+  <!-- Schatten des Blatts -->
+  <rect x="66" y="54" width="128" height="156" rx="14" fill="#000000" fill-opacity="0.28" transform="translate(4 8)"/>
+  <!-- Blatt mit umgeknickter Ecke oben rechts -->
+  <path d="M66 68 a14 14 0 0 1 14-14 h74 l40 40 v98 a14 14 0 0 1-14 14 H80 a14 14 0 0 1-14-14 Z"
+        fill="url(#a_paper)"/>
+  <!-- umgeknickte Ecke -->
+  <path d="M154 54 v26 a14 14 0 0 0 14 14 h26 Z" fill="url(#a_fold)"/>
+  <path d="M154 54 l40 40" stroke="#ffffff" stroke-opacity="0.5" stroke-width="2"/>
+
+  <!-- Textzeilen: erste Zeile im Akzent (Überschrift), darunter neutrale Zeilen -->
+  <g stroke-linecap="round">
+    <line x1="86" y1="112" x2="150" y2="112" stroke="#5f6f84" stroke-width="9"/>
+    <line x1="86" y1="134" x2="170" y2="134" stroke="#9aa1a9" stroke-width="7"/>
+    <line x1="86" y1="152" x2="170" y2="152" stroke="#9aa1a9" stroke-width="7"/>
+    <line x1="86" y1="170" x2="146" y2="170" stroke="#9aa1a9" stroke-width="7"/>
+  </g>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Variante C – „Terminal": technischer, Hacker-/Werkzeug-Charakter. Ein Konsolenfenster mit
+       Akzent-Prompt (›) und Cursor-Block. Passt zum Sicherheits-/Automatisierungs-Charakter. -->
+  <defs>
+    <linearGradient id="c_screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2b2b"/>
+      <stop offset="1" stop-color="#232323"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#1e1e1e"/>
+
+  <!-- Konsolenfenster -->
+  <rect x="48" y="56" width="160" height="144" rx="18" fill="url(#c_screen)"
+        stroke="#3a3a3a" stroke-width="2"/>
+  <!-- Titelleiste mit drei Punkten -->
+  <line x1="48" y1="86" x2="208" y2="86" stroke="#3a3a3a" stroke-width="2"/>
+  <circle cx="68" cy="71" r="5" fill="#5f6f84"/>
+  <circle cx="86" cy="71" r="5" fill="#4a4a4a"/>
+  <circle cx="104" cy="71" r="5" fill="#4a4a4a"/>
+
+  <!-- Prompt-Chevron im Akzent -->
+  <path d="M76 116 L100 134 L76 152" fill="none" stroke="#9fb0c4" stroke-width="12"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Eingabezeile -->
+  <line x1="112" y1="134" x2="150" y2="134" stroke="#c3c9d0" stroke-width="10" stroke-linecap="round"/>
+  <!-- blinkender Cursor-Block -->
+  <rect x="160" y="123" width="16" height="22" rx="3" fill="#9fb0c4"/>
+
+  <!-- zweite, schwächere Zeile -->
+  <line x1="76" y1="174" x2="168" y2="174" stroke="#4a4a4a" stroke-width="8" stroke-linecap="round"/>
+</svg>
