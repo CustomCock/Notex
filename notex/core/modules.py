@@ -47,7 +47,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("rdap", "RDAP/ASN", "Inhaber, Netzblock und ASN zu IPs und Domains (nur auf Klick, Netzwerk)",
                "Netzwerk (nur auf Klick)", False, "I"),
     ModuleInfo("scanner", "Netzwerk-Scanner", "Hosts und offene Ports im eigenen Netz prüfen", "keine", False, "J"),
-    ModuleInfo("logs", "Log-Auswertung", "auth.log und Windows-Ereignisprotokolle auswerten", "python-evtx", False, "K"),
+    ModuleInfo("logs", "Log-Auswertung", "auth.log/secure (auch .gz) und Windows-.evtx auswerten", "evtx (nur für .evtx)", False, "K"),
     ModuleInfo("pcap", "PCAP-Übersicht", "Mitschnitte (.pcap/.pcapng) zusammenfassen", "dpkt", False, "K"),
 ]
 BY_KEY = {m.key: m for m in MODULES}

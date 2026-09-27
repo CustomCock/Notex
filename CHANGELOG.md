@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.12.0] – unveröffentlicht
+
+### Hinzugefügt
+- Modul Log-Auswertung (Standard aus, `Ctrl+Shift+Alt+L`): auth.log/secure (auch rotierte .gz) und Windows-.evtx
+  (Paket evtx, Rust/MIT) mit Dashboard (Fehlversuche je IP/Benutzer, Erfolg nach Fehlversuchen, Brute-Force-Verdacht,
+  neue Benutzer/Gruppen/Dienste, geleerte Protokolle, Kontosperren), Zeitleiste (QPainter), Filter, Sprung zur Quelle,
+  „Zur Zeitleiste hinzufügen“, RDAP für IPs, Markdown-Report; große Logs gestreamt
+- Abhängigkeiten evtx 0.13.1 (MIT, Wheels) und dpkt 1.9.8 (BSD-3) hinzugefügt
+
 ## [1.11.0] – 2026-09-27
 
 ### Hinzugefügt

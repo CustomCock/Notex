@@ -35,7 +35,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.9.0 | Block H: Metadaten, YARA, Zeitleiste & Beweismittel, IOC entschärfen | fertig, Tests grün (Win+Linux), lokal getaggt, kein Release |
 | 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
-| 1.12.0 | Block K: Log-Auswertung, PCAP | in Arbeit |
+| 1.12.0 | Block K: Log-Auswertung, PCAP | in Arbeit (K1 fertig) |
 
 ## Erledigt
 
@@ -314,6 +314,15 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - J3 `core/scan_export.py`: PowerShell (TcpClient, ExecutionPolicy-Hinweis) und Bash (/dev/tcp, timeout, ping),
   gleiche Ziele/Ports, CSV. Test: bash -n immer, PowerShell-Parser wenn pwsh da (auf CI-Ubuntu/Windows vorhanden).
 - Keine neue Python-Abhängigkeit (nur Standardbibliothek) → Build unverändert.
+### 1.12.0 – Block K (in Arbeit)
+- K1 Log-Auswertung `core/logauth.py`: Linux-Syslog-Parser (prog-Kontext, da _SYSLOG den „prog:“-Präfix abtrennt;
+  Regeln für sshd/sudo/su/useradd/userdel/usermod/passwd, rotierte .gz per gzip-Stream) und Windows-.evtx über das
+  Paket **evtx** (Rust, MIT, abi3-Wheels Win/Linux ~1 MB). **Entscheidung gegen python-evtx**: dessen Dep `hexdump`
+  hat eine kaputte setup.py (baut auf neuem setuptools nicht) → in beiden Builds unsicher. Event-ID-Zuordnung als
+  reine Funktion auf dem Event-XML (parse_evtx_xml), ohne Bibliothek testbar. analyze() Dashboard (Fehlversuche
+  je IP/User, Erfolg-nach-Fehlversuch, Brute-Force, neue User/Gruppen/Dienste, log_cleared, lockouts, Stunden-
+  Zeitleiste). `ui/logauth_dialog.py` mit QPainter-Zeitleiste; MainWindow.add_prepared_timeline_entry verbindet die
+  Log-Zeile mit Modul H3. requirements/build/CI/Lizenzen: evtx 0.13.1, dpkt 1.9.8.
 
 ## Offen
 

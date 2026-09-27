@@ -237,7 +237,7 @@ Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken
 | IP-Konflikte | aus | – |
 | RDAP/ASN | aus | Netzwerk (nur auf Klick) |
 | Netzwerk-Scanner | aus | – |
-| Log-Auswertung | aus | python-evtx |
+| Log-Auswertung | aus | evtx (gebündelt, nur für .evtx) |
 | PCAP-Übersicht | aus | dpkt |
 
 Module, die noch nicht umgesetzt sind, stehen mit „folgt in Block …“ in der Liste. Ist „Hex & Dateianalyse“ aus,
@@ -546,6 +546,31 @@ bzw. Palette „RDAP / ASN abfragen“ (Markierung oder Wert unter dem Cursor, s
 - Aus verschlüsselten Notizen fragt Notex vor dem Senden nach.
 
 ![RDAP-Karte](docs/60-rdap-card.png)
+
+
+## Log-Auswertung
+
+Modul „Log-Auswertung“ (Standard aus). Menü Datei → „Log-Auswertung …“, `Ctrl+Shift+Alt+L`, Palette oder Rechtsklick
+im Baum auf eine Log-Datei.
+
+- **Linux**: `auth.log`/`secure` inklusive rotierter `.gz` – sshd (Fehlversuche, erfolgreiche Anmeldung,
+  Schlüssel-Login, unbekannte Benutzer), sudo (Befehl und Fehlversuch), su, useradd/userdel/usermod, Gruppen,
+  Passwortänderungen.
+- **Windows**: `.evtx`-Ereignisprotokolle über das Paket **evtx** (Rust, MIT, vorgebaute Wheels für Windows und Linux)
+  – die Ereignisse 4624/4625 (mit Anmeldetyp), 4634, 4648, 4672, 4720, 4722–4726, 4728/4732/4756, 4740, 1102, 7045,
+  4688.
+- **Dashboard**: Fehlversuche je IP und Benutzer, erfolgreiche Anmeldung nach Fehlversuchen, Brute-Force-Verdacht ab
+  einer Schwelle, neue Benutzer, Gruppenänderungen, geleerte Protokolle, neue Dienste, Kontosperren; dazu eine
+  **Zeitleiste** (Fehlversuche rot, Erfolge grün je Stunde).
+- Jede Zeile ist filterbar (Art, „nur auffällige“, Textsuche); Doppelklick springt zur Quellzeile (auth.log),
+  Rechtsklick: „Zur Zeitleiste hinzufügen“ (Modul Zeitleiste), „RDAP zu <IP>“ (Modul RDAP), IP kopieren.
+- „Report einfügen/kopieren“ schreibt einen Markdown-Report. Große Logs werden gestreamt (Grenze 500 000 Ereignisse).
+
+Die Zuordnung der Windows-Event-IDs arbeitet auf dem gerenderten Event-XML und ist dadurch unabhängig von der
+Bibliothek testbar. **Entscheidung gegen python-evtx**: dessen Abhängigkeit `hexdump` baut auf neuem setuptools nicht
+und ist in beiden Builds unsicher; `evtx` bringt fertige Wheels ohne Transitiv-Abhängigkeit.
+
+![Log-Auswertung](docs/62-logauth.png)
 
 
 ## Netzwerk-Scanner
@@ -927,6 +952,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
 | Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
 | Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
+| Ctrl+Shift+Alt+L | Log-Auswertung (Modul Log-Auswertung) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |
 | Ctrl+Shift+Alt+C | Prüfsummen der aktuellen Datei (Modul Hex & Dateianalyse) |
 | Ctrl+Alt+D / Ctrl+Shift+Alt+D | IOCs entschärfen / wieder scharf machen (Auswahl oder Datei, Modul IOC) |

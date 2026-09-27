@@ -914,6 +914,7 @@ class MainWindow(QMainWindow):
         self.modules.contribute("ip_conflicts", self._activate_ip_conflicts)
         self.modules.contribute("rdap", self._activate_rdap)
         self.modules.contribute("scanner", self._activate_scanner)
+        self.modules.contribute("logs", self._activate_logs)
         self.modules.contribute("yara", self._activate_yara)
 
     def _module_action(self, text: str, shortcut: str | None, slot, menu=None) -> QAction:
@@ -1184,6 +1185,34 @@ class MainWindow(QMainWindow):
             return
         target = dialog.target_path()
         if target is None:
+            name = dialogs.ask_text(self, "Neue Zeitleiste", "Name:", "Zeitleiste")
+            if not name:
+                return
+            target = self.root / (name if name.lower().endswith(".md") else f"{name}.md")
+            if not fileops.is_within(target.resolve(), self.root.resolve()) or target.exists():
+                dialogs.warn(self, "Neue Zeitleiste", f"„{target.name}“ gibt es schon oder liegt außerhalb von data/.")
+                return
+            try:
+                fileops.atomic_write_bytes(target, tl.new_text(target.stem).encode("utf-8"))
+            except OSError as error:
+                dialogs.warn(self, "Neue Zeitleiste", str(error))
+                return
+            self.file_index.request_rescan()
+        self.add_timeline_entry(target, dialog.entry())
+
+    def add_prepared_timeline_entry(self, entry) -> None:
+        """Einen fertigen Zeitleisten-Eintrag (z. B. aus der Log-Auswertung) übernehmen: Ziel wählen, dann einfügen."""
+        from notex.ui.timeline_dialog import EntryDialog
+        if getattr(self, "modules", None) is not None and not self.modules.enabled("timeline"):
+            self.toast.show_message("Modul „Zeitleiste“ ist aus (Einstellungen → Module)", "info")
+            return
+        candidates = self._timeline_candidates()
+        dialog = EntryDialog(self, entry, candidates, candidates[0] if candidates else None)
+        if not dialog.exec():
+            return
+        target = dialog.target_path()
+        if target is None:
+            from notex.core import timeline as tl
             name = dialogs.ask_text(self, "Neue Zeitleiste", "Name:", "Zeitleiste")
             if not name:
                 return
@@ -1651,6 +1680,51 @@ class MainWindow(QMainWindow):
         self._analysis_dialogs.setdefault("scanner", []).append(dialog)
         dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("scanner", []).remove(d)
                                 if d in self._analysis_dialogs.get("scanner", []) else None)
+        dialog.show()
+
+    # ---- Modul: Log-Auswertung -------------------------------------------------------------------
+    def _activate_logs(self):
+        action = self._module_action("Log-Auswertung …", "Ctrl+Shift+Alt+L", lambda: self.analyze_log(),
+                                     self.file_menu)
+        self.registry.add("logs:open", "Log-Auswertung (auth.log, secure, .evtx)", lambda: self.analyze_log(),
+                          category="Sicherheit", shortcut="Ctrl+Shift+Alt+L",
+                          keywords="log auth secure evtx anmeldung login brute force ereignis windows linux")
+
+        def tree_entry(menu, path: Path) -> None:
+            if self._is_log_file(path):
+                menu.addAction(icon("scroll-text"), "Log-Auswertung …", lambda: self.analyze_log(path))
+        self.sidebar.tree.menu_providers.append(tree_entry)
+        dialogs_open: list = self._analysis_dialogs.setdefault("logs", [])
+
+        def undo() -> None:
+            self._drop_actions([action])
+            self.registry.remove("logs:open")
+            if tree_entry in self.sidebar.tree.menu_providers:
+                self.sidebar.tree.menu_providers.remove(tree_entry)
+            for dialog in list(dialogs_open):
+                dialog.close()
+            dialogs_open.clear()
+        return undo
+
+    @staticmethod
+    def _is_log_file(path: Path) -> bool:
+        name = path.name.lower()
+        return (name.endswith(".evtx") or name.endswith(".log") or name.endswith(".log.gz")
+                or "auth" in name or "secure" in name or name.endswith(".gz"))
+
+    def analyze_log(self, path: Path | None = None) -> None:
+        from notex.core import logauth
+        from notex.ui.logauth_dialog import LogAuthDialog
+        target = self._analysis_target(path)
+        if target is None:
+            return
+        if target.suffix.lower() == ".evtx" and not logauth.evtx_available():
+            self.toast.show_message("Für .evtx fehlt das Paket „evtx“ in diesem Build", "info")
+            return
+        dialog = LogAuthDialog(self, target)
+        self._analysis_dialogs.setdefault("logs", []).append(dialog)
+        dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("logs", []).remove(d)
+                                if d in self._analysis_dialogs.get("logs", []) else None)
         dialog.show()
 
     # ---- Modul: IOCs entschärfen ----------------------------------------------------------------
