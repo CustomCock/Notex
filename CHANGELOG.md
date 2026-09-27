@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.12.1] – 2026-09-27
+
+### Behoben
+- Netzwerk-Scanner blieb nach dem ersten Host hängen: Reverse-DNS läuft jetzt mit Timeout in einem Thread (blockiert
+  den Event-Loop nie) und wird zwischengespeichert; Verbindungen werden immer mit Timeout geschlossen (Windows/
+  Proactor); Abbruch greift auch während laufender Port-Probes
+- Encoding-Umstellung machte den Menüpunkt kaputt (Windows): Überlaufmenü der Bearbeitungsleiste wird lazy in
+  aboutToShow gebaut, Relayout verzögert, keine zwischen Menüs geteilten QActions mehr
+- Metadaten-Fenster war bei JPEGs ohne EXIF leer: es zeigt jetzt immer Dateigröße, Format, Bildmaße (SOF),
+  Farbkomponenten, Verfahren (Baseline/Progressiv), JFIF, ICC-Profil, geschätzte Qualität, Vorschaubild-Status und
+  die Segmentliste; fehlen EXIF/XMP/IPTC (bzw. Dokumenteigenschaften), steht das ausdrücklich als Hinweis darin
+- PCAP-Auswertung überarbeitet: Protokoll-Hierarchie (Ethernet › ARP/IPv4 › ICMP/UDP/TCP › DNS/HTTP/TLS mit Paketen
+  und Bytes je Ebene), Hosts mit MAC/Adresstyp/Rolle, ARP (inkl. Spoofing- und Gratuitous-Hinweis), ICMP mit
+  Echo-Paarung und RTT, DNS mit Anfrage/Antwort-Paarung, TCP-Verbindungen mit Status/Bytes je Richtung und
+  „Stream folgen“ (Text/Hex), HTTP mit Anfrage+Antwort, TLS-SNI/Version, Dienste, Befunde
+
 ## [1.12.0] – 2026-09-27
 
 ### Hinzugefügt

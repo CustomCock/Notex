@@ -36,6 +36,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.10.0 | Block I: Port-Infos, IP-Konflikte, RDAP/ASN | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.11.0 | Block J: Netzwerk-Scanner | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.12.0 | Block K: Log-Auswertung, PCAP | fertig, Tests grün, lokal getaggt, kein Release |
+| 1.12.1 | Block L: Fehlerbehebung (Scanner, Encoding-Menü, JPEG-Metadaten, PCAP-Auswertung) | fertig, Tests grün, lokal getaggt |
 
 ## Erledigt
 
@@ -333,6 +334,22 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Screenshots 62–63 (Log-Auswertung, PCAP-Übersicht).
 - Build-Größe nach K (Build-Check-Artefakte, commit c8b5445): Windows ≈ 104,3 MB, Linux ≈ 101,8 MB (vorher nach H ≈ 99,9 / 96,7 MB; + evtx-Rust-Wheel und dpkt). CI Tests + Build-Check grün auf Win+Linux.
 - Fix: dpkt fehlte zunächst in requirements.txt (nur in build.py/CI/Lizenzen) → Build-Check rot; mit c8b5445 ergänzt, danach grün.
+### 1.12.1 – Block L (Fehlerbehebung)
+- L1 Scanner-Hang: `_reverse_dns` → `run_in_executor` mit `resolve_timeout` (Std. 2 s) + Sitzungs-Cache; gemeinsamer
+  `_close_writer` schließt Verbindungen immer mit Timeout (auch in `_discover`); `scan_host` prüft `cancelled` je Probe.
+  Tests: langsamer Resolver (parallel, < 4 s statt 6 s seriell), nie zurückkehrender Resolver/Writer, Abbruch mitten
+  in den Probes.
+- L2 Encoding-Menü: `EditorToolbar` – Überlaufmenü wird lazy in `aboutToShow` gebaut (`_build_overflow_menu`),
+  `_relayout` merkt nur die versteckten Gruppen und wird über `QTimer.singleShot(0)` entkoppelt; Encoding-/EOL-
+  Optionen als Datenkonstanten → jedes Menü baut eigene QActions (keine geteilten mehr). Regressionstest.
+- L3 Metadaten JPEG: `read()` liefert immer Datei/Format/Größe; `_read_jpeg` parst SOF (Maße, Verfahren, Komponenten),
+  JFIF, ICC (mit Beschreibung), Adobe, DQT→geschätzte Qualität, Vorschaubild, Segmentliste; „Keine EXIF/XMP/IPTC“-
+  Hinweis, generisch auch für PNG/WebP/PDF/Office. Tests: ohne EXIF, progressiv, mit ICC, .JPG-Großschreibung.
+- L4 PCAP neu: `core/pcapinfo.py` komplett überarbeitet (Protokoll-Hierarchie, Hosts/Rollen, ARP+Spoofing-Befund,
+  ICMP-Echo-RTT, DNS-Paarung, TCP-Status/Bytes/Retransmissions + `stream()`, HTTP req+resp, TLS, Dienste, Befunde).
+  **Fixture selbst erzeugt** (`tools/make_fixture_pcap.py` → `tests/fixtures/beispiel_traffic.pcap`, 13 Pakete/958 B),
+  Sollwerte per Test festgeschrieben. `ui/pcap_dialog.py` mit Reitern und „Stream folgen“ (Text/Hex).
+- Screenshot 63 (PCAP) auf die neue Auswertung aktualisiert.
 
 ## Offen
 
