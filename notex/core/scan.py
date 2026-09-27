@@ -206,6 +206,20 @@ async def _default_connect(ip: str, port: int, timeout: float):
     return await asyncio.wait_for(asyncio.open_connection(ip, port), timeout)
 
 
+async def _close_writer(writer, timeout: float) -> None:
+    """Verbindung schließen – immer mit Timeout. Unter Windows (ProactorEventLoop) kann wait_closed sonst hängen."""
+    try:
+        writer.close()
+    except (OSError, ConnectionError, RuntimeError):
+        return
+    try:
+        await asyncio.wait_for(writer.wait_closed(), timeout)
+    except (OSError, asyncio.TimeoutError, ConnectionError, RuntimeError):
+        pass
+    except Exception:                       # noqa: BLE001 – Schließen darf den Scan nie stoppen
+        pass
+
+
 async def _probe_port(ip: str, port: int, timeout: float, grab_banner: bool, connect: Connector) -> OpenPort | None:
     try:
         reader, writer = await connect(ip, port, timeout)
@@ -220,11 +234,7 @@ async def _probe_port(ip: str, port: int, timeout: float, grab_banner: bool, con
     except (OSError, asyncio.TimeoutError, ConnectionError, UnicodeError):
         pass
     finally:
-        writer.close()
-        try:
-            await asyncio.wait_for(writer.wait_closed(), timeout)
-        except (OSError, asyncio.TimeoutError, ConnectionError):
-            pass
+        await _close_writer(writer, timeout)
     return result
 
 
@@ -245,11 +255,16 @@ async def _grab(ip: str, port: int, reader, writer, timeout: float) -> str:
 async def scan_host(ip: str, ports: list[int], *, timeout: float = DEFAULT_TIMEOUT,
                     concurrency: int = DEFAULT_CONCURRENCY, grab_banner: bool = True,
                     connect: Connector = _default_connect,
+                    cancelled: Callable[[], bool] | None = None,
                     on_port: Callable[[str, OpenPort], None] | None = None) -> list[OpenPort]:
     semaphore = asyncio.Semaphore(max(1, concurrency))
 
     async def one(port: int):
+        if cancelled and cancelled():       # Abbruch greift auch während laufender Port-Probes
+            return None
         async with semaphore:
+            if cancelled and cancelled():
+                return None
             result = await _probe_port(ip, port, timeout, grab_banner, connect)
         if result and on_port:
             on_port(ip, result)
@@ -267,6 +282,7 @@ class ScanConfig:
     discover: bool = True          # erst prüfen, ob der Host lebt (spart Zeit bei großen Bereichen)
     reverse_dns: bool = True
     use_ping: bool = False         # zusätzlich System-ping bei der Host-Erkennung (kann geblockt sein)
+    resolve_timeout: float = 2.0   # Reverse-DNS je Host, läuft in einem Thread (blockiert den Loop nie)
 
 
 async def scan(targets: list[Target], config: ScanConfig, *, connect: Connector = _default_connect,
@@ -279,6 +295,19 @@ async def scan(targets: list[Target], config: ScanConfig, *, connect: Connector 
     hosts: list[Host] = []
     total = len(targets)
     host_semaphore = asyncio.Semaphore(max(1, min(64, config.concurrency // 4 or 1)))
+    resolve_cache: dict[str, str] = {}
+    lookup = resolver or _reverse_dns
+
+    async def resolve(ip: str) -> str:
+        if ip in resolve_cache:
+            return resolve_cache[ip]
+        loop = asyncio.get_event_loop()
+        try:                                  # synchroner Namensdienst → Thread + Timeout, blockiert den Loop nie
+            name = await asyncio.wait_for(loop.run_in_executor(None, lookup, ip), config.resolve_timeout)
+        except (asyncio.TimeoutError, OSError, Exception):    # noqa: BLE001
+            name = None
+        resolve_cache[ip] = name or ""
+        return resolve_cache[ip]
 
     async def do(index: int, target: Target) -> Host:
         async with host_semaphore:
@@ -297,12 +326,12 @@ async def scan(targets: list[Target], config: ScanConfig, *, connect: Connector 
                     probe_ports = []
             host.ports = await scan_host(target.ip, probe_ports, timeout=config.timeout,
                                          concurrency=config.concurrency, grab_banner=config.grab_banner,
-                                         connect=connect)
+                                         connect=connect, cancelled=cancelled)
             if host.ports:
                 host.alive = True
                 host.reason = host.reason or "offener Port"
-            if config.reverse_dns and not host.hostname:
-                host.hostname = (resolver or _reverse_dns)(target.ip) or ""
+            if config.reverse_dns and not host.hostname and (host.alive or host.ports):
+                host.hostname = await resolve(target.ip)
             return host
 
     tasks = [asyncio.ensure_future(do(i, t)) for i, t in enumerate(targets)]
@@ -327,19 +356,16 @@ async def scan(targets: list[Target], config: ScanConfig, *, connect: Connector 
 async def _discover(ip: str, config: ScanConfig, connect: Connector) -> tuple[bool, str]:
     """TCP-Anklopfen an einigen üblichen Ports; der erste offene belegt „lebt“."""
     knock = [p for p in (443, 80, 22, 445, 3389, 135, 139) if p in config.ports] or config.ports[:6]
+    timeout = min(config.timeout, 1.0)
     for port in knock:
         try:
-            _reader, writer = await connect(ip, port, min(config.timeout, 1.0))
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except (OSError, ConnectionError):
-                pass
-            return True, f"TCP {port} offen"
+            _reader, writer = await connect(ip, port, timeout)
         except (OSError, asyncio.TimeoutError, ConnectionError):
             continue
         except Exception:                   # noqa: BLE001
             continue
+        await _close_writer(writer, timeout)
+        return True, f"TCP {port} offen"
     return False, "keine Antwort (kann auch eine Firewall sein)"
 
 
