@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -8,29 +9,39 @@ import pytest
 from notex.core import scan_export
 
 
-def test_bash_script_is_syntactically_valid() -> None:
-    script = scan_export.bash("10.0.0.1-10.0.0.3, 192.168.1.10", [22, 80, 443], timeout=0.5)
-    assert "#!/usr/bin/env bash" in script and "/dev/tcp/$ip/$port" in script
-    assert "10.0.0.1 10.0.0.2 10.0.0.3 192.168.1.10" in script
-    assert "ports=(22 80 443)" in script and 'echo "ip,port,status,service,banner"' in script
-    if not shutil.which("bash"):
+def _real_bash() -> str | None:
+    """Pfad zu einer echten Bash. Der WSL-Stub `bash.exe` unter Windows zählt nicht (er ist evtl. nicht installiert)."""
+    if sys.platform.startswith("win"):
+        return None
+    return shutil.which("bash")
+
+
+def _check_bash(script: str) -> None:
+    bash = _real_bash()
+    if not bash:
         pytest.skip("bash nicht verfügbar")
     with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as handle:
         handle.write(script)
         path = handle.name
     try:
-        result = subprocess.run(["bash", "-n", path], capture_output=True, text=True)
+        result = subprocess.run([bash, "-n", path], capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
     finally:
         Path(path).unlink()
 
 
+def test_bash_script_is_syntactically_valid() -> None:
+    script = scan_export.bash("10.0.0.1-10.0.0.3, 192.168.1.10", [22, 80, 443], timeout=0.5)
+    assert "#!/usr/bin/env bash" in script and "/dev/tcp/$ip/$port" in script
+    assert "10.0.0.1 10.0.0.2 10.0.0.3 192.168.1.10" in script
+    assert "ports=(22 80 443)" in script and 'echo "ip,port,status,service,banner"' in script
+    _check_bash(script)
+
+
 def test_bash_without_ping() -> None:
     script = scan_export.bash("10.0.0.1", [80], ping_first=False)
     assert "ping_first=0" in script
-    if shutil.which("bash"):
-        result = subprocess.run(["bash", "-n", "/dev/stdin"], input=script, capture_output=True, text=True)
-        assert result.returncode == 0, result.stderr
+    _check_bash(script)
 
 
 def test_powershell_script_content() -> None:
@@ -50,8 +61,10 @@ def test_powershell_syntax_if_pwsh_available() -> None:
         handle.write(script)
         path = handle.name
     try:
-        check = ("$ErrorActionPreference='Stop'; $null = [System.Management.Automation.Language.Parser]::ParseFile("
-                 f"'{path}', [ref]$null, [ref]$errors); if ($errors.Count) {{ $errors; exit 1 }}")
+        check = ("$tokens = $null; $errs = $null; "
+                 "[void][System.Management.Automation.Language.Parser]::ParseFile("
+                 f"'{path}', [ref]$tokens, [ref]$errs); "
+                 "if ($errs.Count -gt 0) { $errs | ForEach-Object { $_.Message }; exit 1 }")
         result = subprocess.run([pwsh, "-NoProfile", "-Command", check], capture_output=True, text=True)
         assert result.returncode == 0, result.stdout + result.stderr
     finally:
