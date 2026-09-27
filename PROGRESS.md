@@ -451,10 +451,15 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Blöcke F–K und L abgeschlossen; Block M (1.13.0) fertig.** Aus dem Plan „L–P“ stehen noch aus:
-- **N (1.14.0)** eigener IP-/Netzwerk-Scanner als Ersatz für „Advanced IP Scanner“ (OUI-Liste NICHT aus Wiresharks manuf/GPL).
-- **O (1.15.0)** Fragebögen/Vorlagen (passwortlose Spalten, keine Zugangsdaten erfassen).
-- **P (1.16.0)** Inventar/Docusnap-artig (nie Passwörter/Schlüssel/Tokens erfassen).
+**Blöcke F–K, L und M (1.13.0) fertig.** Neuer Plan des Besitzers (27.09.2026): **Q → N → O**, danach Abschluss.
+- **Q (1.14.0)** Kontextmenü-Analyse für markierten Text (Erkennung von IP/Hash/Base64/JWT/… + Aktionen in einer Karte;
+  Hash-Info mit Online-Lookup, sauber getrennt von Verschlüsselung).
+- **N (1.15.0)** eigener IP-/Netzwerk-Scanner als Ersatz für „Advanced IP Scanner“ (OUI-Liste NICHT aus Wiresharks
+  manuf/GPL); Erkennungs-/Netzwerklogik mit Block Q geteilt.
+- **O (1.16.0)** Formatierte Bearbeitung (WYSIWYG-Markdown) + Fragebögen/Vorlagen (Berichtsheft, Systemcheck,
+  E-Mail-/Tabellen-Vorlagen, Sicherheits-Check; passwortlose Spalten, keine Zugangsdaten erfassen).
+
+- **P (Inventar/Docusnap-artig) ist ZURÜCKGESTELLT** (Entscheidung Besitzer 27.09.2026): vorerst NICHT bauen.
 
 Nach jedem Block anhalten und zusammenfassen; erst bei „weiter“ fortfahren.
 
