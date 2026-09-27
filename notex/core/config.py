@@ -66,6 +66,7 @@ DEFAULTS: dict[str, Any] = {
     "tree_show_all": False,   # Baum: alle Dateien statt nur der Endungen (automatisch an, solange ein Analyse-Modul an ist)
     "tree_show_hidden": False, # Baum: versteckte Dateien/Ordner (Punktdateien, Windows-Hidden) mitanzeigen
     "quick_access": [],        # an den Schnellzugriff angeheftete Ordner (absolute Pfade)
+    "new_file_eol": "lf",      # Zeilenende für neu angelegte Dateien (per „Neu"-Menü): "lf" | "crlf"
     "modules": {              # Module an/aus (siehe core/modules.py) – Standard: Variablen, Hex, Ports, IOC an
         "variables": True, "hex": True, "strings": False, "embedded": False, "entropy": False, "metadata": False,
         "yara": False, "timeline": False, "ioc": True, "ports": True, "ip_conflicts": False, "rdap": False,

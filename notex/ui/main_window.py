@@ -244,6 +244,9 @@ class MainWindow(QMainWindow):
         tree = self.sidebar.tree
         file_menu = self.menuBar().addMenu("&Datei")
         file_menu.addAction(self._action("Neue Datei", "Ctrl+N", lambda: tree.create_file(tree.folder_for(tree.selected_path()))))
+        self.new_typed_menu = file_menu.addMenu("Neue Datei nach Typ")
+        self.new_typed_menu.setIcon(icon("file-plus"))
+        self.new_typed_menu.aboutToShow.connect(lambda: self._build_new_menu(self.new_typed_menu))
         file_menu.addAction(self._action("Neuer Ordner", "Ctrl+Shift+N", lambda: tree.create_folder(tree.folder_for(tree.selected_path()))))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Datei öffnen …", "Ctrl+O", self.open_file_dialog))
@@ -1958,6 +1961,67 @@ class MainWindow(QMainWindow):
         """Werkzeuge-Menü für die Blatt-Leiste: nur Werkzeuge, die zur aktuellen Datei passen."""
         self._build_tools_menu(menu, self._current_file_kind(), only_applicable=True)
 
+    def _build_new_menu(self, menu, folder: Path | None = None) -> None:
+        """„Neu"-Menü aus den Dateityp-Vorlagen bauen (Startinhalt + Zeilenende)."""
+        from notex.core import newfile
+        menu.clear()
+        for ftype in newfile.TYPES:
+            action = menu.addAction(icon(ftype.icon), f"{ftype.label}  ({ftype.extension})")
+            action.setToolTip(ftype.description)
+            action.triggered.connect(lambda _c=False, key=ftype.key, f=folder: self.new_file_of_type(key, f))
+        menu.setToolTipsVisible(True)
+        menu.addSeparator()
+        eol_menu = menu.addMenu(icon("corner-down-left"), "Zeilenende für neue Dateien")
+        current = self.config.get("new_file_eol", "lf")
+        for key, label in newfile.EOL_LABELS:
+            item = eol_menu.addAction(label)
+            item.setCheckable(True)
+            item.setChecked(current == key)
+            item.triggered.connect(lambda _c=False, k=key: self.config.__setitem__("new_file_eol", k))
+
+    def new_file_of_type(self, key: str, folder: Path | None = None) -> None:
+        """Neue Datei eines Typs anlegen: Endung, Startinhalt und Zeilenende aus core/newfile."""
+        from notex.core import newfile, fileops
+        from notex.ui import dialogs
+        ftype = newfile.BY_KEY.get(key)
+        if ftype is None:
+            return
+        tree = self.sidebar.tree
+        folder = folder or tree.folder_for(tree.selected_path())
+        if not tree._guard_write(folder, "Eine Datei anlegen"):
+            return
+        name = dialogs.ask_text(self, "Neue Datei", "Dateiname:", newfile.suggested_name(key))
+        if not name:
+            return
+        if not Path(name).suffix:
+            name += ftype.extension
+        try:
+            path = fileops.create_file(folder, name)
+            eol = self.config.get("new_file_eol", "lf")
+            data = newfile.encode_content(ftype.starter, eol)
+            if data:
+                path.write_bytes(data)                 # Bytes: Zeilenende exakt wie gewählt, keine Übersetzung
+        except OSError as error:
+            dialogs.warn(self, "Neue Datei", str(error))
+            return
+        if tree.is_notes_root():
+            tree.expand(tree.index_for(folder))
+            tree.select_path(path)
+        self.tabs.open_file(path)
+        self._place_new_cursor(path, newfile.cursor_offset(ftype.starter))
+
+    def _place_new_cursor(self, path: Path, offset: int) -> None:
+        """Cursor an die Marker-Stelle der Vorlage setzen (nur im Texteditor, wenn sinnvoll)."""
+        if offset <= 0:
+            return
+        editor = self.tabs.current_editor()
+        if editor is None:
+            return
+        from PySide6.QtGui import QTextCursor
+        cursor = editor.textCursor()
+        cursor.setPosition(min(offset, len(editor.toPlainText())))
+        editor.setTextCursor(cursor)
+
     def _pin_current_folder(self) -> None:
         """Den aktuell im Baum gewählten Ordner (bzw. den angezeigten Wurzelordner) an den Schnellzugriff heften."""
         tree = self.sidebar.tree
@@ -3153,6 +3217,12 @@ class MainWindow(QMainWindow):
         self.registry.add("tools:overview", "Werkzeug-Übersicht", self.show_tool_overview, category="Werkzeuge",
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
+        self.sidebar.tree.new_menu_builder = self._build_new_menu        # „Neue Datei nach Typ" im Baum-Kontextmenü
+        from notex.core import newfile as _newfile
+        for _ft in _newfile.TYPES:
+            self.registry.add(f"new:{_ft.key}", f"Neue Datei: {_ft.label}",
+                              lambda _c=False, k=_ft.key: self.new_file_of_type(k),
+                              category="Datei", keywords=f"neu datei {_ft.label} {_ft.extension}")
         self.registry.add("explorer:notes", "Explorer: Notizen anzeigen",
                           lambda: self.sidebar._on_place_selected(self.sidebar.tree.notes_root),
                           category="Ansicht", keywords="explorer baum notizen ort data")

@@ -62,6 +62,7 @@ class FileTree(QTreeView):
         super().__init__()
         self.menu_providers: list = []    # Callable[[QMenu, Path], None] – Module hängen Einträge ein
         self.folder_menu_providers: list = []   # dasselbe für Ordner (z. B. YARA über einen Ordner)
+        self.new_menu_builder = None      # Callable[[QMenu, Path], None] – „Neue Datei nach Typ" (setzt das Hauptfenster)
         self.notes_root = Path(root)      # der Notiz-Ordner (data/) – immer beschreibbar
         self.root = self.notes_root       # aktuell angezeigte Wurzel (kann ein anderer Ort sein)
         self._extensions = list(extensions)
@@ -386,6 +387,9 @@ class FileTree(QTreeView):
     def build_context_menu(self, path: Path | None) -> QMenu:
         menu = style_menu(QMenu(self))
         menu.addAction(icon("file-plus"), "Neue Datei", lambda: self.create_file(self.folder_for(path)))
+        if self.new_menu_builder is not None:
+            typed = menu.addMenu(icon("file-plus"), "Neue Datei nach Typ")
+            self.new_menu_builder(typed, self.folder_for(path))
         menu.addAction(icon("folder-plus"), "Neuer Ordner", lambda: self.create_folder(self.folder_for(path)))
         if path is not None:
             menu.addSeparator()
