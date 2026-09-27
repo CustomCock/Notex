@@ -170,6 +170,9 @@ class MainWindow(QMainWindow):
         from notex.core.modules import ModuleRegistry
         self.modules = ModuleRegistry(self.config)
         self._install_modules()
+        from notex.ui.analyze_actions import AnalyzeController
+        self.analyze = AnalyzeController(self)                # Analyse per Rechtsklick (Block Q)
+        self._editor_menu_providers.append(self.analyze.menu_provider)
         self.modules.on_change(lambda _key, _on: self.apply_tree_filter())
         self.apply_tree_filter()
         self.file_index.request_rescan()
@@ -2111,6 +2114,48 @@ class MainWindow(QMainWindow):
                 return
             self.toast.show_message(f"HTML exportiert · {Path(out).name}", "check")
 
+    def run_command(self, command_id: str) -> None:
+        """Einen registrierten Palette-Befehl programmatisch auslösen (z. B. aus der Analyse-Karte)."""
+        entry = self.registry.get(command_id)
+        if entry is not None and entry.callback is not None:
+            entry.callback()
+
+    def insert_analysis_note(self, markdown: str) -> None:
+        """Analyse-Ergebnis in die aktuelle Notiz einfügen; sonst in die Zwischenablage."""
+        from PySide6.QtGui import QGuiApplication
+        editor = self.tabs.current_editor()
+        if editor is not None and not editor.isReadOnly() and not getattr(editor, "locked", False):
+            cursor = editor.textCursor()
+            editor._grouped(lambda: cursor.insertText(("\n" if cursor.positionInBlock() else "") + markdown + "\n"))
+            self.toast.show_message("Analyse in die Notiz eingefügt", "check")
+        else:
+            QGuiApplication.clipboard().setText(markdown)
+            self.toast.show_message("Analyse in die Zwischenablage kopiert", "info")
+
+    def _analyze_selection(self, action: str) -> None:
+        """Analyse-Aktion aus der Command Palette auf die aktuelle Auswahl/Wort anwenden."""
+        editor = self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Keine Textnotiz offen", "info")
+            return
+        term = self.analyze._term(editor)
+        if not term:
+            self.toast.show_message("Nichts markiert", "info")
+            return
+        from notex.core import detect
+        if action == "detect":
+            self.analyze.detect_card(term)
+        elif action == "hashinfo":
+            self.analyze.hash_info(term, detect.analyze(term))
+        elif action == "timestamp":
+            self.analyze.timestamp(term)
+        elif action == "number":
+            self.analyze.number(term)
+        elif action == "jwt":
+            self.analyze.jwt(term)
+        elif action == "base64":
+            self.analyze.decode(term, "base64")
+
     def _pin_current_folder(self) -> None:
         """Den aktuell im Baum gewählten Ordner (bzw. den angezeigten Wurzelordner) an den Schnellzugriff heften."""
         tree = self.sidebar.tree
@@ -3307,6 +3352,13 @@ class MainWindow(QMainWindow):
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
         self.sidebar.tree.new_menu_builder = self._build_new_menu        # „Neue Datei nach Typ" im Baum-Kontextmenü
+        for _aid, _atitle in (("detect", "Analysieren: Typ erkennen"), ("hashinfo", "Analysieren: Hash-Info"),
+                              ("base64", "Analysieren: Base64 dekodieren"), ("jwt", "Analysieren: JWT zerlegen"),
+                              ("timestamp", "Analysieren: Zeitstempel umrechnen"),
+                              ("number", "Analysieren: Zahl in Basen")):
+            self.registry.add(f"analyze:{_aid}", _atitle, lambda _c=False, a=_aid: self._analyze_selection(a),
+                              category="Analysieren",
+                              keywords="analyse erkennen markierung hash base64 jwt zeitstempel zahl ip port")
         self.registry.add("export:pdf", "Exportieren: als PDF …", lambda: self.export_current("pdf"),
                           category="Datei", keywords="export pdf drucken bericht ausgeben")
         self.registry.add("export:html", "Exportieren: als HTML …", lambda: self.export_current("html"),
