@@ -270,6 +270,10 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Speichern", QKeySequence.StandardKey.Save, self.tabs.save_current))
         file_menu.addAction(self._action("Speichern unter …", "Ctrl+Shift+Alt+S", self.tabs.save_current_as))
         file_menu.addAction(self._action("Alle speichern", "Ctrl+Shift+S", self.tabs.save_all))
+        export_menu = file_menu.addMenu("Exportieren")
+        export_menu.setIcon(icon("file-output"))
+        export_menu.addAction(self._action("Als PDF …", None, lambda: self.export_current("pdf")))
+        export_menu.addAction(self._action("Als HTML …", None, lambda: self.export_current("html")))
         file_menu.addAction(self._action("Tab schließen", "Ctrl+W", self.tabs.close_current))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Einstellungen …", "Ctrl+,", self.open_settings))
@@ -2022,6 +2026,79 @@ class MainWindow(QMainWindow):
         cursor.setPosition(min(offset, len(editor.toPlainText())))
         editor.setTextCursor(cursor)
 
+    def _export_values(self) -> dict | None:
+        """Variablenwerte für den Export – nur wenn das Modul Variablen an ist."""
+        service = getattr(self, "variable_service", None)
+        if service is not None and "variables" in self._enabled_modules():
+            return dict(service.values)
+        return None
+
+    def _export_prefix(self) -> str:
+        service = getattr(self, "variable_service", None)
+        return service.prefix if service is not None else "§"
+
+    def _logo_path(self) -> Path:
+        import notex
+        return Path(notex.__file__).resolve().parent / "assets" / "notex.png"
+
+    def _logo_data_uri(self) -> str:
+        import base64
+        try:
+            data = self._logo_path().read_bytes()
+        except OSError:
+            return ""
+        return "data:image/png;base64," + base64.b64encode(data).decode("ascii")
+
+    def export_current(self, fmt: str) -> None:
+        """Aktuelle Textnotiz nach PDF oder HTML exportieren (Variablen aufgelöst, .ntx nur nach Rückfrage)."""
+        from PySide6.QtWidgets import QFileDialog
+        from notex.core import export as core_export
+        from notex.ui import export_service, dialogs
+        editor = self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Nur Textnotizen lassen sich exportieren", "info")
+            return
+        path = editor.path
+        content = editor.toPlainText()
+        name = path.name if path is not None else "Notiz.txt"
+        if path is not None and fileops.is_encrypted_path(path):
+            if not dialogs.confirm(
+                    self, "Verschlüsselte Notiz exportieren",
+                    "Der Export schreibt den Klartext dieser verschlüsselten Notiz in eine unverschlüsselte Datei.",
+                    informative="Nur fortfahren, wenn der Zielort sicher ist.",
+                    yes="Trotzdem exportieren", danger=True):
+                return
+        stem = path.stem if path is not None else "Notiz"
+        kind = core_export.kind_for(name)
+        values = self._export_values()
+        prefix = self._export_prefix()
+        meta = core_export.ExportMeta(title=stem)
+        target_dir = path.parent if path is not None else self.root
+        if fmt == "pdf":
+            out, _ = QFileDialog.getSaveFileName(self, "Als PDF exportieren",
+                                                 str(target_dir / f"{stem}.pdf"), "PDF (*.pdf)")
+            if not out:
+                return
+            try:
+                export_service.export_pdf(Path(out), content, kind, meta, name=name, values=values,
+                                          prefix=prefix, logo_path=self._logo_path())
+            except Exception as error:                       # noqa: BLE001 – dem Nutzer den Fehler zeigen
+                export_service.warn(self, str(error))
+                return
+            self.toast.show_message(f"PDF exportiert · {Path(out).name}", "check")
+        else:
+            out, _ = QFileDialog.getSaveFileName(self, "Als HTML exportieren",
+                                                 str(target_dir / f"{stem}.html"), "HTML (*.html *.htm)")
+            if not out:
+                return
+            try:
+                export_service.export_html(Path(out), content, kind, meta, name=name, values=values,
+                                           prefix=prefix, logo_data_uri=self._logo_data_uri())
+            except OSError as error:
+                export_service.warn(self, str(error))
+                return
+            self.toast.show_message(f"HTML exportiert · {Path(out).name}", "check")
+
     def _pin_current_folder(self) -> None:
         """Den aktuell im Baum gewählten Ordner (bzw. den angezeigten Wurzelordner) an den Schnellzugriff heften."""
         tree = self.sidebar.tree
@@ -3218,6 +3295,10 @@ class MainWindow(QMainWindow):
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
         self.sidebar.tree.new_menu_builder = self._build_new_menu        # „Neue Datei nach Typ" im Baum-Kontextmenü
+        self.registry.add("export:pdf", "Exportieren: als PDF …", lambda: self.export_current("pdf"),
+                          category="Datei", keywords="export pdf drucken bericht ausgeben")
+        self.registry.add("export:html", "Exportieren: als HTML …", lambda: self.export_current("html"),
+                          category="Datei", keywords="export html webseite ausgeben")
         from notex.core import newfile as _newfile
         for _ft in _newfile.TYPES:
             self.registry.add(f"new:{_ft.key}", f"Neue Datei: {_ft.label}",
