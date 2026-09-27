@@ -299,3 +299,65 @@ def test_tiff_read_only(tmp_path: Path) -> None:
     assert report.kind == "tiff" and not report.can_strip and values(report)["Hersteller"] == "Canon"
     with pytest.raises(md.MetadataError):
         md.strip(path)
+
+
+# ---- L3: JPEG-Metadaten dürfen nie leer sein ----------------------------------------------------------------------
+def _jpeg_segment(marker: int, payload: bytes) -> bytes:
+    return bytes([0xFF, marker]) + struct.pack(">H", len(payload) + 2) + payload
+
+
+def plain_jpeg(sof_marker: int = 0xC0, with_icc: bool = False, with_jfif: bool = True) -> bytes:
+    parts = [b"\xff\xd8"]
+    if with_jfif:
+        parts.append(_jpeg_segment(0xE0, b"JFIF\x00\x01\x02\x01\x00\x48\x00\x48\x00\x00"))   # v1.02, 72 dpi
+    parts.append(_jpeg_segment(0xDB, b"\x00" + bytes(range(1, 65))))                          # DQT (Luminanz)
+    sof = struct.pack(">BHHB", 8, 480, 640, 3) + b"\x01\x22\x00\x02\x11\x01\x03\x11\x01"       # 8bit 640x480 3 Komp.
+    parts.append(_jpeg_segment(sof_marker, sof))
+    if with_icc:
+        parts.append(_jpeg_segment(0xE2, b"ICC_PROFILE\x00\x01\x01" + b"\x00" * 20 + b"desc"
+                                   + b"\x00" * 4 + struct.pack(">I", 5) + b"sRGB\x00"))
+    parts.append(_jpeg_segment(0xDA, b"\x01\x01\x00\x00\x3f\x00"))
+    parts.append(b"\x12\x34\xff\xd9")
+    return b"".join(parts)
+
+
+def test_jpeg_without_exif_is_never_empty(tmp_path: Path) -> None:
+    path = tmp_path / "screenshot.JPG"                     # Groß-/Kleinschreibung egal (Erkennung per Magic Bytes)
+    path.write_bytes(plain_jpeg())
+    report = md.read(path)
+    v = values(report)
+    assert report.kind == "jpeg" and len(report.fields) >= 6
+    assert v["Format"] == "JPEG-Bild" and "Bytes" in v["Dateigröße"]
+    assert v["Abmessungen"] == "640 × 480 px" and v["Verfahren"] == "Baseline"
+    assert v["Farbkomponenten"].startswith("3 (YCbCr") and v["JFIF-Version"] == "1.02"
+    assert "Geschätzte Qualität" in v and v["Auflösung"].endswith("dpi")
+    assert v["Eingebettetes Vorschaubild vorhanden"] == "nein" and "Aufbau" in v
+    assert v["Metadaten"] == "Keine EXIF-, XMP- oder IPTC-Metadaten vorhanden"
+    assert not report.can_strip                            # nichts zu entfernen
+
+
+def test_jpeg_progressive_and_icc(tmp_path: Path) -> None:
+    path = tmp_path / "web.jpeg"
+    path.write_bytes(plain_jpeg(sof_marker=0xC2, with_icc=True))
+    v = values(md.read(path))
+    assert v["Verfahren"] == "Progressiv"
+    assert v["ICC-Farbprofil"].startswith("vorhanden") and "sRGB" in v["ICC-Farbprofil"]
+
+
+def test_jpeg_with_exif_still_lists_structure(tmp_path: Path) -> None:
+    path = tmp_path / "foto.jpg"
+    path.write_bytes(jpeg())                                # Fixture mit EXIF+GPS von oben
+    v = values(md.read(path))
+    assert v["Hersteller"] == "Canon" and "Aufbau" in v and "Metadaten" not in v   # kein "keine Metadaten"-Hinweis
+
+
+def test_png_without_metadata_gets_hint(tmp_path: Path) -> None:
+    import zlib as _zlib
+    ihdr = struct.pack(">IIBBBBB", 4, 4, 8, 2, 0, 0, 0)
+    data = md.PNG_SIG + chunk(b"IHDR", ihdr) + chunk(b"IDAT", _zlib.compress(b"\x00\xff\x00\x00" * 4)) \
+        + chunk(b"IEND", b"")
+    path = tmp_path / "leer.png"
+    path.write_bytes(data)
+    v = values(md.read(path))
+    assert v["Format"] == "PNG-Bild" and "Dateigröße" in v
+    assert any(f.group == "Hinweis" for f in md.read(path).fields)

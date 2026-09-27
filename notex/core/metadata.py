@@ -373,41 +373,139 @@ def _jpeg_segments(mm) -> tuple[list[tuple[int, int, int]], int, int]:
         pos += 2 + struct.unpack(">H", mm[pos + 2:pos + 4])[0]
 
 
+SOF_MARKERS = {0xC0: "Baseline", 0xC1: "Erweitert sequentiell", 0xC2: "Progressiv", 0xC3: "Verlustfrei",
+               0xC5: "Differentiell sequentiell", 0xC6: "Differentiell progressiv", 0xC7: "Differentiell verlustfrei",
+               0xC9: "Arithmetisch sequentiell", 0xCA: "Arithmetisch progressiv", 0xCB: "Arithmetisch verlustfrei",
+               0xCD: "Arithm. diff. sequentiell", 0xCE: "Arithm. diff. progressiv", 0xCF: "Arithm. diff. verlustfrei"}
+COMPONENT_NAMES = {1: "Graustufen", 3: "YCbCr (Farbe)", 4: "CMYK/YCCK"}
+# Standard-Luminanz-Quantisierungstabelle (Annex K) in Zickzack-Reihenfolge – Grundlage der Qualitätsschätzung
+_STD_LUM_ZZ = [16, 11, 12, 14, 12, 10, 16, 14, 13, 14, 18, 17, 16, 19, 24, 40, 26, 24, 22, 22, 24, 49, 35, 37,
+               29, 40, 58, 51, 61, 60, 57, 51, 56, 55, 64, 72, 92, 78, 64, 68, 87, 69, 55, 56, 80, 109, 81, 87,
+               95, 98, 103, 104, 103, 62, 77, 113, 121, 112, 100, 120, 92, 101, 103, 99]
+
+
+def _segment_name(marker: int) -> str:
+    if marker in SOF_MARKERS:
+        return f"SOF{marker - 0xC0:X} ({SOF_MARKERS[marker]})"
+    if 0xE0 <= marker <= 0xEF:
+        return f"APP{marker - 0xE0}"
+    return {0xC4: "DHT (Huffman)", 0xDB: "DQT (Quantisierung)", 0xDD: "DRI (Restart)", 0xDA: "SOS (Bilddaten)",
+            0xFE: "COM (Kommentar)"}.get(marker, f"Marker 0x{marker:02X}")
+
+
+def _jpeg_quality(payload: bytes) -> int | None:
+    """Qualität (0–100) aus einer 8-Bit-Luminanz-DQT schätzen (Vergleich mit der Standardtabelle)."""
+    pos = 0
+    while pos + 1 <= len(payload):
+        pq, tq = payload[pos] >> 4, payload[pos] & 0x0F
+        pos += 1
+        count = 64
+        if pq != 0 or pos + count > len(payload):
+            return None
+        if tq != 0:                                  # nur die Luminanztabelle (Tq=0) auswerten
+            pos += count
+            continue
+        table = payload[pos:pos + count]
+        ratios = [table[k] * 100.0 / _STD_LUM_ZZ[k] for k in range(count) if _STD_LUM_ZZ[k]]
+        if not ratios:
+            return None
+        avg = sum(ratios) / len(ratios)
+        quality = (200 - avg) / 2 if avg < 100 else 5000 / avg
+        return max(1, min(100, round(quality)))
+    return None
+
+
+def _icc_description(data: bytes) -> str:
+    pos = data.find(b"desc")
+    if pos < 0:
+        return ""
+    try:
+        length = struct.unpack(">I", data[pos + 8:pos + 12])[0]
+        text = data[pos + 12:pos + 12 + min(length, 200)]
+        return text.split(b"\x00")[0].decode("latin-1", "replace").strip()
+    except (struct.error, IndexError):
+        return ""
+
+
 def _read_jpeg(path: Path, report: Report) -> None:
     with _mapped(path) as mm:
         segments, sos, eoi = _jpeg_segments(mm)
         removed: dict[str, int] = {}
+        has_meta = False
+        icc = bytearray()
+        seg_list: list[str] = []
         for marker, start, end in segments:
             payload = bytes(mm[start + 4:end])
+            seg_list.append(f"{_segment_name(marker)} @ 0x{start:X} ({end - start} B)")
             if marker == 0xE1 and payload.startswith(b"Exif\x00\x00"):
                 add_exif(report, payload[6:])
                 removed["EXIF (Kamera, Zeiten, GPS, Vorschaubild)"] = 1
+                has_meta = True
             elif marker == 0xE1 and payload.startswith(b"http://ns.adobe.com/xap/1.0/\x00"):
                 add_xmp(report, payload[29:])
                 removed["XMP"] = 1
+                has_meta = True
             elif marker == 0xE1 and payload.startswith(b"http://ns.adobe.com/xmp/extension/"):
                 report.add("XMP", "Erweitertes XMP", f"{len(payload)} Bytes")
                 removed["XMP"] = 1
+                has_meta = True
             elif marker == 0xED:
+                before = len(report.fields)
                 add_iptc(report, payload)
-                removed["IPTC/Photoshop (APP13)"] = 1
+                if len(report.fields) > before:
+                    removed["IPTC/Photoshop (APP13)"] = 1
+                    has_meta = True
             elif marker == 0xFE:
                 report.add("Kommentar", "JPEG-Kommentar", payload.decode("utf-8", "replace"))
                 removed["JPEG-Kommentar"] = 1
+                has_meta = True
             elif marker == 0xE2 and payload.startswith(b"MPF\x00"):
                 report.add("Datei", "Weitere Bilder (MPF)", "vorhanden – liegen hinter dem Hauptbild")
                 removed["Mehrbild-Verweise (MPF)"] = 1
+            elif marker == 0xE0 and payload.startswith(b"JFIF\x00"):
+                report.add("Bild", "JFIF-Version", f"{payload[5]}.{payload[6]:02d}", removable=False)
+                units = {0: "keine", 1: "dpi", 2: "dpcm"}.get(payload[7], "?")
+                x, y = struct.unpack(">HH", payload[8:12])
+                report.add("Bild", "Auflösung", f"{x}×{y} {units}", removable=False)
+            elif marker == 0xE0 and payload.startswith(b"JFXX"):
+                report.add("Bild", "JFIF-Vorschaubild", "vorhanden", removable=False)
+            elif marker == 0xE2 and payload.startswith(b"ICC_PROFILE\x00"):
+                icc += payload[14:]
+            elif marker == 0xEE and payload.startswith(b"Adobe"):
+                transform = {0: "unbekannt/RGB", 1: "YCbCr", 2: "YCCK"}.get(payload[11] if len(payload) > 11 else -1, "?")
+                report.add("Bild", "Adobe-Segment", f"Farbtransformation {transform}", removable=False)
+            elif marker in SOF_MARKERS:
+                precision, height, width, components = payload[0], *struct.unpack(">HH", payload[1:5]), payload[5]
+                report.add("Bild", "Abmessungen", f"{width} × {height} px", removable=False)
+                report.add("Bild", "Verfahren", SOF_MARKERS[marker], removable=False)
+                report.add("Bild", "Farbkomponenten", f"{components} ({COMPONENT_NAMES.get(components, '?')}), "
+                           f"{precision} Bit", removable=False)
+            elif marker == 0xDB:
+                quality = _jpeg_quality(payload)
+                if quality is not None and not any(f.name == "Geschätzte Qualität" for f in report.fields):
+                    report.add("Bild", "Geschätzte Qualität", f"≈ {quality} %", removable=False)
             elif 0xE1 <= marker <= 0xEF and marker not in KEEP_APP:
                 ident = payload[:24].split(b"\x00")[0].decode("latin-1", "replace")
                 report.add("Weitere Segmente", f"APP{marker - 0xE0}", f"{ident or '?'} ({len(payload)} Bytes)")
                 removed[f"APP{marker - 0xE0}-Segmente (herstellerspezifisch)"] = 1
+        if icc:
+            desc = _icc_description(bytes(icc))
+            report.add("Bild", "ICC-Farbprofil", f"vorhanden ({len(icc)} Bytes)" + (f" – {desc}" if desc else ""),
+                       removable=False)
+        thumb = any(f.name == "Eingebettetes Vorschaubild" for f in report.fields) or \
+            any("JFIF-Vorschaubild" == f.name for f in report.fields)
+        report.add("Bild", "Eingebettetes Vorschaubild vorhanden", "ja" if thumb else "nein", removable=False)
+        if seg_list:
+            report.add("Segmente", "Aufbau", " · ".join(seg_list), removable=False)
         if eoi > 0 and eoi < len(mm):
             tail = len(mm) - eoi
             report.add("Datei", "Daten hinter dem Bildende", f"{tail} Bytes (z. B. weiteres Bild, Tiefenkarte)")
             removed["Daten hinter dem Bildende"] = 1
+        if not has_meta:
+            report.add("Hinweis", "Metadaten", "Keine EXIF-, XMP- oder IPTC-Metadaten vorhanden", removable=False)
         report.removes = list(removed)
         report.keeps = ["Bilddaten (unverändert, keine Neukodierung)", "JFIF-Kopf, ICC-Farbprofil, Adobe-Segment"]
-        report.can_strip = sos > 0
+        report.can_strip = sos > 0 and bool(removed)
         orientation = next((f.value for f in report.fields if f.name == "Ausrichtung"), "")
         if orientation and not orientation.startswith("1 "):
             report.keeps.append(f"Hinweis: Ausrichtung „{orientation}“ steht im EXIF – ohne sie kann das Bild gedreht "
@@ -842,10 +940,22 @@ KIND_NAMES = {"jpeg": "JPEG-Bild", "png": "PNG-Bild", "webp": "WebP-Bild", "tiff
 
 
 def read(path: Path) -> Report:
-    """Alle Metadaten einer Datei. Wirft MetadataError bei kaputten oder nicht unterstützten Dateien."""
+    """Alle Metadaten einer Datei. Wirft MetadataError bei kaputten oder nicht unterstützten Dateien.
+
+    Das Ergebnis ist NIE leer: immer Dateigröße und Format, dazu format-spezifische Struktur- und Bildinfos;
+    fehlen EXIF/XMP/IPTC (bzw. Dokumenteigenschaften), steht das ausdrücklich als Hinweis darin.
+    """
     path = Path(path)
     kind = detect(path)
     report = Report(kind)
+    try:
+        size = path.stat().st_size
+    except OSError:
+        size = 0
+    report.add("Datei", "Name", path.name, removable=False)
+    report.add("Datei", "Format", KIND_NAMES.get(kind, kind), removable=False)
+    report.add("Datei", "Dateigröße", f"{size:,} Bytes".replace(",", ".") + (f" ({_human(size)})" if size >= 1024 else ""),
+               removable=False)
     if kind == "tiff":
         with _mapped(path) as mm:
             add_exif(report, mm, prefix="TIFF")
@@ -858,7 +968,18 @@ def read(path: Path) -> Report:
         reader(path, report)
     except (struct.error, IndexError, zipfile.BadZipFile, EOFError) as error:
         raise MetadataError(f"Datei beschädigt oder unvollständig: {error}") from error
+    if not report.removable_fields and not any(f.group == "Hinweis" for f in report.fields):
+        report.add("Hinweis", "Metadaten", "Keine entfernbaren Metadaten vorhanden", removable=False)
     return report
+
+
+def _human(size: int) -> str:
+    value = float(size)
+    for unit in ("Bytes", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            return f"{value:.0f} {unit}" if unit == "Bytes" else f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
 
 
 def clean_name(path: Path) -> Path:
