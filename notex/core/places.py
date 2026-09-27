@@ -160,10 +160,8 @@ def is_system_path(path: Path | str) -> bool:
         for segment in parts[1:2]:
             if segment.lower() in _WIN_SYSTEM_DIRS:
                 return True
-        # …\AppData\… gilt als heikel
-        lowered = [p.lower() for p in parts]
-        if "appdata" in lowered:
-            return True
+        # AppData ist Nutzerdaten (dort liegen u. a. Temp-Dateien) – bewusst NICHT als Systemordner werten,
+        # sonst warnt die App bei ganz normalen Nutzerpfaden.
         return False
     lowered_path = norm.as_posix()
     for sysdir in _UNIX_SYSTEM_DIRS:

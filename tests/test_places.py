@@ -17,11 +17,13 @@ def test_notes_place(tmp_path):
 
 
 def test_quick_access_dedup_and_normalize():
+    import os
     config = {"quick_access": ["/a/b", "/a/b/", "/a//b", "", 123, "/c"]}
     paths = places.quick_access_paths(config)
     # /a/b, /a/b/, /a//b normalisieren auf denselben Pfad → nur einmal; leere/nicht-Strings raus
+    # (Trennzeichen plattformabhängig – deshalb über os.path.normpath vergleichen)
     norm = [str(p) for p in paths]
-    assert norm == ["/a/b", "/c"]
+    assert norm == [os.path.normpath("/a/b"), os.path.normpath("/c")]
 
 
 def test_add_and_remove_pinned():
