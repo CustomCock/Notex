@@ -2,6 +2,30 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.16.0] – 2026-09-28
+
+### Hinzugefügt
+- **Formatierte Bearbeitung (WYSIWYG-Markdown)** (Block O0): `**fett**` wird als **fett** angezeigt und bearbeitet –
+  keine Sternchen mehr im Blick. Symbolleiste und Kürzel (Ctrl+B/I, Überschriften, Listen, Aufgaben, Zitat,
+  Trennlinie, Link) formatieren; Umschalter **Formatiert | Quelltext (Markdown)**. Unter der Haube bleibt Markdown
+  (verlustarmer Roundtrip). Befehl „Formatiert bearbeiten“ (Palette + Baum-Kontextmenü) für .md-Notizen; Variablen
+  (§name) bleiben erhalten. Tabellen/Codeblöcke werden formatiert gezeigt, Feinarbeit über die Quelltext-Ansicht.
+- **Fragebögen/Formulare** (Block O1): Fragebogen-Assistent (ein Abschnitt pro Seite, Fortschritt, Zurück/Weiter,
+  Vorschlags-Chips, Zwischenstand gemerkt) füllt YAML-Fragebögen aus `templates/fragebogen/` aus. Fragetypen
+  Freitext/Ja-Nein/Auswahl/Mehrfachauswahl/Zahl/Datum/Uhrzeit/Tabelle, Bedingungen, Pflichtfelder, Gewichtung.
+  Das Ergebnis wird als formatierte Notiz gespeichert (Antworten im Frontmatter, erneut ausfüllbar). Eigene
+  Fragebögen ohne Programmieren möglich.
+- **Mitgelieferte Fragebögen**: **Ausbildungsnachweis/Berichtsheft** (O2) – wahlweise **aus einem Kalender-Export
+  (.ics) vorbefüllt** (RFC 5545, Serien/EXDATE, ohne Zusatzabhängigkeit); **Systemcheck beim Kunden** (O3);
+  **Sicherheits-Check** für kleine Unternehmen (O6) mit **Auswertung** (Punkte je Bereich, Ampel, Gesamtbewertung;
+  eigene Formulierungen, inhaltlich an DIN SPEC 27076 / BSI IT-Grundschutz angelehnt).
+- **E-Mail-Vorlagen** (O4): Terminbestätigung/-verschiebung, Störungs-Rückfrage, Ticket-Eingang, Wartungsankündigung,
+  Abschlussmeldung, Passwort zurückgesetzt (ohne Passwort im Text), Angebotsanfrage, Nachfassen, Phishing-Info,
+  Urlaubsübergabe – Betreff als erste Zeile, ohne Grußformel/Signatur.
+- **Tabellen-Vorlagen** (O5): IP-Adressliste, Hardware-Inventar, Softwarelizenzen, Wartungsplan, Backup-Protokoll,
+  Change-Log, VoIP-Nebenstellen, Patchfeld, Kontakte, Zeiterfassung, Lernplan, Aufgabenliste sowie Benutzer/Zugänge
+  **ohne Passwortspalte** (Hinweis: Passwortmanager). CSV zählt jetzt als Vorlagen-Endung.
+
 ## [1.15.0] – 2026-09-28
 
 ### Hinzugefügt

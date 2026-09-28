@@ -246,6 +246,52 @@ wird gerendert, CSV als Tabelle, sonst als Text; Variablen (`§name`) werden auf
 Kopfzeile (Logo, Titel, Autor/Datum) und eine Fußzeile (Seite X von Y), das HTML ist ein eigenständiges Dokument mit
 eingebettetem Logo. Der Klartext einer verschlüsselten Notiz (.ntx) wird nur nach ausdrücklicher Rückfrage exportiert.
 
+## Formatierte Bearbeitung, Fragebögen und Vorlagen
+
+| Formatierte Bearbeitung (WYSIWYG) | Fragebogen-Assistent |
+|---|---|
+| ![WYSIWYG](docs/69-wysiwyg.png) | ![Fragebogen](docs/70-fragebogen.png) |
+
+**Formatiert bearbeiten (WYSIWYG):** Rechtsklick auf eine `.md`-Notiz → „Formatiert bearbeiten …“ (auch in der
+Palette). `**fett**` erscheint als **fett** und wird als fetter Text bearbeitet – keine Sternchen im Blick. Die
+Symbolleiste und Kürzel (Ctrl+B/I, Überschriften, Listen, Aufgaben, Zitat, Trennlinie, Link) formatieren; oben rechts
+schaltet **Formatiert | Quelltext (Markdown)** um. Unter der Haube bleibt Markdown; Variablen (`§name`) bleiben in
+beiden Ansichten erhalten. Tabellen und Codeblöcke werden formatiert gezeigt – Feinarbeit an ihnen am besten in der
+Quelltext-Ansicht.
+
+**Fragebögen ausfüllen:** Datei → „Fragebogen ausfüllen …“ (oder Palette) öffnet einen Assistenten (ein Abschnitt pro
+Seite, Fortschritt, Zurück/Weiter, Zwischenstand gemerkt). Das Ergebnis wird als formatierte Notiz gespeichert
+(Antworten im Frontmatter, später erneut ausfüllbar). Mitgeliefert:
+
+- **Ausbildungsnachweis/Berichtsheft** – optional **aus einem Kalender-Export (.ics)** vorbefüllt
+  („Berichtsheft aus Kalender (.ics) …“): die Termine der gewählten Woche werden zu Tages-Tätigkeiten mit Dauer.
+- **Systemcheck beim Kunden** – Checkliste mit Befunden und Empfehlungen.
+- **Sicherheits-Check** für kleine Unternehmen – mit **Auswertung** (Punkte je Bereich, Ampel, Gesamtbewertung).
+
+Eigene Fragebögen sind einfache YAML-Dateien in `templates/fragebogen/`:
+
+```yaml
+id: mein-check
+title: Mein Check
+sections:
+  - id: allgemein
+    title: Allgemein
+    questions:
+      - {id: name, type: text, label: "Name", required: true}
+      - {id: ok, type: yesno, weight: 2, label: "Läuft alles?"}
+      - id: details
+        type: text
+        label: "Details"
+        when: {question: ok, equals: Nein}   # nur zeigen, wenn oben „Nein"
+```
+
+Fragetypen: `text`, `yesno`, `choice`, `multichoice`, `number`, `date`, `time`, `table`. Mit `options` (auch mit
+`score` für die Auswertung), `when` (Bedingung), `weight`, `help`, `chips` und einer optionalen `output`-Vorlage
+(`{{fragen-id}}`).
+
+**E-Mail- und Tabellen-Vorlagen** liegen unter „Neue Datei aus Vorlage“ bereit (E-Mail: Betreff als erste Zeile, ohne
+Grußformel/Signatur; Tabellen als CSV/Markdown, Benutzerlisten bewusst **ohne Passwortspalte**).
+
 ## Analyse per Rechtsklick
 
 Text markieren (oder mit dem Cursor auf einem Wort stehen) und rechtsklicken → Gruppe **Analysieren**. Notex erkennt
@@ -1024,6 +1070,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
 | Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Datei › Fragebogen ausfüllen | Assistent für Berichtsheft/Systemcheck/Sicherheits-Check (auch aus Kalender .ics) |
+| Baum/Palette › Formatiert bearbeiten | Markdown-Notiz im WYSIWYG-Editor (Ctrl+B/I, Listen …), Quelltext-Umschalter |
 | Ctrl+Shift+W | Werkzeug-Übersicht (durchsuchbarer Katalog aller Werkzeuge) |
 | Datei › Neue Datei nach Typ | Text/Markdown/CSV/JSON/YAML/HTML/Python/Shell/INI mit Startinhalt und Zeilenende (auch je Typ in der Palette) |
 | Datei › Exportieren | Aktuelle Notiz als PDF oder HTML (Variablen aufgelöst; .ntx nur nach Rückfrage; auch in der Palette) |

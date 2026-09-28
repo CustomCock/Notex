@@ -40,6 +40,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.13.0 | Block M: Werkzeuge-Menü, Explorer-Orte, Neu nach Typ, App-Icon, PDF/HTML-Export, allgemeine Log-Auswertung | fertig, Tests grün, lokal getaggt |
 | 1.14.0 | Block Q: Analyse per Rechtsklick (Typ-Erkennung, Karte, Netz-/Hash-/Umwandeln-Aktionen) | fertig, Tests grün, lokal getaggt |
 | 1.15.0 | Block N: Geräte-Scanner (Advanced-IP-Scanner-artig), OUI-Hersteller, NetBIOS, Host-Aktionen, Export | fertig, Tests grün, lokal getaggt |
+| 1.16.0 | Block O: WYSIWYG-Markdown, Fragebogen-Engine + Assistent, Berichtsheft (ICS), Systemcheck, Sicherheits-Check, E-Mail-/Tabellen-Vorlagen | fertig, Tests grün, lokal getaggt |
 
 ## Erledigt
 
@@ -431,6 +432,29 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   das Wesentliche ab.
 - Screenshot 68 (Geräte-Scanner). Keine neuen Python-Abhängigkeiten (nur Standardbibliothek + vorhandene Engine).
 
+### 1.16.0 – Block O
+- O0 WYSIWYG: `core/richmd.py` (Qt-frei) – Markdown ↔ Blockmodell mit stabilem, idempotentem Roundtrip (Überschriften,
+  Absätze, Listen/Aufgaben, Zitate, Codeblöcke, Tabellen, Trennlinien; Inline fett/kursiv/durchgestrichen/Code/Link);
+  Variablen bleiben erhalten. `ui/rich_markdown.py`: RichMarkdownEditor (QTextEdit) + Symbolleiste/Kürzel +
+  „Formatiert | Quelltext"-Umschalter; RichMarkdownDialog + Befehl „Formatiert bearbeiten" (nur .md, nicht .ntx).
+  **Entscheidung:** eigenes Blockmodell statt Qt-`toHtml`-Roundtrip (deterministisch, Qt-frei testbar). Tabellen/Code
+  werden formatiert gezeigt, Feinarbeit über Quelltext.
+- O1 Engine: `core/questionnaire.py` (Qt-frei) – YAML-Fragebögen, Typen, Bedingungen (`when`), Pflicht, Gewichtung,
+  Auswertung (`score`/`score_summary`, Ampel), Ausgabe (`output`-Vorlage `{{id}}` + `§`-Variablen), Antworten im
+  Frontmatter (`parse_answers`). `ui/questionnaire_dialog.py`: Assistent (ein Abschnitt/Seite, Chips, Zwischenstand).
+  Ergebnis → formatierte Notiz, öffnet im WYSIWYG-Editor; bewertete Fragebögen bekommen die Auswertung vorangestellt.
+- O2 Berichtsheft: `berichtsheft.yaml` + **ICS-Import** `core/ics.py` (Qt-frei, RFC 5545, keine neue Abhängigkeit:
+  VEVENT/DTSTART/DTEND/SUMMARY, ganztägig, RRULE DAILY/WEEKLY+INTERVAL/COUNT/UNTIL/BYDAY, EXDATE, CLASS:PRIVATE
+  übersprungen; `berichtsheft_rows` fasst eine ISO-Woche zusammen). Befehl „Berichtsheft aus Kalender (.ics)".
+- O3 Systemcheck: `systemcheck.yaml`. O6 Sicherheits-Check: `sicherheits-check.yaml` mit gewichteten yesno-Fragen +
+  Auswertung (eigene Formulierungen, an DIN SPEC 27076 / BSI IT-Grundschutz angelehnt).
+- O4/O5: E-Mail-Vorlagen (Betreff als erste Zeile, ohne Grußformel/Signatur) und Tabellen-Vorlagen (CSV/Markdown,
+  Benutzerlisten ohne Passwortspalte) in `core/templates.py`; `.csv` als Vorlagen-Endung ergänzt.
+- **Vereinfacht/ehrlich:** der WYSIWYG-Editor ist ein eigenes Fenster (kein neuer Tab-Modus, um den bestehenden Editor
+  nicht zu gefährden); TZID im ICS wird als lokale Zeit behandelt (keine Zonen-DB); der „Frage-Antwort Tag-für-Tag"-
+  Modus des Berichtshefts ist über Tabelle + Vorschlags-Chips + ICS-Vorbefüllung abgedeckt, kein eigener Dialog.
+- Neue Qt-freie Tests: `test_richmd` (11), `test_questionnaire` (10), `test_ics` (6). Keine neuen Python-Abhängigkeiten.
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -496,15 +520,14 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Blöcke F–K, L, M (1.13.0), Q (1.14.0) und N (1.15.0) fertig.** Plan des Besitzers (27.09.2026): **Q → N → O**.
+**Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.
 - **N (1.15.0)** Geräte-Scanner als Ersatz für „Advanced IP Scanner“ – **erledigt**.
-- **O (1.16.0)** – **als Nächstes**: Formatierte Bearbeitung (WYSIWYG-Markdown) + Fragebögen/Vorlagen (Berichtsheft,
-  Systemcheck, E-Mail-/Tabellen-Vorlagen, Sicherheits-Check; passwortlose Spalten, keine Zugangsdaten erfassen).
+- **O (1.16.0)** WYSIWYG-Markdown + Fragebögen/Vorlagen – **erledigt**.
 
 - **P (Inventar/Docusnap-artig) ist ZURÜCKGESTELLT** (Entscheidung Besitzer 27.09.2026): vorerst NICHT bauen.
 
-Nach jedem Block anhalten und zusammenfassen; erst bei „weiter“ fortfahren.
+Keine offenen Blöcke auf Entwicklerseite – auf neue Wünsche des Besitzers warten.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.
