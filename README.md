@@ -246,6 +246,83 @@ wird gerendert, CSV als Tabelle, sonst als Text; Variablen (`§name`) werden auf
 Kopfzeile (Logo, Titel, Autor/Datum) und eine Fußzeile (Seite X von Y), das HTML ist ein eigenständiges Dokument mit
 eingebettetem Logo. Der Klartext einer verschlüsselten Notiz (.ntx) wird nur nach ausdrücklicher Rückfrage exportiert.
 
+## Formatierte Bearbeitung, Fragebögen und Vorlagen
+
+| Formatierte Bearbeitung (WYSIWYG) | Fragebogen-Assistent |
+|---|---|
+| ![WYSIWYG](docs/69-wysiwyg.png) | ![Fragebogen](docs/70-fragebogen.png) |
+
+**Formatiert bearbeiten (WYSIWYG):** Rechtsklick auf eine `.md`-Notiz → „Formatiert bearbeiten …“ (auch in der
+Palette). `**fett**` erscheint als **fett** und wird als fetter Text bearbeitet – keine Sternchen im Blick. Die
+Symbolleiste und Kürzel (Ctrl+B/I, Überschriften, Listen, Aufgaben, Zitat, Trennlinie, Link) formatieren; oben rechts
+schaltet **Formatiert | Quelltext (Markdown)** um. Unter der Haube bleibt Markdown; Variablen (`§name`) bleiben in
+beiden Ansichten erhalten. Tabellen und Codeblöcke werden formatiert gezeigt – Feinarbeit an ihnen am besten in der
+Quelltext-Ansicht.
+
+**Fragebögen ausfüllen:** Datei → „Fragebogen ausfüllen …“ (oder Palette) öffnet einen Assistenten (ein Abschnitt pro
+Seite, Fortschritt, Zurück/Weiter, Zwischenstand gemerkt). Das Ergebnis wird als formatierte Notiz gespeichert
+(Antworten im Frontmatter, später erneut ausfüllbar). Mitgeliefert:
+
+- **Ausbildungsnachweis/Berichtsheft** – optional **aus einem Kalender-Export (.ics)** vorbefüllt
+  („Berichtsheft aus Kalender (.ics) …“): die Termine der gewählten Woche werden zu Tages-Tätigkeiten mit Dauer.
+- **Systemcheck beim Kunden** – Checkliste mit Befunden und Empfehlungen.
+- **Sicherheits-Check** für kleine Unternehmen – mit **Auswertung** (Punkte je Bereich, Ampel, Gesamtbewertung).
+
+Eigene Fragebögen sind einfache YAML-Dateien in `templates/fragebogen/`:
+
+```yaml
+id: mein-check
+title: Mein Check
+sections:
+  - id: allgemein
+    title: Allgemein
+    questions:
+      - {id: name, type: text, label: "Name", required: true}
+      - {id: ok, type: yesno, weight: 2, label: "Läuft alles?"}
+      - id: details
+        type: text
+        label: "Details"
+        when: {question: ok, equals: Nein}   # nur zeigen, wenn oben „Nein"
+```
+
+Fragetypen: `text`, `yesno`, `choice`, `multichoice`, `number`, `date`, `time`, `table`. Mit `options` (auch mit
+`score` für die Auswertung), `when` (Bedingung), `weight`, `help`, `chips` und einer optionalen `output`-Vorlage
+(`{{fragen-id}}`).
+
+**E-Mail- und Tabellen-Vorlagen** liegen unter „Neue Datei aus Vorlage“ bereit (E-Mail: Betreff als erste Zeile, ohne
+Grußformel/Signatur; Tabellen als CSV/Markdown, Benutzerlisten bewusst **ohne Passwortspalte**).
+
+## Analyse per Rechtsklick
+
+Text markieren (oder mit dem Cursor auf einem Wort stehen) und rechtsklicken → Gruppe **Analysieren**. Notex erkennt
+den Typ der Markierung und bietet nur die passenden Aktionen; das Ergebnis erscheint in einer kompakten Karte neben
+der Markierung. Dieselben Aktionen stehen auch in der Command Palette („Analysieren: …“). Aktionen abgeschalteter
+Module erscheinen als „… – Modul aktivieren“.
+
+![Analyse per Rechtsklick](docs/67-analyse.png)
+
+| Erkannter Typ | Aktionen |
+|---|---|
+| IPv4 / IPv6 / Domain | DNS auflösen (A/AAAA/PTR), Ping, gängige Ports prüfen, Port nachschlagen, RDAP/ASN, in IP-Übersicht/Scanner öffnen |
+| CIDR (z. B. `10.0.0.0/24`) | im Netzwerk-Scanner öffnen |
+| Port (`443/tcp`, `host:443`) | Port nachschlagen (IANA + gängige Dienste, offline) |
+| Hash (MD5/SHA-1/256/512, NTLM, bcrypt/argon2/…) | **Hash-Info**: Typ erkennen, Online-Lookup (nur ungesalzen) |
+| Base64 / Base32 / Hex / URL | dekodieren (Binärergebnis als Hex) |
+| JWT | Header/Payload als JSON, Zeiten lesbar (Signatur **nicht** geprüft) |
+| Unix-Zeit / ISO-Datum | Zeitstempel ↔ Datum (UTC + lokal) |
+| Zahl (dez/hex/bin) | in allen Basen + Bit-Ansicht |
+| Hex-Farbe (`#1e1e1e`) | Farbvorschau + RGB |
+| CVE-ID | im Browser bei der NVD nachschlagen |
+| User-Agent | in Browser / System / Gerät zerlegen |
+| jedes Wort | „Hash dieses Worts bilden“ (MD5/SHA-1/SHA-256/NTLM, lokal) |
+
+**Hash ist nicht Verschlüsselung.** Ein Hash ist eine Einwegfunktion – er lässt sich nicht „entschlüsseln“. „Hash-Info“
+schlägt einen Hash höchstens in einer öffentlichen Datenbank nach (ob der Klartext eines bekannten Passworts vorliegt).
+Das geht nur bei **ungesalzenen** Hashes; gesalzene Formate (bcrypt, argon2, sha512crypt …) sind sinnlos abzufragen und
+der Knopf bleibt deaktiviert. Der Online-Lookup ist standardmäßig aus (Einstellungen → **Analyse**), fragt vor dem
+ersten Senden nach und ist aus verschlüsselten Notizen (.ntx) gesperrt. Bewusst **keine** mitgelieferte Wortliste und
+**keine** Rainbow-Tables – Offline-Cracking ist Aufgabe eigener Werkzeuge wie hashcat oder John the Ripper.
+
 ## Module
 
 Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der Command Palette) schaltet Funktionen
@@ -629,6 +706,27 @@ TLS nur der SNI-Name). Kaputte Aufzeichnungen werden übersprungen, nicht abgebr
 Modul „Netzwerk-Scanner“ (Standard aus). **Nur für das eigene Netz** – Ziele außerhalb privater Bereiche verlangen
 eine Bestätigung (abschaltbar). Menü Datei → „Netzwerk-Scanner …“, `Ctrl+Shift+Alt+P` oder Palette.
 
+### Geräte-Scanner (wie „Advanced IP Scanner“)
+
+`Ctrl+Shift+Alt+P` öffnet den **Geräte-Scanner**: er erkennt das eigene Subnetz automatisch (mehrere Adapter möglich)
+und listet die gefundenen Geräte mit **Status, Name, IP, MAC, Hersteller, Kommentar, Diensten und Antwortzeit**.
+
+- **Erkennung**: Ping/TCP-Anklopfen für „lebt der Host?“, ARP-Tabelle für die MAC, Reverse-DNS und **NetBIOS** für
+  Namen, **Hersteller aus der Offline-OUI-Liste** (öffentliche IEEE-Daten; lokal verwaltete/zufällige MACs werden als
+  solche gekennzeichnet). Profile **Schnell / Standard / Gründlich**, Ausschlussliste, Live-Filter.
+- **Aktionen je Gerät** (Rechtsklick/Doppelklick): im Browser öffnen, Remotedesktop (RDP), Freigaben (`\\host`), SSH,
+  Ping, Traceroute, Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-Herunterfahren/Neustart
+  (Windows, mit deutlicher Bestätigung), Kommentar, Favoriten, IP/MAC/Name kopieren, an die IP-Übersicht.
+- **Spalten** ein-/ausblendbar (Rechtsklick auf den Kopf), sortierbar, Breiten werden gespeichert.
+- **Export**: CSV, JSON, Markdown, HTML, PDF.
+- Hersteller aktualisieren: `python tools/update_oui.py` (lädt die IEEE-Liste, wenn Netz verfügbar).
+
+![Geräte-Scanner](docs/68-geraete-scanner.png)
+
+### Port-Scan (ein Ziel genau)
+
+Der frühere Port-fokussierte Scan ist als **„Port-Scan“** in der Command Palette (`scan:ports`) erhalten.
+
 - **Ziele**: einzelne IP, Hostname, CIDR (`192.168.1.0/24`), Bereich (`10.0.0.1-10.0.0.50` oder `10.0.0.1-50`),
   Liste – gemischt. Obergrenze mit Warnung (Standard 4096), Rückfrage ab 512 Zielen.
 - **Ports**: Profile Top-100 / Top-1000, eigene Listen (`22,80,443` oder `1-1024`), als **eigenes Profil speicherbar**.
@@ -972,6 +1070,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
 | Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Datei › Fragebogen ausfüllen | Assistent für Berichtsheft/Systemcheck/Sicherheits-Check (auch aus Kalender .ics) |
+| Baum/Palette › Formatiert bearbeiten | Markdown-Notiz im WYSIWYG-Editor (Ctrl+B/I, Listen …), Quelltext-Umschalter |
 | Ctrl+Shift+W | Werkzeug-Übersicht (durchsuchbarer Katalog aller Werkzeuge) |
 | Datei › Neue Datei nach Typ | Text/Markdown/CSV/JSON/YAML/HTML/Python/Shell/INI mit Startinhalt und Zeilenende (auch je Typ in der Palette) |
 | Datei › Exportieren | Aktuelle Notiz als PDF oder HTML (Variablen aufgelöst; .ntx nur nach Rückfrage; auch in der Palette) |
@@ -1005,7 +1105,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
 | Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
 | Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
-| Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
+| Ctrl+Shift+Alt+P | Geräte-Scanner: Geräte im eigenen Netz (Name/IP/MAC/Hersteller/Dienste), Modul Netzwerk-Scanner |
 | Ctrl+Shift+Alt+L | Log-Auswertung – beliebige Logs (Stufen/Fehler/Muster) oder Anmelde-Logs/.evtx (Modul Log-Auswertung) |
 | Ctrl+Shift+Alt+K | PCAP-Übersicht (Modul PCAP-Übersicht) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |

@@ -170,6 +170,9 @@ class MainWindow(QMainWindow):
         from notex.core.modules import ModuleRegistry
         self.modules = ModuleRegistry(self.config)
         self._install_modules()
+        from notex.ui.analyze_actions import AnalyzeController
+        self.analyze = AnalyzeController(self)                # Analyse per Rechtsklick (Block Q)
+        self._editor_menu_providers.append(self.analyze.menu_provider)
         self.modules.on_change(lambda _key, _on: self.apply_tree_filter())
         self.apply_tree_filter()
         self.file_index.request_rescan()
@@ -254,6 +257,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Versionsverlauf …", "Ctrl+Shift+Y", self.show_history))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Neue Datei aus Vorlage …", "Ctrl+Shift+T", lambda: self.new_from_template()))
+        file_menu.addAction(self._action("Fragebogen ausfüllen …", None, lambda: self.start_questionnaire()))
         file_menu.addAction(self._action("Neue Woche", "Alt+W", lambda: self.new_week()))
         file_menu.addAction(self._action("Nächste Woche anlegen", None, lambda: self.new_week(next_week=True)))
         file_menu.addAction(self._action("Vorlagen-Ordner öffnen", None, self.open_templates_folder))
@@ -1675,22 +1679,32 @@ class MainWindow(QMainWindow):
     def _activate_scanner(self):
         """Scanner nur auf ausdrücklichen Start; öffentliche Ziele verlangen eine Bestätigung."""
         action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner())
-        self.registry.add("scan:open", "Netzwerk-Scanner (Hosts und offene Ports im eigenen Netz)",
+        self.registry.add("scan:open", "Netzwerk-Scanner (Geräte im eigenen Netz)",
                           lambda: self.open_scanner(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+P",
-                          keywords="scan scanner netzwerk port host offen tcp nmap discovery")
+                          keywords="scan scanner netzwerk geräte host mac hersteller advanced ip discovery")
+        self.registry.add("scan:ports", "Port-Scan (offene Ports eines Ziels)",
+                          lambda: self.open_port_scanner(), category="Netzwerk",
+                          keywords="scan port offen tcp banner nmap ziel")
         dialogs_open: list = self._analysis_dialogs.setdefault("scanner", [])
 
         def undo() -> None:
             self._drop_actions([action])
             self.registry.remove("scan:open")
+            self.registry.remove("scan:ports")
             for dialog in list(dialogs_open):
                 dialog.close()
             dialogs_open.clear()
         return undo
 
     def open_scanner(self) -> None:
+        from notex.ui.network_scanner import NetworkScannerDialog
+        self._open_scanner_dialog(NetworkScannerDialog(self))
+
+    def open_port_scanner(self) -> None:
         from notex.ui.scan_dialog import ScanDialog
-        dialog = ScanDialog(self)
+        self._open_scanner_dialog(ScanDialog(self))
+
+    def _open_scanner_dialog(self, dialog) -> None:
         self._analysis_dialogs.setdefault("scanner", []).append(dialog)
         dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("scanner", []).remove(d)
                                 if d in self._analysis_dialogs.get("scanner", []) else None)
@@ -2110,6 +2124,163 @@ class MainWindow(QMainWindow):
                 export_service.warn(self, str(error))
                 return
             self.toast.show_message(f"HTML exportiert · {Path(out).name}", "check")
+
+    def questionnaires_folder(self) -> Path:
+        """Ordner mit Fragebögen (templates/fragebogen); mitgelieferte werden einmalig geschrieben."""
+        from notex.core.questionnaires_builtin import BUILTIN
+        folder = app_root() / "templates" / "fragebogen"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            installed = self.config.setdefault("templates", {}).setdefault("fragebogen_installed", [])
+            for name, text in BUILTIN.items():
+                if name not in installed:
+                    target = folder / name
+                    if not target.exists():
+                        target.write_text(text, encoding="utf-8")
+                    installed.append(name)
+        except OSError:
+            pass
+        return folder
+
+    def start_questionnaire(self, path: Path | None = None) -> None:
+        """Einen Fragebogen ausfüllen (Assistent) und das Ergebnis als formatierte Notiz speichern."""
+        from notex.core import questionnaire as qn
+        from notex.ui.questionnaire_dialog import QuestionnaireDialog
+        folder = self.questionnaires_folder()
+        if path is None:
+            files = sorted(folder.glob("*.yaml")) + sorted(folder.glob("*.yml"))
+            if not files:
+                self.toast.show_message("Keine Fragebögen in templates/fragebogen", "info")
+                return
+            names = [p.name for p in files]
+            chosen = dialogs.choose(self, "Fragebogen ausfüllen", "Fragebogen:", names)
+            if chosen is None:
+                return
+            path = folder / chosen
+        try:
+            questionnaire = qn.load_yaml(Path(path).read_text(encoding="utf-8"))
+        except (OSError, Exception) as error:            # noqa: BLE001 – YAML-Fehler dem Nutzer zeigen
+            dialogs.warn(self, "Fragebogen", f"Konnte den Fragebogen nicht laden:\n{error}")
+            return
+        dialog = QuestionnaireDialog(self, questionnaire)
+        dialog.completed.connect(lambda answers, q=questionnaire: self._questionnaire_done(q, answers))
+        self._format_dialogs = getattr(self, "_format_dialogs", [])
+        self._format_dialogs.append(dialog)
+        dialog.show()
+
+    def start_berichtsheft_from_ics(self) -> None:
+        """Ausbildungsnachweis aus einem Kalender-Export (.ics) für eine Woche vorbefüllen."""
+        from datetime import date
+        from PySide6.QtWidgets import QFileDialog, QInputDialog
+        from notex.core import ics, questionnaire as qn
+        from notex.ui.questionnaire_dialog import QuestionnaireDialog
+        path, _ = QFileDialog.getOpenFileName(self, "Kalender wählen (.ics)", str(self.root),
+                                              "iCalendar (*.ics);;Alle Dateien (*)")
+        if not path:
+            return
+        today = date.today()
+        year, ok = QInputDialog.getInt(self, "Woche", "Jahr:", today.year, 2000, 2100)
+        if not ok:
+            return
+        week, ok = QInputDialog.getInt(self, "Woche", "Kalenderwoche:", today.isocalendar().week, 1, 53)
+        if not ok:
+            return
+        try:
+            text = Path(path).read_text(encoding="utf-8", errors="replace")
+            rows = ics.berichtsheft_rows(text, year, week)
+        except Exception as error:                       # noqa: BLE001
+            dialogs.warn(self, "Kalender-Import", str(error))
+            return
+        try:
+            spec = (self.questionnaires_folder() / "berichtsheft.yaml").read_text(encoding="utf-8")
+            questionnaire = qn.load_yaml(spec)
+        except OSError as error:
+            dialogs.warn(self, "Berichtsheft", str(error))
+            return
+        answers = {"kw": str(week), "taetigkeiten": rows}
+        if not rows:
+            self.toast.show_message("Keine Termine in dieser Woche gefunden", "info")
+        dialog = QuestionnaireDialog(self, questionnaire, answers)
+        dialog.completed.connect(lambda a, q=questionnaire: self._questionnaire_done(q, a))
+        self._format_dialogs = getattr(self, "_format_dialogs", [])
+        self._format_dialogs.append(dialog)
+        dialog.show()
+
+    def _questionnaire_done(self, questionnaire, answers: dict) -> None:
+        from notex.core import questionnaire as qn
+        values = self._export_values()
+        result = qn.score(questionnaire, answers)
+        intro = qn.score_summary(result) if result.maximum > 0 else ""    # bewerteter Fragebogen → Auswertung
+        markdown = qn.render_markdown(questionnaire, answers, variables=values, prefix=self._export_prefix(),
+                                      intro=intro)
+        folder = self.sidebar.tree.notes_root
+        from datetime import datetime
+        name = fileops.unique_path(folder, f"{questionnaire.id}-{datetime.now():%Y-%m-%d}", ".md")
+        try:
+            name.write_text(markdown, encoding="utf-8")
+        except OSError as error:
+            dialogs.warn(self, "Fragebogen", str(error))
+            return
+        if self.sidebar.tree.is_notes_root():
+            self.sidebar.tree.select_path(name)
+        self.edit_markdown_formatted(name)
+
+    def edit_markdown_formatted(self, path: Path | None = None) -> None:
+        """Eine Markdown-Notiz in der formatierten (WYSIWYG-)Ansicht bearbeiten."""
+        from notex.ui.rich_markdown import RichMarkdownDialog
+        path = path or self._current_file()
+        if path is None or Path(path).suffix.lower() not in (".md", ".markdown"):
+            self.toast.show_message("Nur für Markdown-Notizen (.md)", "info")
+            return
+        if fileops.is_encrypted_path(path):
+            self.toast.show_message("Verschlüsselte Notiz: bitte im normalen Editor bearbeiten", "info")
+            return
+        dialog = RichMarkdownDialog(self, path)
+        self._format_dialogs = getattr(self, "_format_dialogs", [])
+        self._format_dialogs.append(dialog)
+        dialog.show()
+
+    def run_command(self, command_id: str) -> None:
+        """Einen registrierten Palette-Befehl programmatisch auslösen (z. B. aus der Analyse-Karte)."""
+        entry = self.registry.get(command_id)
+        if entry is not None and entry.callback is not None:
+            entry.callback()
+
+    def insert_analysis_note(self, markdown: str) -> None:
+        """Analyse-Ergebnis in die aktuelle Notiz einfügen; sonst in die Zwischenablage."""
+        from PySide6.QtGui import QGuiApplication
+        editor = self.tabs.current_editor()
+        if editor is not None and not editor.isReadOnly() and not getattr(editor, "locked", False):
+            cursor = editor.textCursor()
+            editor._grouped(lambda: cursor.insertText(("\n" if cursor.positionInBlock() else "") + markdown + "\n"))
+            self.toast.show_message("Analyse in die Notiz eingefügt", "check")
+        else:
+            QGuiApplication.clipboard().setText(markdown)
+            self.toast.show_message("Analyse in die Zwischenablage kopiert", "info")
+
+    def _analyze_selection(self, action: str) -> None:
+        """Analyse-Aktion aus der Command Palette auf die aktuelle Auswahl/Wort anwenden."""
+        editor = self.tabs.current_editor()
+        if editor is None:
+            self.toast.show_message("Keine Textnotiz offen", "info")
+            return
+        term = self.analyze._term(editor)
+        if not term:
+            self.toast.show_message("Nichts markiert", "info")
+            return
+        from notex.core import detect
+        if action == "detect":
+            self.analyze.detect_card(term)
+        elif action == "hashinfo":
+            self.analyze.hash_info(term, detect.analyze(term))
+        elif action == "timestamp":
+            self.analyze.timestamp(term)
+        elif action == "number":
+            self.analyze.number(term)
+        elif action == "jwt":
+            self.analyze.jwt(term)
+        elif action == "base64":
+            self.analyze.decode(term, "base64")
 
     def _pin_current_folder(self) -> None:
         """Den aktuell im Baum gewählten Ordner (bzw. den angezeigten Wurzelordner) an den Schnellzugriff heften."""
@@ -3307,6 +3478,28 @@ class MainWindow(QMainWindow):
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum
         self.sidebar.tree.new_menu_builder = self._build_new_menu        # „Neue Datei nach Typ" im Baum-Kontextmenü
+        for _aid, _atitle in (("detect", "Analysieren: Typ erkennen"), ("hashinfo", "Analysieren: Hash-Info"),
+                              ("base64", "Analysieren: Base64 dekodieren"), ("jwt", "Analysieren: JWT zerlegen"),
+                              ("timestamp", "Analysieren: Zeitstempel umrechnen"),
+                              ("number", "Analysieren: Zahl in Basen")):
+            self.registry.add(f"analyze:{_aid}", _atitle, lambda _c=False, a=_aid: self._analyze_selection(a),
+                              category="Analysieren",
+                              keywords="analyse erkennen markierung hash base64 jwt zeitstempel zahl ip port")
+        self.registry.add("format:edit", "Formatiert bearbeiten (WYSIWYG) …",
+                          lambda: self.edit_markdown_formatted(), category="Bearbeiten",
+                          keywords="formatiert wysiwyg markdown fett kursiv rich text vorlage bearbeiten")
+        self.registry.add("fragebogen:new", "Fragebogen ausfüllen …", lambda: self.start_questionnaire(),
+                          category="Datei", keywords="fragebogen formular assistent berichtsheft systemcheck "
+                                                     "sicherheit check ausbildungsnachweis wizard")
+        self.registry.add("berichtsheft:ics", "Berichtsheft aus Kalender (.ics) …",
+                          lambda: self.start_berichtsheft_from_ics(), category="Datei",
+                          keywords="berichtsheft ausbildungsnachweis kalender ics outlook termine woche import")
+
+        def _format_tree_entry(menu, path: Path) -> None:
+            if path.suffix.lower() in (".md", ".markdown") and not fileops.is_encrypted_path(path):
+                menu.addAction(icon("square-pen"), "Formatiert bearbeiten …",
+                               lambda: self.edit_markdown_formatted(path))
+        self.sidebar.tree.menu_providers.append(_format_tree_entry)
         self.registry.add("export:pdf", "Exportieren: als PDF …", lambda: self.export_current("pdf"),
                           category="Datei", keywords="export pdf drucken bericht ausgeben")
         self.registry.add("export:html", "Exportieren: als HTML …", lambda: self.export_current("html"),

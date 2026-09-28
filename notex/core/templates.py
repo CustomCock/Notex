@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
-TEMPLATE_SUFFIXES = (".md", ".txt", ".yar", ".yara")
+TEMPLATE_SUFFIXES = (".md", ".txt", ".yar", ".yara", ".csv")
 _PLACEHOLDER = re.compile(r"\{\{\s*([a-zA-Z]+)\s*([+-]\s*\d+)?\s*(?::([^}]*))?\}\}")
 
 DEFAULT_TEMPLATES: dict[str, str] = {
@@ -75,6 +75,93 @@ LATER_TEMPLATES: dict[str, str] = {
         "Neue Zeile mit aktueller Zeit: Command Palette → „Beweismittel: Übergabe eintragen“.\n\n"
         "| Wann | Von | An | Zweck | Unterschrift |\n|---|---|---|---|---|\n|  |  |  |  |  |\n\n"
         "## Notizen\n\n"
+    ),
+    # --- E-Mail-Vorlagen (O4): erste Zeile = Betreff, ohne Grußformel/Signatur (kommt aus Outlook) ---
+    "E-Mail-Terminbestätigung.md": (
+        "Betreff: Terminbestätigung {{date}}\n\n"
+        "hiermit bestätige ich unseren Termin am §datum um §uhrzeit bei §kunde.\n\n"
+        "Bitte melden Sie sich, falls etwas dazwischenkommt.\n"
+    ),
+    "E-Mail-Terminverschiebung.md": (
+        "Betreff: Terminverschiebung\n\n"
+        "leider muss ich unseren Termin verschieben. Passt Ihnen stattdessen §datum um §uhrzeit?\n\n"
+        "Alternativ nennen Sie mir gern zwei Zeitfenster.\n"
+    ),
+    "E-Mail-Störung-Rückfrage.md": (
+        "Betreff: Rückfrage zur gemeldeten Störung\n\n"
+        "danke für Ihre Meldung. Für die Eingrenzung brauche ich noch ein paar Angaben:\n\n"
+        "- Seit wann tritt das Problem auf?\n- Welche Geräte/Benutzer sind betroffen?\n"
+        "- Gab es kürzlich Änderungen (Updates, neue Hardware)?\n- Genaue Fehlermeldung?\n"
+    ),
+    "E-Mail-Ticket-Eingang.md": (
+        "Betreff: Ihr Anliegen ist eingegangen (Ticket §ticket)\n\n"
+        "Ihre Anfrage haben wir unter der Nummer §ticket aufgenommen und kümmern uns darum.\n"
+        "Sie erhalten eine Rückmeldung, sobald es Neuigkeiten gibt.\n"
+    ),
+    "E-Mail-Wartungsankündigung.md": (
+        "Betreff: Geplante Wartung am §datum\n\n"
+        "am §datum führen wir zwischen §uhrzeit und §uhrzeit_ende Wartungsarbeiten durch.\n"
+        "In dieser Zeit kann §dienst zeitweise nicht erreichbar sein. Wir halten die Einschränkung so kurz wie möglich.\n"
+    ),
+    "E-Mail-Abschlussmeldung.md": (
+        "Betreff: Erledigt – §betreff\n\n"
+        "die gemeldete Sache ist erledigt. Kurz zusammengefasst:\n\n"
+        "- Ursache: \n- Maßnahme: \n- Status: abgeschlossen\n\n"
+        "Bitte prüfen Sie kurz, ob bei Ihnen alles wie erwartet funktioniert.\n"
+    ),
+    "E-Mail-Passwort-zurückgesetzt.md": (
+        "Betreff: Passwort zurückgesetzt\n\n"
+        "Ihr Passwort für §konto wurde zurückgesetzt. Aus Sicherheitsgründen wird das neue Passwort NICHT per "
+        "E-Mail versendet – Sie erhalten es über den vereinbarten sicheren Weg und ändern es bitte bei der ersten "
+        "Anmeldung.\n"
+    ),
+    "E-Mail-Angebotsanfrage.md": (
+        "Betreff: Angebotsanfrage §thema\n\n"
+        "für §thema hätten wir gern ein Angebot. Eckdaten:\n\n"
+        "- Anzahl/Umfang: \n- Gewünschter Zeitraum: \n- Besonderheiten: \n\n"
+        "Bitte nennen Sie uns Preis, Lieferzeit und Konditionen.\n"
+    ),
+    "E-Mail-Nachfassen.md": (
+        "Betreff: Nachfrage zu §betreff\n\n"
+        "ich komme kurz auf meine Nachricht vom §datum zurück. Konnten Sie schon einen Blick darauf werfen?\n"
+        "Für Rückfragen stehe ich gern zur Verfügung.\n"
+    ),
+    "E-Mail-Phishing-Info.md": (
+        "Betreff: Vorsicht: verdächtige E-Mails im Umlauf\n\n"
+        "aktuell sind gefälschte E-Mails im Umlauf. Bitte:\n\n"
+        "- keine Links oder Anhänge aus unerwarteten Mails öffnen\n"
+        "- keine Zugangsdaten eingeben\n- im Zweifel kurz bei der IT nachfragen\n\n"
+        "Verdächtige Mails bitte weiterleiten und dann löschen.\n"
+    ),
+    "E-Mail-Urlaubsübergabe.md": (
+        "Betreff: Vertretung während meiner Abwesenheit\n\n"
+        "vom §von bis §bis bin ich nicht erreichbar. In dringenden Fällen wenden Sie sich bitte an §vertretung.\n\n"
+        "Offene Punkte:\n\n- \n- \n"
+    ),
+    # --- Tabellen-Vorlagen (O5): CSV bzw. Markdown; KEINE Passwortspalten ---
+    "Tabelle-IP-Adressliste.csv": "Name,IP,MAC,Gerätetyp,Standort,Notiz\n",
+    "Tabelle-Hardware-Inventar.csv": "Gerät,Hersteller,Modell,Seriennummer,Standort,Kaufdatum,Garantie bis,Notiz\n",
+    "Tabelle-Softwarelizenzen.csv": "Software,Version,Lizenztyp,Anzahl,Ablauf,Zugeordnet an,Notiz\n",
+    "Tabelle-Wartungsplan.csv": "Aufgabe,Intervall,Zuständig,Zuletzt,Nächste Fälligkeit,Status\n",
+    "Tabelle-Backup-Protokoll.csv": "Datum,System,Umfang,Ergebnis,Dauer,Wiederherstellung getestet,Notiz\n",
+    "Tabelle-Change-Log.csv": "Datum,Was geändert,Grund,Durchgeführt von,Zurückrollbar,Notiz\n",
+    "Tabelle-VoIP-Nebenstellen.csv": "Nebenstelle,Name,Abteilung,Gerät,MAC,Notiz\n",
+    "Tabelle-Patchfeld.csv": "Dose,Patchfeld-Port,Switch,Switch-Port,VLAN,Raum,Notiz\n",
+    "Tabelle-Kontakte.csv": "Name,Firma,Rolle,Telefon,E-Mail,Notiz\n",
+    "Tabelle-Zeiterfassung.csv": "Datum,Von,Bis,Pause,Tätigkeit,Projekt\n",
+    "Tabelle-Benutzer-Zugänge.md": (
+        "# Benutzer & Zugänge\n\n"
+        "> Hinweis: **Keine Passwörter hier eintragen.** Passwörter gehören in einen Passwortmanager.\n\n"
+        "| Benutzer | Konto/Login | System | Rolle/Rechte | MFA | Aktiv seit | Notiz |\n"
+        "|---|---|---|---|---|---|---|\n|  |  |  |  |  |  |  |\n"
+    ),
+    "Tabelle-Lernplan.md": (
+        "# Lernplan {{date:%Y}}\n\n"
+        "| Woche | Thema | Ziel | Ressourcen | Status |\n|---|---|---|---|---|\n| {{week}} | {{cursor}} |  |  | offen |\n"
+    ),
+    "Tabelle-Aufgabenliste.md": (
+        "# Aufgaben\n\n| Aufgabe | Priorität | Fällig | Status | Notiz |\n|---|---|---|---|---|\n"
+        "| {{cursor}} | mittel | {{date+7}} | offen |  |\n"
     ),
 }
 DEFAULT_TEMPLATES.update(LATER_TEMPLATES)

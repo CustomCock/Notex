@@ -81,9 +81,9 @@ class SettingsPage(QWidget):
 
 class SettingsDialog(QDialog):
     CATEGORIES = ["Darstellung", "Blatt", "Schrift", "Editor", "Rechtschreibung", "Nachschlagen", "Module", "Variablen",
-                  "System", "Tastenkürzel"]
+                  "Analyse", "System", "Tastenkürzel"]
     CATEGORY_ICONS = ["palette", "file-text", "type", "text-cursor-input", "spell-check", "book-open", "blocks",
-                      "variable", "sliders-horizontal", "keyboard"]
+                      "variable", "scan-text", "sliders-horizontal", "keyboard"]
 
     def __init__(self, window, store: ThemeStore) -> None:
         super().__init__(window)
@@ -114,6 +114,7 @@ class SettingsDialog(QDialog):
         self.pages = QStackedWidget()
         for builder in (self._build_appearance, self._build_paper, self._build_font, self._build_editor,
                         self._build_spelling, self._build_lookup, self._build_modules, self._build_variables,
+                        self._build_analysis,
                         self._build_system,
                         self._build_shortcuts):
             page = builder()
@@ -525,6 +526,22 @@ class SettingsDialog(QDialog):
         else:
             page.section("Rechtschreibung")
             page.note("Noch nicht verfügbar.")
+        return page
+
+    def _build_analysis(self) -> SettingsPage:
+        page = SettingsPage()
+        cfg = self.config.setdefault("analysis", {})
+        page.section("Analyse per Rechtsklick")
+        online = QCheckBox("Online-Hash-Lookup erlauben (sendet den markierten Hash an einen Dienst)")
+        online.setChecked(bool(cfg.get("hash_online", False)))
+        online.toggled.connect(lambda on: cfg.__setitem__("hash_online", on))
+        page.row("", online)
+        page.note("Ein Hash ist eine Einwegfunktion, keine Verschlüsselung – er wird nicht „entschlüsselt“, sondern "
+                  "höchstens in einer öffentlichen Datenbank nachgeschlagen. Der Lookup deckt nur ungesalzene Hashes "
+                  "ab (MD5 über die Nitrxgen-Datenbank); gesalzene Formate (bcrypt/argon2/sha512crypt) sind sinnlos "
+                  "abzufragen. Vor dem ersten Senden fragt Notex nach. Aus verschlüsselten Notizen (.ntx) ist der "
+                  "Online-Lookup gesperrt. Offline-Cracking mit Wortlisten ist bewusst NICHT enthalten – dafür gibt "
+                  "es eigene Werkzeuge wie hashcat oder John the Ripper.")
         return page
 
     def _build_lookup(self) -> SettingsPage:

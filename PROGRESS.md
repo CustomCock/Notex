@@ -38,6 +38,9 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.12.0 | Block K: Log-Auswertung, PCAP | fertig, Tests grün, lokal getaggt, kein Release |
 | 1.12.1 | Block L: Fehlerbehebung (Scanner, Encoding-Menü, JPEG-Metadaten, PCAP-Auswertung) | fertig, Tests grün, lokal getaggt |
 | 1.13.0 | Block M: Werkzeuge-Menü, Explorer-Orte, Neu nach Typ, App-Icon, PDF/HTML-Export, allgemeine Log-Auswertung | fertig, Tests grün, lokal getaggt |
+| 1.14.0 | Block Q: Analyse per Rechtsklick (Typ-Erkennung, Karte, Netz-/Hash-/Umwandeln-Aktionen) | fertig, Tests grün, lokal getaggt |
+| 1.15.0 | Block N: Geräte-Scanner (Advanced-IP-Scanner-artig), OUI-Hersteller, NetBIOS, Host-Aktionen, Export | fertig, Tests grün, lokal getaggt |
+| 1.16.0 | Block O: WYSIWYG-Markdown, Fragebogen-Engine + Assistent, Berichtsheft (ICS), Systemcheck, Sicherheits-Check, E-Mail-/Tabellen-Vorlagen | fertig, Tests grün, lokal getaggt |
 
 ## Erledigt
 
@@ -386,6 +389,72 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Neue Qt-freie Tests: `test_tools`, `test_places`, `test_newfile`, `test_export`, `test_loggeneric` und Ergänzungen
   in `test_logauth`. Keine neuen Abhängigkeiten (QtPdf war ab Block F im Build). Alle Tests grün (offscreen).
 
+### 1.14.0 – Block Q
+- Q1 Erkennung: `core/detect.py` (Qt-frei) – `analyze(text)` liefert alle plausiblen Typen mit Konfidenz
+  (IPv4/IPv6/CIDR/MAC/Domain/URL/E-Mail/Port, Hashes nach Länge+Präfix, Base64/Base32/Hex-Blob, JWT, Unix-Zeit,
+  ISO-Datum, Zahl, Hex-Farbe, CVE, ATT&CK, User-Agent). Bewusst konservativ (Satz != Base64, Jahr != Port,
+  gültige Oktette). `token_at` für „nichts markiert". 16 Tests.
+- Q2 Menü: `ui/analyze_actions.py::AnalyzeController.menu_provider` hängt die Gruppe „Analysieren" ins Editor-
+  Kontextmenü (über `_editor_menu_providers`), nur passende Aktionen, modul-gated (sonst „… – Modul aktivieren"),
+  „Erkennen …" + Palette-Befehle `analyze:*`.
+- Q3 Netzwerk: DNS (socket A/AAAA/PTR – MX/TXT bräuchten eine DNS-Lib, nicht im Build), Ping/Ports über `core/scan`,
+  Port-Info über `core/ports`; RDAP/IP-Übersicht/Scanner rufen die vorhandenen Fenster. Alles im Worker-Thread.
+- Q4 Hash-Info: `core/hashlookup.py` (Qt-frei, Netz injizierbar) – **Nitrxgen MD5-Datenbank** (frei, ohne Schlüssel).
+  **Entscheidung:** nur MD5 hat einen freien, schlüssellosen Klartext-Dienst → SHA-1/256/NTLM-Knopf deaktiviert mit
+  Begründung; gesalzene Formate ebenso. Datenschutz-Rückfrage, Einstellung `analysis.hash_online` (Settings-Seite
+  „Analyse"), .ntx sperrt den Lookup. „Hash dieses Worts bilden" lokal (NTLM = MD4(UTF-16LE), eigenes MD4 in
+  `core/convert.py`, da OpenSSL 3 oft kein md4 hat). Hash klar von Verschlüsselung getrennt (UI + Doku). Keine
+  Wortlisten/Rainbow-Tables (Begründung in der Doku).
+- Q5 Umwandeln: `core/convert.py` (Qt-frei) – Base64/Base32/Hex/URL, JWT (Signatur ungeprüft), Zeitstempel, Zahl in
+  Basen, Hex-Farbe, User-Agent. Ergebnisse in der Karte (`ui/analysis_card.py`, Popover, wiederverwendbar), „Als Notiz
+  einfügen".
+- Q6 Doku: README-Abschnitt „Analyse per Rechtsklick" (Tabelle Typ→Aktionen, Hash≠Verschlüsselung), CHANGELOG,
+  THIRD_PARTY_LICENSES (Online-Dienste inkl. Nitrxgen). Screenshot 67.
+- Neue Qt-freie Tests: `test_detect` (16), `test_convert` (10), `test_hashlookup` (9). Keine neuen Abhängigkeiten.
+
+### 1.15.0 – Block N
+- N1 Erkennung (Qt-frei): `core/oui.py` – MAC→Hersteller aus den öffentlichen **IEEE-MAC-Blöcken**
+  (`assets/oui/oui.tsv.gz`, 38.930 Einträge; `tools/update_oui.py` lädt bevorzugt die IEEE-CSV, sonst aus einem
+  erreichbaren Spiegel NUR die Fakten – **nicht** Wiresharks GPL-`manuf`). Erkennt lokal verwaltete/Multicast-MACs.
+  `core/netdetect.py` – eigene Subnetze aus `ip addr`/`ipconfig`, Ausschlusslisten, NetBIOS-Namensabfrage (NBSTAT
+  Bau+Parse), Wake-on-LAN-Paket. Tests: `test_oui` (6), `test_netdetect` (7).
+- N2/N3 UI: `ui/network_scanner.py::NetworkScannerDialog` – Live-Tabelle (Status/Name/IP/MAC/Hersteller/Kommentar/
+  Dienste/ms), Profile Schnell/Standard/Gründlich, Ausschluss, Filter, Spalten ein-/ausblendbar + Breiten gespeichert.
+  Anreicherung im Worker (ARP-MAC, OUI, NetBIOS, Antwortzeit per TCP-Connect). Host-Aktionen: Browser/RDP/Freigabe/
+  SSH/Ping/Traceroute/Ports vertiefen/RDAP/Wake-on-LAN/Remote-Shutdown+Neustart (Windows, Bestätigung)/Kommentar/
+  Favoriten/Kopieren/an IP-Übersicht. Export CSV/JSON/Markdown/HTML/PDF. `scan:open` = Geräte-Scanner,
+  `scan:ports` = alter Port-Scan. Reverse-DNS/Ping/Ports teilen die Logik mit Block Q (core/scan).
+- **Entscheidung OUI-Quelle:** IEEE-Registry (frei, reine Fakten – wie IANA-Ports). standards-oui.ieee.org war in der
+  Umgebung gesperrt; Fakten aus einem Spiegel extrahiert. Wiresharks `manuf` (GPL) bewusst gemieden.
+- **Zurückgestellt/vereinfacht (ehrlich):** mDNS/LLMNR-Namensabfrage und SMB-Freigaben-Auflistung sind noch nicht
+  umgesetzt (nur Reverse-DNS + NetBIOS; Freigaben werden über den Datei-Manager geöffnet, nicht aufgelistet);
+  „unbekannte Hersteller ausblenden" und feine Geschwindigkeits-Regler (Timeout/Retries) fehlen noch – Profile decken
+  das Wesentliche ab.
+- Screenshot 68 (Geräte-Scanner). Keine neuen Python-Abhängigkeiten (nur Standardbibliothek + vorhandene Engine).
+
+### 1.16.0 – Block O
+- O0 WYSIWYG: `core/richmd.py` (Qt-frei) – Markdown ↔ Blockmodell mit stabilem, idempotentem Roundtrip (Überschriften,
+  Absätze, Listen/Aufgaben, Zitate, Codeblöcke, Tabellen, Trennlinien; Inline fett/kursiv/durchgestrichen/Code/Link);
+  Variablen bleiben erhalten. `ui/rich_markdown.py`: RichMarkdownEditor (QTextEdit) + Symbolleiste/Kürzel +
+  „Formatiert | Quelltext"-Umschalter; RichMarkdownDialog + Befehl „Formatiert bearbeiten" (nur .md, nicht .ntx).
+  **Entscheidung:** eigenes Blockmodell statt Qt-`toHtml`-Roundtrip (deterministisch, Qt-frei testbar). Tabellen/Code
+  werden formatiert gezeigt, Feinarbeit über Quelltext.
+- O1 Engine: `core/questionnaire.py` (Qt-frei) – YAML-Fragebögen, Typen, Bedingungen (`when`), Pflicht, Gewichtung,
+  Auswertung (`score`/`score_summary`, Ampel), Ausgabe (`output`-Vorlage `{{id}}` + `§`-Variablen), Antworten im
+  Frontmatter (`parse_answers`). `ui/questionnaire_dialog.py`: Assistent (ein Abschnitt/Seite, Chips, Zwischenstand).
+  Ergebnis → formatierte Notiz, öffnet im WYSIWYG-Editor; bewertete Fragebögen bekommen die Auswertung vorangestellt.
+- O2 Berichtsheft: `berichtsheft.yaml` + **ICS-Import** `core/ics.py` (Qt-frei, RFC 5545, keine neue Abhängigkeit:
+  VEVENT/DTSTART/DTEND/SUMMARY, ganztägig, RRULE DAILY/WEEKLY+INTERVAL/COUNT/UNTIL/BYDAY, EXDATE, CLASS:PRIVATE
+  übersprungen; `berichtsheft_rows` fasst eine ISO-Woche zusammen). Befehl „Berichtsheft aus Kalender (.ics)".
+- O3 Systemcheck: `systemcheck.yaml`. O6 Sicherheits-Check: `sicherheits-check.yaml` mit gewichteten yesno-Fragen +
+  Auswertung (eigene Formulierungen, an DIN SPEC 27076 / BSI IT-Grundschutz angelehnt).
+- O4/O5: E-Mail-Vorlagen (Betreff als erste Zeile, ohne Grußformel/Signatur) und Tabellen-Vorlagen (CSV/Markdown,
+  Benutzerlisten ohne Passwortspalte) in `core/templates.py`; `.csv` als Vorlagen-Endung ergänzt.
+- **Vereinfacht/ehrlich:** der WYSIWYG-Editor ist ein eigenes Fenster (kein neuer Tab-Modus, um den bestehenden Editor
+  nicht zu gefährden); TZID im ICS wird als lokale Zeit behandelt (keine Zonen-DB); der „Frage-Antwort Tag-für-Tag"-
+  Modus des Berichtshefts ist über Tabelle + Vorschlags-Chips + ICS-Vorbefüllung abgedeckt, kein eigener Dialog.
+- Neue Qt-freie Tests: `test_richmd` (11), `test_questionnaire` (10), `test_ics` (6). Keine neuen Python-Abhängigkeiten.
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -451,12 +520,14 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Blöcke F–K und L abgeschlossen; Block M (1.13.0) fertig.** Aus dem Plan „L–P“ stehen noch aus:
-- **N (1.14.0)** eigener IP-/Netzwerk-Scanner als Ersatz für „Advanced IP Scanner“ (OUI-Liste NICHT aus Wiresharks manuf/GPL).
-- **O (1.15.0)** Fragebögen/Vorlagen (passwortlose Spalten, keine Zugangsdaten erfassen).
-- **P (1.16.0)** Inventar/Docusnap-artig (nie Passwörter/Schlüssel/Tokens erfassen).
+**Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
+- **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.
+- **N (1.15.0)** Geräte-Scanner als Ersatz für „Advanced IP Scanner“ – **erledigt**.
+- **O (1.16.0)** WYSIWYG-Markdown + Fragebögen/Vorlagen – **erledigt**.
 
-Nach jedem Block anhalten und zusammenfassen; erst bei „weiter“ fortfahren.
+- **P (Inventar/Docusnap-artig) ist ZURÜCKGESTELLT** (Entscheidung Besitzer 27.09.2026): vorerst NICHT bauen.
+
+Keine offenen Blöcke auf Entwicklerseite – auf neue Wünsche des Besitzers warten.
 
 Offen beim Besitzer (unverändert):
 1. Release: Branch nach `main` mergen und taggen – der Workflow baut dann Windows-ZIP und Linux-tar.gz.

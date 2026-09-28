@@ -2,6 +2,70 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.16.0] – 2026-09-28
+
+### Hinzugefügt
+- **Formatierte Bearbeitung (WYSIWYG-Markdown)** (Block O0): `**fett**` wird als **fett** angezeigt und bearbeitet –
+  keine Sternchen mehr im Blick. Symbolleiste und Kürzel (Ctrl+B/I, Überschriften, Listen, Aufgaben, Zitat,
+  Trennlinie, Link) formatieren; Umschalter **Formatiert | Quelltext (Markdown)**. Unter der Haube bleibt Markdown
+  (verlustarmer Roundtrip). Befehl „Formatiert bearbeiten“ (Palette + Baum-Kontextmenü) für .md-Notizen; Variablen
+  (§name) bleiben erhalten. Tabellen/Codeblöcke werden formatiert gezeigt, Feinarbeit über die Quelltext-Ansicht.
+- **Fragebögen/Formulare** (Block O1): Fragebogen-Assistent (ein Abschnitt pro Seite, Fortschritt, Zurück/Weiter,
+  Vorschlags-Chips, Zwischenstand gemerkt) füllt YAML-Fragebögen aus `templates/fragebogen/` aus. Fragetypen
+  Freitext/Ja-Nein/Auswahl/Mehrfachauswahl/Zahl/Datum/Uhrzeit/Tabelle, Bedingungen, Pflichtfelder, Gewichtung.
+  Das Ergebnis wird als formatierte Notiz gespeichert (Antworten im Frontmatter, erneut ausfüllbar). Eigene
+  Fragebögen ohne Programmieren möglich.
+- **Mitgelieferte Fragebögen**: **Ausbildungsnachweis/Berichtsheft** (O2) – wahlweise **aus einem Kalender-Export
+  (.ics) vorbefüllt** (RFC 5545, Serien/EXDATE, ohne Zusatzabhängigkeit); **Systemcheck beim Kunden** (O3);
+  **Sicherheits-Check** für kleine Unternehmen (O6) mit **Auswertung** (Punkte je Bereich, Ampel, Gesamtbewertung;
+  eigene Formulierungen, inhaltlich an DIN SPEC 27076 / BSI IT-Grundschutz angelehnt).
+- **E-Mail-Vorlagen** (O4): Terminbestätigung/-verschiebung, Störungs-Rückfrage, Ticket-Eingang, Wartungsankündigung,
+  Abschlussmeldung, Passwort zurückgesetzt (ohne Passwort im Text), Angebotsanfrage, Nachfassen, Phishing-Info,
+  Urlaubsübergabe – Betreff als erste Zeile, ohne Grußformel/Signatur.
+- **Tabellen-Vorlagen** (O5): IP-Adressliste, Hardware-Inventar, Softwarelizenzen, Wartungsplan, Backup-Protokoll,
+  Change-Log, VoIP-Nebenstellen, Patchfeld, Kontakte, Zeiterfassung, Lernplan, Aufgabenliste sowie Benutzer/Zugänge
+  **ohne Passwortspalte** (Hinweis: Passwortmanager). CSV zählt jetzt als Vorlagen-Endung.
+
+## [1.15.0] – 2026-09-28
+
+### Hinzugefügt
+- **Geräte-Scanner** (Block N, wie „Advanced IP Scanner", `Ctrl+Shift+Alt+P`): findet Geräte im eigenen Netz und
+  zeigt sie in einer Live-Tabelle mit **Status, Name, IP, MAC, Hersteller, Kommentar, Dienste-Chips und Antwortzeit**.
+  Das eigene Subnetz wird automatisch erkannt (mehrere Adapter möglich), mit Ausschlussliste und Profilen
+  (Schnell/Standard/Gründlich). Host-Erkennung kombiniert Ping/TCP-Anklopfen und liest die ARP-Tabelle für MACs;
+  Namen aus Reverse-DNS und **NetBIOS**; **Hersteller aus der Offline-OUI-Liste** (öffentliche IEEE-Daten, per
+  `tools/update_oui.py` aktualisierbar – bewusst nicht Wiresharks GPL-`manuf`), lokal verwaltete MACs gekennzeichnet.
+- **Host-Aktionen** (Kontextmenü/Doppelklick): im Browser öffnen, Remotedesktop (RDP), Freigaben öffnen (`\\host`),
+  SSH im Terminal, Ping, Traceroute, Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-
+  Herunterfahren/Neustart (Windows, mit deutlicher Bestätigung), Kommentar, Favoriten, IP/MAC/Name kopieren, an die
+  IP-Übersicht übergeben. Spalten ein-/ausblendbar, sortierbar, Breiten gespeichert; Live-Filter.
+- **Export** des Scans als CSV, JSON, Markdown, HTML und PDF. Der bisherige Port-Scan bleibt als „Port-Scan" in der
+  Command Palette erhalten (`scan:ports`).
+
+### Geändert
+- `Ctrl+Shift+Alt+P` / „Netzwerk-Scanner" öffnet jetzt den Geräte-Scanner (vorher den reinen Port-Scan).
+
+## [1.14.0] – 2026-09-27
+
+### Hinzugefügt
+- **Analyse per Rechtsklick** (Block Q): Text markieren → Kontextmenü **Analysieren**. Notex erkennt den Typ
+  (IPv4/IPv6/CIDR/MAC, Domain/URL/E-Mail, Port, Hash, Base64/Base32/Hex, JWT, Unix-Zeit, ISO-Datum, Zahl, Hex-Farbe,
+  CVE, ATT&CK-ID, User-Agent – Mehrdeutigkeit erlaubt) und bietet passende Aktionen; das Ergebnis erscheint in einer
+  kompakten Karte neben der Markierung, nicht in großen Dialogen. Dieselben Aktionen gibt es in der Command Palette.
+  Nicht passende oder abgeschaltete Module erscheinen als „… – Modul aktivieren".
+- **Netzwerk-Aktionen** auf markiertem Text: DNS auflösen (A/AAAA/PTR), Ping, gängige Ports prüfen (Modul-frei über
+  die Scan-Engine), Port nachschlagen, RDAP/ASN, „In IP-Übersicht/Netzwerk-Scanner öffnen" – alles im Hintergrund,
+  private/reservierte Adressen bei RDAP abgefangen.
+- **Hash-Info**: erkannte Hash-Typen mit Konfidenz (Länge/Zeichensatz/Präfix erklärt), ein Button „Online-Lookup"
+  mit Ergebniszeile darunter. Nur ungesalzene Hashes (MD5 über die Nitrxgen-Datenbank); gesalzene Formate
+  (bcrypt/argon2/sha512crypt) sind deaktiviert mit Begründung. Datenschutz-Rückfrage vor dem ersten Senden,
+  Einstellung unter „Analyse"; aus verschlüsselten Notizen (.ntx) gesperrt. Zusätzlich „Hash dieses Worts bilden"
+  (MD5/SHA-1/SHA-256/NTLM, lokal). **Ein Hash ist eine Einwegfunktion, keine Verschlüsselung** – Notex „entschlüsselt"
+  nichts und bringt bewusst keine Wortlisten/Rainbow-Tables mit (dafür gibt es hashcat/John the Ripper).
+- **Umwandeln** in der Karte: Base64/Base32/Hex/URL dekodieren, JWT zerlegen (Signatur ungeprüft), Unix-Zeit ↔ Datum,
+  Zahl in Basen + Bits, Hex-Farbvorschau, User-Agent zerlegen, CVE im Browser nachschlagen. Jedes Ergebnis lässt sich
+  „Als Notiz einfügen".
+
 ## [1.13.0] – 2026-09-27
 
 ### Hinzugefügt
