@@ -2168,6 +2168,44 @@ class MainWindow(QMainWindow):
         self._format_dialogs.append(dialog)
         dialog.show()
 
+    def start_berichtsheft_from_ics(self) -> None:
+        """Ausbildungsnachweis aus einem Kalender-Export (.ics) für eine Woche vorbefüllen."""
+        from datetime import date
+        from PySide6.QtWidgets import QFileDialog, QInputDialog
+        from notex.core import ics, questionnaire as qn
+        from notex.ui.questionnaire_dialog import QuestionnaireDialog
+        path, _ = QFileDialog.getOpenFileName(self, "Kalender wählen (.ics)", str(self.root),
+                                              "iCalendar (*.ics);;Alle Dateien (*)")
+        if not path:
+            return
+        today = date.today()
+        year, ok = QInputDialog.getInt(self, "Woche", "Jahr:", today.year, 2000, 2100)
+        if not ok:
+            return
+        week, ok = QInputDialog.getInt(self, "Woche", "Kalenderwoche:", today.isocalendar().week, 1, 53)
+        if not ok:
+            return
+        try:
+            text = Path(path).read_text(encoding="utf-8", errors="replace")
+            rows = ics.berichtsheft_rows(text, year, week)
+        except Exception as error:                       # noqa: BLE001
+            dialogs.warn(self, "Kalender-Import", str(error))
+            return
+        try:
+            spec = (self.questionnaires_folder() / "berichtsheft.yaml").read_text(encoding="utf-8")
+            questionnaire = qn.load_yaml(spec)
+        except OSError as error:
+            dialogs.warn(self, "Berichtsheft", str(error))
+            return
+        answers = {"kw": str(week), "taetigkeiten": rows}
+        if not rows:
+            self.toast.show_message("Keine Termine in dieser Woche gefunden", "info")
+        dialog = QuestionnaireDialog(self, questionnaire, answers)
+        dialog.completed.connect(lambda a, q=questionnaire: self._questionnaire_done(q, a))
+        self._format_dialogs = getattr(self, "_format_dialogs", [])
+        self._format_dialogs.append(dialog)
+        dialog.show()
+
     def _questionnaire_done(self, questionnaire, answers: dict) -> None:
         from notex.core import questionnaire as qn
         values = self._export_values()
@@ -3453,6 +3491,9 @@ class MainWindow(QMainWindow):
         self.registry.add("fragebogen:new", "Fragebogen ausfüllen …", lambda: self.start_questionnaire(),
                           category="Datei", keywords="fragebogen formular assistent berichtsheft systemcheck "
                                                      "sicherheit check ausbildungsnachweis wizard")
+        self.registry.add("berichtsheft:ics", "Berichtsheft aus Kalender (.ics) …",
+                          lambda: self.start_berichtsheft_from_ics(), category="Datei",
+                          keywords="berichtsheft ausbildungsnachweis kalender ics outlook termine woche import")
 
         def _format_tree_entry(menu, path: Path) -> None:
             if path.suffix.lower() in (".md", ".markdown") and not fileops.is_encrypted_path(path):
