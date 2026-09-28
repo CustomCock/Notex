@@ -1678,22 +1678,32 @@ class MainWindow(QMainWindow):
     def _activate_scanner(self):
         """Scanner nur auf ausdrücklichen Start; öffentliche Ziele verlangen eine Bestätigung."""
         action = self._module_action("Netzwerk-Scanner …", "Ctrl+Shift+Alt+P", lambda: self.open_scanner())
-        self.registry.add("scan:open", "Netzwerk-Scanner (Hosts und offene Ports im eigenen Netz)",
+        self.registry.add("scan:open", "Netzwerk-Scanner (Geräte im eigenen Netz)",
                           lambda: self.open_scanner(), category="Netzwerk", shortcut="Ctrl+Shift+Alt+P",
-                          keywords="scan scanner netzwerk port host offen tcp nmap discovery")
+                          keywords="scan scanner netzwerk geräte host mac hersteller advanced ip discovery")
+        self.registry.add("scan:ports", "Port-Scan (offene Ports eines Ziels)",
+                          lambda: self.open_port_scanner(), category="Netzwerk",
+                          keywords="scan port offen tcp banner nmap ziel")
         dialogs_open: list = self._analysis_dialogs.setdefault("scanner", [])
 
         def undo() -> None:
             self._drop_actions([action])
             self.registry.remove("scan:open")
+            self.registry.remove("scan:ports")
             for dialog in list(dialogs_open):
                 dialog.close()
             dialogs_open.clear()
         return undo
 
     def open_scanner(self) -> None:
+        from notex.ui.network_scanner import NetworkScannerDialog
+        self._open_scanner_dialog(NetworkScannerDialog(self))
+
+    def open_port_scanner(self) -> None:
         from notex.ui.scan_dialog import ScanDialog
-        dialog = ScanDialog(self)
+        self._open_scanner_dialog(ScanDialog(self))
+
+    def _open_scanner_dialog(self, dialog) -> None:
         self._analysis_dialogs.setdefault("scanner", []).append(dialog)
         dialog.finished.connect(lambda _r, d=dialog: self._analysis_dialogs.get("scanner", []).remove(d)
                                 if d in self._analysis_dialogs.get("scanner", []) else None)

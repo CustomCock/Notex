@@ -77,3 +77,13 @@ def test_parse_nbstat_response():
     data = _fake_nbstat_response("WORKSTATION1")
     assert netdetect.parse_nbstat_response(data) == "WORKSTATION1"
     assert netdetect.parse_nbstat_response(b"\x00" * 10) is None
+
+
+def test_build_wol_packet():
+    packet = netdetect.build_wol_packet("00:1A:2B:3C:4D:5E")
+    assert len(packet) == 6 + 16 * 6
+    assert packet[:6] == b"\xff" * 6
+    assert packet[6:12] == bytes.fromhex("001A2B3C4D5E")
+    import pytest
+    with pytest.raises(ValueError):
+        netdetect.build_wol_packet("keine mac")

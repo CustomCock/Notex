@@ -177,3 +177,24 @@ def parse_nbstat_response(data: bytes) -> str | None:
     except (IndexError, ValueError):
         return None
     return None
+
+
+# ---- Wake-on-LAN ----------------------------------------------------------------------------------
+
+def build_wol_packet(mac: str) -> bytes:
+    """Magic Packet: 6× 0xFF gefolgt von 16× der 6-Byte-MAC."""
+    from notex.core.oui import normalize
+    norm = normalize(mac)
+    if not norm:
+        raise ValueError("Keine gültige MAC-Adresse")
+    mac_bytes = bytes.fromhex(norm)
+    return b"\xff" * 6 + mac_bytes * 16
+
+
+def send_wol(mac: str, broadcast: str = "255.255.255.255", port: int = 9) -> None:
+    """Magic Packet per UDP-Broadcast senden (weckt den Rechner, falls WoL aktiv ist)."""
+    import socket
+    packet = build_wol_packet(mac)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(packet, (broadcast, port))
