@@ -43,8 +43,15 @@ def test_parse_ipconfig():
 
 
 def test_local_adapters_uses_runner():
-    adapters = netdetect.local_adapters(runner=lambda cmd: IP_ADDR if cmd[0] == "ip" else "")
-    assert any(a.cidr == "192.168.1.0/24" for a in adapters)
+    # Runner liefert je nach Plattform die passende Ausgabe (Linux: `ip`, Windows: `ipconfig`).
+    def runner(cmd):
+        if cmd[0] == "ip":
+            return IP_ADDR
+        if cmd[0] == "ipconfig":
+            return IPCONFIG
+        return ""
+    cidrs = {a.cidr for a in netdetect.local_adapters(runner=runner)}
+    assert "192.168.1.0/24" in cidrs or "192.168.178.0/24" in cidrs
 
 
 def test_parse_exclusions():
