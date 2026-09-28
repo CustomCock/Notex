@@ -2124,6 +2124,21 @@ class MainWindow(QMainWindow):
                 return
             self.toast.show_message(f"HTML exportiert · {Path(out).name}", "check")
 
+    def edit_markdown_formatted(self, path: Path | None = None) -> None:
+        """Eine Markdown-Notiz in der formatierten (WYSIWYG-)Ansicht bearbeiten."""
+        from notex.ui.rich_markdown import RichMarkdownDialog
+        path = path or self._current_file()
+        if path is None or Path(path).suffix.lower() not in (".md", ".markdown"):
+            self.toast.show_message("Nur für Markdown-Notizen (.md)", "info")
+            return
+        if fileops.is_encrypted_path(path):
+            self.toast.show_message("Verschlüsselte Notiz: bitte im normalen Editor bearbeiten", "info")
+            return
+        dialog = RichMarkdownDialog(self, path)
+        self._format_dialogs = getattr(self, "_format_dialogs", [])
+        self._format_dialogs.append(dialog)
+        dialog.show()
+
     def run_command(self, command_id: str) -> None:
         """Einen registrierten Palette-Befehl programmatisch auslösen (z. B. aus der Analyse-Karte)."""
         entry = self.registry.get(command_id)
@@ -3369,6 +3384,15 @@ class MainWindow(QMainWindow):
             self.registry.add(f"analyze:{_aid}", _atitle, lambda _c=False, a=_aid: self._analyze_selection(a),
                               category="Analysieren",
                               keywords="analyse erkennen markierung hash base64 jwt zeitstempel zahl ip port")
+        self.registry.add("format:edit", "Formatiert bearbeiten (WYSIWYG) …",
+                          lambda: self.edit_markdown_formatted(), category="Bearbeiten",
+                          keywords="formatiert wysiwyg markdown fett kursiv rich text vorlage bearbeiten")
+
+        def _format_tree_entry(menu, path: Path) -> None:
+            if path.suffix.lower() in (".md", ".markdown") and not fileops.is_encrypted_path(path):
+                menu.addAction(icon("square-pen"), "Formatiert bearbeiten …",
+                               lambda: self.edit_markdown_formatted(path))
+        self.sidebar.tree.menu_providers.append(_format_tree_entry)
         self.registry.add("export:pdf", "Exportieren: als PDF …", lambda: self.export_current("pdf"),
                           category="Datei", keywords="export pdf drucken bericht ausgeben")
         self.registry.add("export:html", "Exportieren: als HTML …", lambda: self.export_current("html"),
