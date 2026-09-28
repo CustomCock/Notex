@@ -257,6 +257,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._action("Versionsverlauf …", "Ctrl+Shift+Y", self.show_history))
         file_menu.addSeparator()
         file_menu.addAction(self._action("Neue Datei aus Vorlage …", "Ctrl+Shift+T", lambda: self.new_from_template()))
+        file_menu.addAction(self._action("Fragebogen ausfüllen …", None, lambda: self.start_questionnaire()))
         file_menu.addAction(self._action("Neue Woche", "Alt+W", lambda: self.new_week()))
         file_menu.addAction(self._action("Nächste Woche anlegen", None, lambda: self.new_week(next_week=True)))
         file_menu.addAction(self._action("Vorlagen-Ordner öffnen", None, self.open_templates_folder))
@@ -2124,6 +2125,68 @@ class MainWindow(QMainWindow):
                 return
             self.toast.show_message(f"HTML exportiert · {Path(out).name}", "check")
 
+    def questionnaires_folder(self) -> Path:
+        """Ordner mit Fragebögen (templates/fragebogen); mitgelieferte werden einmalig geschrieben."""
+        from notex.core.questionnaires_builtin import BUILTIN
+        folder = app_root() / "templates" / "fragebogen"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            installed = self.config.setdefault("templates", {}).setdefault("fragebogen_installed", [])
+            for name, text in BUILTIN.items():
+                if name not in installed:
+                    target = folder / name
+                    if not target.exists():
+                        target.write_text(text, encoding="utf-8")
+                    installed.append(name)
+        except OSError:
+            pass
+        return folder
+
+    def start_questionnaire(self, path: Path | None = None) -> None:
+        """Einen Fragebogen ausfüllen (Assistent) und das Ergebnis als formatierte Notiz speichern."""
+        from notex.core import questionnaire as qn
+        from notex.ui.questionnaire_dialog import QuestionnaireDialog
+        folder = self.questionnaires_folder()
+        if path is None:
+            files = sorted(folder.glob("*.yaml")) + sorted(folder.glob("*.yml"))
+            if not files:
+                self.toast.show_message("Keine Fragebögen in templates/fragebogen", "info")
+                return
+            names = [p.name for p in files]
+            chosen = dialogs.choose(self, "Fragebogen ausfüllen", "Fragebogen:", names)
+            if chosen is None:
+                return
+            path = folder / chosen
+        try:
+            questionnaire = qn.load_yaml(Path(path).read_text(encoding="utf-8"))
+        except (OSError, Exception) as error:            # noqa: BLE001 – YAML-Fehler dem Nutzer zeigen
+            dialogs.warn(self, "Fragebogen", f"Konnte den Fragebogen nicht laden:\n{error}")
+            return
+        dialog = QuestionnaireDialog(self, questionnaire)
+        dialog.completed.connect(lambda answers, q=questionnaire: self._questionnaire_done(q, answers))
+        self._format_dialogs = getattr(self, "_format_dialogs", [])
+        self._format_dialogs.append(dialog)
+        dialog.show()
+
+    def _questionnaire_done(self, questionnaire, answers: dict) -> None:
+        from notex.core import questionnaire as qn
+        values = self._export_values()
+        result = qn.score(questionnaire, answers)
+        intro = qn.score_summary(result) if result.maximum > 0 else ""    # bewerteter Fragebogen → Auswertung
+        markdown = qn.render_markdown(questionnaire, answers, variables=values, prefix=self._export_prefix(),
+                                      intro=intro)
+        folder = self.sidebar.tree.notes_root
+        from datetime import datetime
+        name = fileops.unique_path(folder, f"{questionnaire.id}-{datetime.now():%Y-%m-%d}", ".md")
+        try:
+            name.write_text(markdown, encoding="utf-8")
+        except OSError as error:
+            dialogs.warn(self, "Fragebogen", str(error))
+            return
+        if self.sidebar.tree.is_notes_root():
+            self.sidebar.tree.select_path(name)
+        self.edit_markdown_formatted(name)
+
     def edit_markdown_formatted(self, path: Path | None = None) -> None:
         """Eine Markdown-Notiz in der formatierten (WYSIWYG-)Ansicht bearbeiten."""
         from notex.ui.rich_markdown import RichMarkdownDialog
@@ -3387,6 +3450,9 @@ class MainWindow(QMainWindow):
         self.registry.add("format:edit", "Formatiert bearbeiten (WYSIWYG) …",
                           lambda: self.edit_markdown_formatted(), category="Bearbeiten",
                           keywords="formatiert wysiwyg markdown fett kursiv rich text vorlage bearbeiten")
+        self.registry.add("fragebogen:new", "Fragebogen ausfüllen …", lambda: self.start_questionnaire(),
+                          category="Datei", keywords="fragebogen formular assistent berichtsheft systemcheck "
+                                                     "sicherheit check ausbildungsnachweis wizard")
 
         def _format_tree_entry(menu, path: Path) -> None:
             if path.suffix.lower() in (".md", ".markdown") and not fileops.is_encrypted_path(path):
