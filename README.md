@@ -660,6 +660,27 @@ TLS nur der SNI-Name). Kaputte Aufzeichnungen werden übersprungen, nicht abgebr
 Modul „Netzwerk-Scanner“ (Standard aus). **Nur für das eigene Netz** – Ziele außerhalb privater Bereiche verlangen
 eine Bestätigung (abschaltbar). Menü Datei → „Netzwerk-Scanner …“, `Ctrl+Shift+Alt+P` oder Palette.
 
+### Geräte-Scanner (wie „Advanced IP Scanner“)
+
+`Ctrl+Shift+Alt+P` öffnet den **Geräte-Scanner**: er erkennt das eigene Subnetz automatisch (mehrere Adapter möglich)
+und listet die gefundenen Geräte mit **Status, Name, IP, MAC, Hersteller, Kommentar, Diensten und Antwortzeit**.
+
+- **Erkennung**: Ping/TCP-Anklopfen für „lebt der Host?“, ARP-Tabelle für die MAC, Reverse-DNS und **NetBIOS** für
+  Namen, **Hersteller aus der Offline-OUI-Liste** (öffentliche IEEE-Daten; lokal verwaltete/zufällige MACs werden als
+  solche gekennzeichnet). Profile **Schnell / Standard / Gründlich**, Ausschlussliste, Live-Filter.
+- **Aktionen je Gerät** (Rechtsklick/Doppelklick): im Browser öffnen, Remotedesktop (RDP), Freigaben (`\\host`), SSH,
+  Ping, Traceroute, Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-Herunterfahren/Neustart
+  (Windows, mit deutlicher Bestätigung), Kommentar, Favoriten, IP/MAC/Name kopieren, an die IP-Übersicht.
+- **Spalten** ein-/ausblendbar (Rechtsklick auf den Kopf), sortierbar, Breiten werden gespeichert.
+- **Export**: CSV, JSON, Markdown, HTML, PDF.
+- Hersteller aktualisieren: `python tools/update_oui.py` (lädt die IEEE-Liste, wenn Netz verfügbar).
+
+![Geräte-Scanner](docs/68-geraete-scanner.png)
+
+### Port-Scan (ein Ziel genau)
+
+Der frühere Port-fokussierte Scan ist als **„Port-Scan“** in der Command Palette (`scan:ports`) erhalten.
+
 - **Ziele**: einzelne IP, Hostname, CIDR (`192.168.1.0/24`), Bereich (`10.0.0.1-10.0.0.50` oder `10.0.0.1-50`),
   Liste – gemischt. Obergrenze mit Warnung (Standard 4096), Rückfrage ab 512 Zielen.
 - **Ports**: Profile Top-100 / Top-1000, eigene Listen (`22,80,443` oder `1-1024`), als **eigenes Profil speicherbar**.
@@ -1036,7 +1057,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+Alt+P | Port nachschlagen (Modul Port-Infos) |
 | Ctrl+Shift+Alt+I | IP-Übersicht (Modul IP-Konflikte) |
 | Ctrl+Alt+R | RDAP / ASN zur Markierung oder zum Wert unter dem Cursor (Modul RDAP/ASN) |
-| Ctrl+Shift+Alt+P | Netzwerk-Scanner (Modul Netzwerk-Scanner) |
+| Ctrl+Shift+Alt+P | Geräte-Scanner: Geräte im eigenen Netz (Name/IP/MAC/Hersteller/Dienste), Modul Netzwerk-Scanner |
 | Ctrl+Shift+Alt+L | Log-Auswertung – beliebige Logs (Stufen/Fehler/Muster) oder Anmelde-Logs/.evtx (Modul Log-Auswertung) |
 | Ctrl+Shift+Alt+K | PCAP-Übersicht (Modul PCAP-Übersicht) |
 | Ctrl+Alt+Z / Ctrl+Shift+Alt+Z | Zur Zeitleiste hinzufügen / Zeitleiste anzeigen (Modul Zeitleiste) |

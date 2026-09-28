@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [1.15.0] – 2026-09-28
+
+### Hinzugefügt
+- **Geräte-Scanner** (Block N, wie „Advanced IP Scanner", `Ctrl+Shift+Alt+P`): findet Geräte im eigenen Netz und
+  zeigt sie in einer Live-Tabelle mit **Status, Name, IP, MAC, Hersteller, Kommentar, Dienste-Chips und Antwortzeit**.
+  Das eigene Subnetz wird automatisch erkannt (mehrere Adapter möglich), mit Ausschlussliste und Profilen
+  (Schnell/Standard/Gründlich). Host-Erkennung kombiniert Ping/TCP-Anklopfen und liest die ARP-Tabelle für MACs;
+  Namen aus Reverse-DNS und **NetBIOS**; **Hersteller aus der Offline-OUI-Liste** (öffentliche IEEE-Daten, per
+  `tools/update_oui.py` aktualisierbar – bewusst nicht Wiresharks GPL-`manuf`), lokal verwaltete MACs gekennzeichnet.
+- **Host-Aktionen** (Kontextmenü/Doppelklick): im Browser öffnen, Remotedesktop (RDP), Freigaben öffnen (`\\host`),
+  SSH im Terminal, Ping, Traceroute, Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-
+  Herunterfahren/Neustart (Windows, mit deutlicher Bestätigung), Kommentar, Favoriten, IP/MAC/Name kopieren, an die
+  IP-Übersicht übergeben. Spalten ein-/ausblendbar, sortierbar, Breiten gespeichert; Live-Filter.
+- **Export** des Scans als CSV, JSON, Markdown, HTML und PDF. Der bisherige Port-Scan bleibt als „Port-Scan" in der
+  Command Palette erhalten (`scan:ports`).
+
+### Geändert
+- `Ctrl+Shift+Alt+P` / „Netzwerk-Scanner" öffnet jetzt den Geräte-Scanner (vorher den reinen Port-Scan).
+
 ## [1.14.0] – 2026-09-27
 
 ### Hinzugefügt

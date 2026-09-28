@@ -39,6 +39,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.12.1 | Block L: Fehlerbehebung (Scanner, Encoding-Menü, JPEG-Metadaten, PCAP-Auswertung) | fertig, Tests grün, lokal getaggt |
 | 1.13.0 | Block M: Werkzeuge-Menü, Explorer-Orte, Neu nach Typ, App-Icon, PDF/HTML-Export, allgemeine Log-Auswertung | fertig, Tests grün, lokal getaggt |
 | 1.14.0 | Block Q: Analyse per Rechtsklick (Typ-Erkennung, Karte, Netz-/Hash-/Umwandeln-Aktionen) | fertig, Tests grün, lokal getaggt |
+| 1.15.0 | Block N: Geräte-Scanner (Advanced-IP-Scanner-artig), OUI-Hersteller, NetBIOS, Host-Aktionen, Export | fertig, Tests grün, lokal getaggt |
 
 ## Erledigt
 
@@ -410,6 +411,26 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   THIRD_PARTY_LICENSES (Online-Dienste inkl. Nitrxgen). Screenshot 67.
 - Neue Qt-freie Tests: `test_detect` (16), `test_convert` (10), `test_hashlookup` (9). Keine neuen Abhängigkeiten.
 
+### 1.15.0 – Block N
+- N1 Erkennung (Qt-frei): `core/oui.py` – MAC→Hersteller aus den öffentlichen **IEEE-MAC-Blöcken**
+  (`assets/oui/oui.tsv.gz`, 38.930 Einträge; `tools/update_oui.py` lädt bevorzugt die IEEE-CSV, sonst aus einem
+  erreichbaren Spiegel NUR die Fakten – **nicht** Wiresharks GPL-`manuf`). Erkennt lokal verwaltete/Multicast-MACs.
+  `core/netdetect.py` – eigene Subnetze aus `ip addr`/`ipconfig`, Ausschlusslisten, NetBIOS-Namensabfrage (NBSTAT
+  Bau+Parse), Wake-on-LAN-Paket. Tests: `test_oui` (6), `test_netdetect` (7).
+- N2/N3 UI: `ui/network_scanner.py::NetworkScannerDialog` – Live-Tabelle (Status/Name/IP/MAC/Hersteller/Kommentar/
+  Dienste/ms), Profile Schnell/Standard/Gründlich, Ausschluss, Filter, Spalten ein-/ausblendbar + Breiten gespeichert.
+  Anreicherung im Worker (ARP-MAC, OUI, NetBIOS, Antwortzeit per TCP-Connect). Host-Aktionen: Browser/RDP/Freigabe/
+  SSH/Ping/Traceroute/Ports vertiefen/RDAP/Wake-on-LAN/Remote-Shutdown+Neustart (Windows, Bestätigung)/Kommentar/
+  Favoriten/Kopieren/an IP-Übersicht. Export CSV/JSON/Markdown/HTML/PDF. `scan:open` = Geräte-Scanner,
+  `scan:ports` = alter Port-Scan. Reverse-DNS/Ping/Ports teilen die Logik mit Block Q (core/scan).
+- **Entscheidung OUI-Quelle:** IEEE-Registry (frei, reine Fakten – wie IANA-Ports). standards-oui.ieee.org war in der
+  Umgebung gesperrt; Fakten aus einem Spiegel extrahiert. Wiresharks `manuf` (GPL) bewusst gemieden.
+- **Zurückgestellt/vereinfacht (ehrlich):** mDNS/LLMNR-Namensabfrage und SMB-Freigaben-Auflistung sind noch nicht
+  umgesetzt (nur Reverse-DNS + NetBIOS; Freigaben werden über den Datei-Manager geöffnet, nicht aufgelistet);
+  „unbekannte Hersteller ausblenden" und feine Geschwindigkeits-Regler (Timeout/Retries) fehlen noch – Profile decken
+  das Wesentliche ab.
+- Screenshot 68 (Geräte-Scanner). Keine neuen Python-Abhängigkeiten (nur Standardbibliothek + vorhandene Engine).
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -475,12 +496,11 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Blöcke F–K, L, M (1.13.0) und Q (1.14.0) fertig.** Plan des Besitzers (27.09.2026): **Q → N → O**, danach Abschluss.
+**Blöcke F–K, L, M (1.13.0), Q (1.14.0) und N (1.15.0) fertig.** Plan des Besitzers (27.09.2026): **Q → N → O**.
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.
-- **N (1.15.0)** eigener IP-/Netzwerk-Scanner als Ersatz für „Advanced IP Scanner“ (OUI-Liste NICHT aus Wiresharks
-  manuf/GPL); Erkennungs-/Netzwerklogik mit Block Q geteilt.
-- **O (1.16.0)** Formatierte Bearbeitung (WYSIWYG-Markdown) + Fragebögen/Vorlagen (Berichtsheft, Systemcheck,
-  E-Mail-/Tabellen-Vorlagen, Sicherheits-Check; passwortlose Spalten, keine Zugangsdaten erfassen).
+- **N (1.15.0)** Geräte-Scanner als Ersatz für „Advanced IP Scanner“ – **erledigt**.
+- **O (1.16.0)** – **als Nächstes**: Formatierte Bearbeitung (WYSIWYG-Markdown) + Fragebögen/Vorlagen (Berichtsheft,
+  Systemcheck, E-Mail-/Tabellen-Vorlagen, Sicherheits-Check; passwortlose Spalten, keine Zugangsdaten erfassen).
 
 - **P (Inventar/Docusnap-artig) ist ZURÜCKGESTELLT** (Entscheidung Besitzer 27.09.2026): vorerst NICHT bauen.
 

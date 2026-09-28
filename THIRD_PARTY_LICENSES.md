@@ -31,6 +31,7 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 | Inter (Schrift) | 4.1 | SIL Open Font License 1.1 | https://rsms.me/inter | `notex/assets/fonts/LICENSE-Inter.txt` |
 | JetBrains Mono (Schrift) | 2.304 | SIL Open Font License 1.1 | https://www.jetbrains.com/lp/mono | `notex/assets/fonts/LICENSE-JetBrainsMono.txt` |
 | IANA Service Name and Transport Protocol Port Number Registry (Daten) | Stand 2024-10 | frei für jeden Zweck (gemeinsame Erklärung IANA/IETF 2021, https://www.iana.org/help/licensing-terms) | https://www.iana.org/assignments/service-names-port-numbers | – |
+| IEEE MAC Address Block Registry / OUI (Daten: Präfix → Hersteller) | Stand 2026-09 | öffentliche IEEE-Registry, frei nutzbar (reine Fakten) | https://standards-oui.ieee.org/oui/oui.csv | `notex/assets/oui/oui.tsv.gz` |
 | Lucide Icons | 2026 | ISC | https://lucide.dev | `notex/assets/icons/LICENSE-Lucide.txt` |
 | Hunspell-Wörterbuch de_DE (frami, igerman98) | LibreOffice dictionaries | GPL v2 oder v3 | https://github.com/LibreOffice/dictionaries · https://www.j3e.de/ispell/igerman98 | `notex/dictionaries/LICENSE_de_DE_GPLv2.txt`, `README_de_DE.txt` |
 | Hunspell-Wörterbuch en_US (SCOWL) | 2020.12.07 | MIT/BSD-artig (SCOWL, Ispell, WordNet) | http://wordlist.sourceforge.net | `notex/dictionaries/README_en_US_LICENSE.txt` |
@@ -51,6 +52,10 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 - **SF Pro** wird nie mitgeliefert (Apple-Lizenz). Eigene Schriften in `fonts/user/` liegen in
   der Verantwortung des Nutzers.
 - **LanguageTool** wird nicht gebündelt, sondern optional über HTTP angesprochen.
+- **OUI-Herstellerliste:** Die MAC-Präfix→Hersteller-Zuordnungen stammen aus der **öffentlichen IEEE-Registry**
+  (frei nutzbar, reine Fakten – wie die IANA-Portdaten). In dieser Arbeitsumgebung war der IEEE-Host gesperrt; die
+  Fakten wurden aus einem erreichbaren Spiegel extrahiert und als eigene `oui.tsv.gz` gespeichert. Bewusst **nicht**
+  verwendet: Wiresharks `manuf` (GPL). Mit Netz aktualisiert `python tools/update_oui.py` direkt von der IEEE.
 - **Online-Dienste (nur auf Nutzeraktion):** RDAP/RIPEstat (Netz-/ASN-Infos), Wikipedia/Wiktionary (Nachschlagen)
   und – für die Hash-Info – die **Nitrxgen MD5-Datenbank** (https://www.nitrxgen.net/md5db/, frei nutzbar ohne
   Schlüssel). Diese Dienste werden nicht gebündelt, sondern nur abgefragt, wenn der Nutzer die Aktion ausdrücklich
