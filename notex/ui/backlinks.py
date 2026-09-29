@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QListWidgetItem
 
 from notex.core.wikilinks import Backlink
 from notex.theme.icons import icon
-from notex.theme.tokens import COLORS, LAYOUT, SPACING
+from notex.theme.tokens import COLORS, SPACING
 from notex.ui.search_results import HtmlDelegate
 
 ROLE_SOURCE = Qt.ItemDataRole.UserRole + 1

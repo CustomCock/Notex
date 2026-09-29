@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from notex.core import tools
 

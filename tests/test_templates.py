@@ -89,3 +89,17 @@ def test_later_templates_arrive_once(tmp_path: Path) -> None:
     fresh: list[str] = []
     ensure_defaults(tmp_path / "neu", fresh)                             # Erststart: alles, Liste gefüllt
     assert fresh == list(LATER_TEMPLATES)
+
+
+def test_defaults_arrive_when_only_questionnaire_folder_exists(tmp_path: Path) -> None:
+    """Regression R4: legte „Fragebogen ausfüllen“ zuerst templates/fragebogen/ an, kamen die Standardvorlagen
+    (Woche, Tagesnotiz, Besprechung …) nie – der Ordner galt als „schon eingerichtet“."""
+    folder = tmp_path / "templates"
+    (folder / "fragebogen").mkdir(parents=True)
+    (folder / "fragebogen" / "berichtsheft.yaml").write_text("id: x\n", encoding="utf-8")
+    installed: list[str] = []
+    created = ensure_defaults(folder, installed)
+    assert sorted(p.name for p in created) == sorted(DEFAULT_TEMPLATES)
+    assert (folder / "fragebogen" / "berichtsheft.yaml").exists()
+    (folder / "Woche.md").unlink()                                       # gelöscht → bleibt weg
+    assert ensure_defaults(folder, installed) == [] and not (folder / "Woche.md").exists()

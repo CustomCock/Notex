@@ -9,7 +9,7 @@ entscheidet die Oberfläche; hier wird nur Text zu HTML.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from html import escape
 from pathlib import Path

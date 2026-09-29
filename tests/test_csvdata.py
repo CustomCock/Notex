@@ -1,4 +1,4 @@
-from notex.core.csvdata import (Dialect, filter_indices, parse, serialize, sniff, sorted_indices, table_supported,
+from notex.core.csvdata import (filter_indices, parse, serialize, sniff, sorted_indices, table_supported,
                                 to_number)
 
 

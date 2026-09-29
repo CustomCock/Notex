@@ -69,9 +69,9 @@ def parse_ipconfig(output: str) -> list[Adapter]:
 
 def _run(command: list[str]) -> str:
     import subprocess
+    from notex.core import syscmd
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=8)
-        return result.stdout
+        return syscmd.run(command, timeout=8)[1]   # OEM-Codepage unter Windows, siehe core/syscmd.py
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -158,8 +158,7 @@ def parse_nbstat_response(data: bytes) -> str | None:
                 offset += data[offset] + 1
             offset += 1
         offset += 2 + 2 + 4        # Typ + Klasse + TTL
-        rdlen = int.from_bytes(data[offset:offset + 2], "big")
-        offset += 2
+        offset += 2                # RDLENGTH (Länge ergibt sich aus der Namensanzahl)
         if offset >= len(data):
             return None
         num_names = data[offset]

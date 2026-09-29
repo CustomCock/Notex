@@ -124,7 +124,7 @@ class HashDialog(QDialog):
             state = "bad"
         elif not self.digests:
             expected = hashing.expected_algorithm(text)
-            self.verdict.setText(f"Vergleich folgt, sobald die Berechnung fertig ist"
+            self.verdict.setText("Vergleich folgt, sobald die Berechnung fertig ist"
                                  + (f" (sieht aus wie {hashing.LABELS[expected]})" if expected else ""))
         else:
             match = hashing.match_digest(text, self.digests)

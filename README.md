@@ -181,9 +181,18 @@ Undo-Schritt und speichert nicht.
 
 ## Vorlagen und „Neue Woche“
 
-Vorlagen sind `.md`- oder `.txt`-Dateien in `templates/` neben der App. Beim ersten Benutzen legt Notex
-drei an: Woche, Tagesnotiz, Besprechung. **Ctrl+Shift+T** erzeugt eine neue Datei aus einer Vorlage im
-gewählten Ordner; jede Vorlage steht auch als „Vorlage: …“ in der Command Palette.
+Vorlagen sind `.md`-, `.txt`-, `.csv`- oder `.yar`-Dateien in `templates/` neben der App. Beim ersten Benutzen
+legt Notex die mitgelieferten an (Woche, Tagesnotiz, Besprechung, E-Mail- und Tabellen-Vorlagen …).
+**Ctrl+Shift+T** öffnet die Vorlagen-Auswahl und erzeugt die neue Datei im gewählten Ordner.
+
+Die Auswahl zeigt die Vorlagen **nach Kategorien in Abschnitten**, darin alphabetisch: Ausbildung,
+Kunde/Einsatz, E-Mail, Tabellen, Planung & Notizen, Sicherheit & Forensik, Sonstiges. Das **Suchfeld** filtert
+nach Name und Kategorie (`mail termin`, `ausbildung`, `tabellen`); Enter nimmt den ersten Treffer. Die
+**Fragebögen** stehen mit in der Liste – z. B. das **Berichtsheft** (Ausbildungsnachweis) unter „Ausbildung“ – und
+starten beim Auswählen den Assistenten. Eigene Ordnung: ein **Unterordner** in `templates/` wird zur Kategorie
+(`templates/Kunde X/Protokoll.md` → Abschnitt „Kunde X“); Fragebögen können `category:` im YAML angeben. Dateien
+werden für die Einordnung nie verschoben. Jede Datei-Vorlage steht auch als „Vorlage: Kategorie › Name“ in der
+Command Palette.
 
 | Platzhalter | Ergebnis |
 |---|---|
@@ -328,6 +337,11 @@ ersten Senden nach und ist aus verschlüsselten Notizen (.ntx) gesperrt. Bewusst
 Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der Command Palette) schaltet Funktionen
 einzeln an und aus – sofort, ohne Neustart. Ein ausgeschaltetes Modul hat keine Menüeinträge, Befehle,
 Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken nicht.
+
+Ganz oben stehen **„Alle Module“** (Tri-State: an / teils / aus – ein Klick schaltet alle an bzw. aus) sowie die
+Knöpfe **Alle aktivieren** und **Alle deaktivieren** mit Zähler („12 von 15 aktiv“). Auch das wirkt sofort und wird
+gespeichert; „Abbrechen“ im Einstellungsdialog stellt den vorherigen Zustand wieder her. In der Command Palette:
+„Module: alle aktivieren“ / „Module: alle deaktivieren“.
 
 | Modul | Standard | Zusätzlich nötig |
 |---|---|---|
@@ -715,7 +729,7 @@ und listet die gefundenen Geräte mit **Status, Name, IP, MAC, Hersteller, Komme
   Namen, **Hersteller aus der Offline-OUI-Liste** (öffentliche IEEE-Daten; lokal verwaltete/zufällige MACs werden als
   solche gekennzeichnet). Profile **Schnell / Standard / Gründlich**, Ausschlussliste, Live-Filter.
 - **Aktionen je Gerät** (Rechtsklick/Doppelklick): im Browser öffnen, Remotedesktop (RDP), Freigaben (`\\host`), SSH,
-  Ping, Traceroute, Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-Herunterfahren/Neustart
+  Ping, Traceroute (im Hintergrund, Ergebnis in einem kopierbaren Fenster), Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-Herunterfahren/Neustart
   (Windows, mit deutlicher Bestätigung), Kommentar, Favoriten, IP/MAC/Name kopieren, an die IP-Übersicht.
 - **Spalten** ein-/ausblendbar (Rechtsklick auf den Kopf), sortierbar, Breiten werden gespeichert.
 - **Export**: CSV, JSON, Markdown, HTML, PDF.
@@ -909,7 +923,9 @@ Vorschau mitscrollt.
 Ansichten, gemeinsames Undo). Tabs lassen sich per Drag zwischen den Gruppen ziehen; wird ein Tab am
 rechten oder unteren Rand abgelegt, entsteht die zweite Gruppe. `Ctrl+Alt+\` stellt die Gruppen
 untereinander statt nebeneinander, `Ctrl+Alt+→` verschiebt den Tab in die andere Gruppe. Schließt der
-letzte Tab einer Gruppe, verschwindet sie. Die Aufteilung überlebt einen Neustart.
+letzte Tab einer Gruppe, verschwindet sie. Die Aufteilung überlebt einen Neustart. Aktiv ist die Gruppe, in die
+zuletzt geklickt wurde – auch ein Klick auf die Bearbeitungsleiste zählt; Menü „Werkzeuge“ und Leiste wirken immer
+auf dieses Blatt.
 
 ![Split View](docs/27-split-view.png)
 
@@ -1069,7 +1085,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
-| Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Ctrl+Shift+T | Neue Datei aus Vorlage (Auswahl nach Kategorien, mit Suche) |
 | Datei › Fragebogen ausfüllen | Assistent für Berichtsheft/Systemcheck/Sicherheits-Check (auch aus Kalender .ics) |
 | Baum/Palette › Formatiert bearbeiten | Markdown-Notiz im WYSIWYG-Editor (Ctrl+B/I, Listen …), Quelltext-Umschalter |
 | Ctrl+Shift+W | Werkzeug-Übersicht (durchsuchbarer Katalog aller Werkzeuge) |
@@ -1136,6 +1152,7 @@ Notex/
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
   history/        <- Versionsverlauf (entsteht beim ersten Speichern, darf gelöscht werden)
   templates/      <- Vorlagen (.md/.txt), beim ersten Benutzen mit drei Beispielen angelegt
+  logs/           <- notex-fehler.log: nur bei unerwarteten Fehlern (Datei:Zeile + Kurzmeldung, keine Inhalte)
   config.json     <- Einstellungen und Zustand (wird jede Sekunde bei Änderung gesichert)
   themes/, fonts/user/, user_dictionary.txt   <- eigene Themes, Schriften, Wörterbuch (optional)
   licenses/, docs/ENCRYPTION.md, LICENSE, THIRD_PARTY_LICENSES.md, CHANGELOG.md
@@ -1204,6 +1221,13 @@ kaputte), Rechtschreibregeln und -Backends, den LanguageTool-Client gegen einen 
 Fuzzy-Suche, Wiki-Links, Syntax-Lexing, Markdown-Renderer mit Sanitizer, den Zustand des
 geteilten Editors, den Versionsverlauf und das Format der verschlüsselten Notizen (Roundtrip,
 falsches Passwort, Manipulation, Nonce, Formatversion).
+
+Dazu kommen UI-Tests mit echtem Hauptfenster ohne Bildschirm (`QT_QPA_PLATFORM=offscreen`, gemeinsame Fixture in
+`tests/conftest.py` / `tests/uihelp.py`): Werkzeuge-Menü und Blatt-Leiste nach Tab-Wechsel, Teilen und Neuöffnen,
+jedes Netzwerk-Werkzeug (Scanner und Port-Scan per echtem TCP gegen 127.0.0.1, PCAP gegen
+`tests/fixtures/beispiel_traffic.pcap`, RDAP mit Fake-Client). Die CI fährt alles auf Windows und Ubuntu.
+Was sich nur von Hand prüfen lässt (echtes Netz, deutsche Windows-Konsole, EXE ohne Konsole), steht in
+[`docs/TESTPLAN-WINDOWS.md`](docs/TESTPLAN-WINDOWS.md).
 
 ### Design-System
 

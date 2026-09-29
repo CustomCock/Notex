@@ -26,7 +26,6 @@ from notex.ui.toolbar import EditorToolbar
 from notex.ui.paper import EditorPage
 from notex.ui.widgets import EditorTabBar
 
-DIRTY_MARK = " ●"
 MIN_FONT_SIZE, MAX_FONT_SIZE = 8, 40
 
 
@@ -537,7 +536,6 @@ class EditorTabs(QTabWidget):
         editor.read_only = False
         editor.document().setModified(False)
         self._refresh_title(editor)
-        index = self.indexOf(self.page_for(editor))
         self.refresh_icon(editor)
         self.file_opened.emit(new_path)
         self.file_saved.emit(new_path)
@@ -662,7 +660,6 @@ class EditorTabs(QTabWidget):
         """Passwort prüfen, entschlüsseln, Text in den Editor. Bei leerer Datei: Passwort festlegen."""
         from PySide6.QtWidgets import QApplication
         from notex.core import crypto_notes
-        from notex.core.encoding import TextFile
         editor = page.editor
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)   # Argon2id braucht einen Moment
         try:

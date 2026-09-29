@@ -16,7 +16,6 @@ CATEGORIES: list[tuple[str, str]] = [
     ("text", "Text & Daten"),
     ("doku", "Dokumentation"),
 ]
-CATEGORY_LABELS = dict(CATEGORIES)
 
 # Dateiart-Vokabular für die „passt zur Datei?"-Prüfung
 ALL_KINDS = frozenset({"text", "binary", "image", "document", "data", "log", "pcap", "yara"})

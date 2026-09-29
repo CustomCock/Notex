@@ -8,7 +8,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
                                QPushButton, QVBoxLayout, QWidget)
@@ -184,10 +184,6 @@ class LogView(QWidget):
         bar.setValue(bar.maximum())
         self._follow = True
         self.pause_button.setVisible(False)
-
-    @property
-    def following(self) -> bool:
-        return self._follow
 
     # ---- Filter --------------------------------------------------------------------------------------
     def _apply_filter(self) -> None:

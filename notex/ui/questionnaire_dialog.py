@@ -4,7 +4,7 @@ im Frontmatter, erneut bearbeitbar)."""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDateEdit, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QDateEdit, QHBoxLayout, QLabel, QLineEdit,
                                QPlainTextEdit, QProgressBar, QPushButton, QRadioButton, QScrollArea, QTableWidget,
                                QTableWidgetItem, QTimeEdit, QVBoxLayout, QWidget, QDialog)
 from PySide6.QtCore import QDate, QTime

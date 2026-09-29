@@ -585,6 +585,31 @@ class SettingsDialog(QDialog):
                   "Aus verschlüsselten Notizen (.ntx) fragt Notex vor jedem Senden nach.")
         return page
 
+    def _set_all_modules(self, on: bool) -> None:
+        """Alle Module an/aus – sofort über die Registry; die Einzelschalter nur nachziehen (ohne Doppel-Schalten)."""
+        registry = getattr(self.window_, "modules", None)
+        if registry is not None:
+            registry.set_all(on)
+        for key, box in self.module_boxes.items():
+            box.blockSignals(True)
+            box.setChecked(registry.enabled(key) if registry is not None else on)
+            box.blockSignals(False)
+        self._sync_modules_all()
+
+    def _sync_modules_all(self) -> None:
+        boxes = getattr(self, "module_boxes", {})
+        if not boxes or not hasattr(self, "modules_all"):
+            return
+        count, total = sum(1 for b in boxes.values() if b.isChecked()), len(boxes)
+        state = (Qt.CheckState.Checked if count == total else
+                 Qt.CheckState.Unchecked if count == 0 else Qt.CheckState.PartiallyChecked)
+        self.modules_all.blockSignals(True)
+        self.modules_all.setCheckState(state)
+        self.modules_all.blockSignals(False)
+        self.modules_all_on.setEnabled(count < total)
+        self.modules_all_off.setEnabled(count > 0)
+        self.modules_count.setText(f"{count} von {total} aktiv")
+
     def _build_modules(self) -> SettingsPage:
         """Module an/aus – wirkt sofort (Menüs, Palette, Shortcuts, Panels), ohne Neustart."""
         from notex.core.modules import MODULES
@@ -593,11 +618,31 @@ class SettingsDialog(QDialog):
         page.section("Module")
         page.note("Ausgeschaltete Module haben keine Menüeinträge, Befehle, Tastenkürzel, Panels oder Hintergrundarbeit "
                   "und laden ihre Bibliotheken nicht. Umschalten wirkt sofort.")
+        # „Alle Module“: Tri-State (an / teils / aus) + Knöpfe; wirkt sofort wie die Einzelschalter
+        self.modules_all = QCheckBox("Alle Module")
+        self.modules_all.setTristate(True)
+        self.modules_all.clicked.connect(lambda _c=False: self._set_all_modules(
+            registry is None or registry.summary() != "all"))
+        all_on = QPushButton("Alle aktivieren")
+        all_on.clicked.connect(lambda: self._set_all_modules(True))
+        all_off = QPushButton("Alle deaktivieren")
+        all_off.clicked.connect(lambda: self._set_all_modules(False))
+        self.modules_count = QLabel()
+        self.modules_count.setObjectName("SettingsNote")
+        bulk = QWidget()
+        bulk_row = QHBoxLayout(bulk)
+        bulk_row.setContentsMargins(0, 0, 0, 0)
+        bulk_row.addWidget(all_on)
+        bulk_row.addWidget(all_off)
+        bulk_row.addWidget(self.modules_count, 1)
+        self.modules_all_on, self.modules_all_off = all_on, all_off
+        page.row(self.modules_all, bulk)
         self.module_boxes = {}
         for module in MODULES:
             box = QCheckBox(module.name.replace("&", "&&"))      # „&“ ist sonst Tastenkürzel-Markierung
             box.setChecked(registry.enabled(module.key) if registry else bool(module.default))
-            box.toggled.connect(lambda on, key=module.key: registry.set_enabled(key, on) if registry else None)
+            box.toggled.connect(lambda on, key=module.key: (registry.set_enabled(key, on) if registry else None,
+                                                            self._sync_modules_all()))
             ready = registry is None or registry.has_contributions(module.key)
             detail = module.description + (f" · Benötigt: {module.requires}" if module.requires != "keine" else "")
             if not ready:
@@ -607,6 +652,7 @@ class SettingsDialog(QDialog):
             info.setWordWrap(True)
             page.row(box, info)
             self.module_boxes[module.key] = box
+        self._sync_modules_all()
         page.section("IOCs entschärfen")
         ioc_cfg = self.config.setdefault("ioc", {})
         self.ioc_skip_code = QCheckBox("Code-Blöcke (``` und `inline`) nicht umwandeln")

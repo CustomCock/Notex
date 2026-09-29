@@ -178,7 +178,3 @@ def is_within(path: Path | str, root: Path | str) -> bool:
         return True
     except (ValueError, OSError):
         return False
-
-
-def is_within_notes(path: Path | str, notes_root: Path | str) -> bool:
-    return is_within(path, notes_root)

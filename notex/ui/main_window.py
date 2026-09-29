@@ -1553,8 +1553,12 @@ class MainWindow(QMainWindow):
         from notex.core import ipmap
         from notex.ui.analysis_dialog import AnalysisWorker
         index = self.ip_index
-        if index is None or getattr(self, "_ip_worker", None) is not None:
+        if index is None:
             return
+        if getattr(self, "_ip_worker", None) is not None:
+            self._ip_refresh_pending = True       # nicht verwerfen: nach dem laufenden Abgleich nachholen
+            return
+        self._ip_refresh_pending = False
         snapshot = dict(index.files)
 
         def job(_progress, _cancelled):
@@ -1569,12 +1573,15 @@ class MainWindow(QMainWindow):
             if result is not None and self.ip_index is index:
                 index.files = result
                 self._mark_ip_conflicts()
+            if self._ip_refresh_pending:
+                self.refresh_ip_index()
         worker = AnalysisWorker(job)
         worker.done.connect(done)
         self._ip_worker = worker
         worker.start()
 
     _ip_worker = None
+    _ip_refresh_pending = False
 
     def _ip_file_saved(self, path: Path) -> None:
         if self.ip_index is not None and self.ip_index.update_file(path):
@@ -1614,6 +1621,7 @@ class MainWindow(QMainWindow):
     def show_ip_overview(self) -> None:
         from notex.ui.ip_dialog import IpOverviewDialog
         if self.ip_index is None:
+            self.toast.show_message("IP-Übersicht: Modul „IP-Konflikte“ ist aus (Einstellungen → Module)", "info")
             return
         dialog = IpOverviewDialog(self)
         self._analysis_dialogs.setdefault("ip_conflicts", []).append(dialog)
@@ -1790,7 +1798,6 @@ class MainWindow(QMainWindow):
         return undo
 
     def analyze_pcap(self, path: Path | None = None) -> None:
-        from notex.core import pcapinfo
         from notex.ui.pcap_dialog import PcapDialog
         target = self._analysis_target(path)
         if target is None:
@@ -1940,7 +1947,12 @@ class MainWindow(QMainWindow):
     def _build_tools_menu(self, menu, kind: str, only_applicable: bool = False) -> None:
         """Menü „Werkzeuge" (bzw. Toolbar-/Baum-Ableger) aus der Registry bauen – Kategorien als Untermenüs.
         Nicht passende Werkzeuge sind ausgegraut (Tooltip: warum); abgeschaltete Module erscheinen gar nicht."""
-        from notex.core import tools
+        import sys
+        from notex.core import errorlog, tools
+        for action in menu.actions():             # alte Untermenüs wirklich löschen (clear() lässt sie liegen)
+            submenu = action.menu()
+            if submenu is not None and submenu.parent() is menu:
+                submenu.deleteLater()
         menu.clear()
         menu.setToolTipsVisible(True)
         enabled = self._enabled_modules()
@@ -1948,25 +1960,37 @@ class MainWindow(QMainWindow):
         if not groups:
             action = menu.addAction("Keine Werkzeuge aktiv – Einstellungen → Module")
             action.setEnabled(False)
+        failed = False
         for _key, label, group_tools in groups:
             visible = [t for t in group_tools if tools.applies(t, kind)] if only_applicable else group_tools
             if not visible:
                 continue
             submenu = menu.addMenu(label)
             for tool in visible:
-                ok = tools.applies(tool, kind)
-                action = submenu.addAction(icon(tool.icon), tool.name + (f"\t{_native(tool.shortcut)}"
-                                                                         if tool.shortcut else ""))
-                action.setEnabled(ok)
-                if not ok:
-                    action.setToolTip("Passt nicht zur aktuellen Datei" if kind != "none"
-                                      else "Erst eine Datei öffnen oder im Baum auswählen")
-                else:
-                    action.setToolTip(tool.description)
-                action.triggered.connect(lambda _c=False, cmd=tool.command: self._run_tool(cmd))
+                try:                               # ein kaputter Eintrag darf nie das ganze Menü leeren
+                    self._add_tool_action(submenu, tool, kind)
+                except Exception:                  # noqa: BLE001 – melden (Log + Hinweis), Rest weiterbauen
+                    failed = True
+                    sys.excepthook(*sys.exc_info())
+        if failed:
+            action = menu.addAction(f"Fehler beim Aufbau – Details in logs/{errorlog.LOG_NAME}")
+            action.setEnabled(False)
         menu.addSeparator()
         menu.addAction(icon("layout-grid"), "Werkzeug-Übersicht …\t" + _native("Ctrl+Shift+W"),
                        self.show_tool_overview)
+
+    def _add_tool_action(self, submenu, tool, kind: str) -> None:
+        from notex.core import tools
+        ok = tools.applies(tool, kind)
+        action = submenu.addAction(icon(tool.icon), tool.name + (f"\t{_native(tool.shortcut)}"
+                                                                 if tool.shortcut else ""))
+        action.setEnabled(ok)
+        if not ok:
+            action.setToolTip("Passt nicht zur aktuellen Datei" if kind != "none"
+                              else "Erst eine Datei öffnen oder im Baum auswählen")
+        else:
+            action.setToolTip(tool.description)
+        action.triggered.connect(lambda _c=False, cmd=tool.command: self._run_tool(cmd))
 
     def _run_tool(self, command: str) -> None:
         entry = self.registry.get(command)
@@ -1977,6 +2001,16 @@ class MainWindow(QMainWindow):
             tool = tools.BY_COMMAND.get(command)
             if tool and tool.module and tool.module not in self._enabled_modules():
                 self.toast.show_message(f"Modul für „{tool.name}“ ist aus (Einstellungen → Module)", "info")
+            else:
+                self.toast.show_message(f"„{tool.name if tool else command}“ ist gerade nicht verfügbar", "info")
+
+    def set_all_modules(self, on: bool) -> None:
+        """Alle Module an/aus – sofort, ohne Neustart; gespeichert über das Config-Autosave."""
+        changed = self.modules.set_all(on)
+        if changed:
+            self.toast.show_message(f"{len(changed)} Module {'aktiviert' if on else 'deaktiviert'}", "layout-grid")
+        else:
+            self.toast.show_message(f"Alle Module sind schon {'an' if on else 'aus'}", "info")
 
     def show_tool_overview(self) -> None:
         from notex.ui.tool_overview import ToolOverviewDialog
@@ -2047,7 +2081,6 @@ class MainWindow(QMainWindow):
         editor = self.tabs.current_editor()
         if editor is None:
             return
-        from PySide6.QtGui import QTextCursor
         cursor = editor.textCursor()
         cursor.setPosition(min(offset, len(editor.toPlainText())))
         editor.setTextCursor(cursor)
@@ -2128,6 +2161,7 @@ class MainWindow(QMainWindow):
     def questionnaires_folder(self) -> Path:
         """Ordner mit Fragebögen (templates/fragebogen); mitgelieferte werden einmalig geschrieben."""
         from notex.core.questionnaires_builtin import BUILTIN
+        self.templates_folder()        # zuerst die Standardvorlagen – sonst gilt templates/ als „schon eingerichtet“
         folder = app_root() / "templates" / "fragebogen"
         try:
             folder.mkdir(parents=True, exist_ok=True)
@@ -2833,16 +2867,23 @@ class MainWindow(QMainWindow):
 
     def new_from_template(self, name: str | None = None) -> None:
         from datetime import datetime
-        from notex.core.templates import default_file_name, list_templates, render
+        from notex.core import template_catalog
+        from notex.core.templates import default_file_name, render
         folder = self.templates_folder()
-        names = [p.name for p in list_templates(folder)]
         if name is None:
-            if not names:
+            self.questionnaires_folder()                 # mitgelieferte Fragebögen sicherstellen
+            entries = template_catalog.scan(folder)
+            if not entries:
                 self.toast.show_message("Keine Vorlagen – Vorlagen-Ordner öffnen und .md/.txt ablegen", "info")
                 return
-            name = dialogs.choose(self, "Neue Datei aus Vorlage", "Vorlage:", names)
-            if name is None:
+            from notex.ui.template_picker import choose_template
+            entry = choose_template(self, entries, on_open_folder=self.open_templates_folder)
+            if entry is None:
                 return
+            if entry.kind == "questionnaire":           # Fragebogen (z. B. Berichtsheft) → Assistent
+                self.start_questionnaire(folder / entry.key)
+                return
+            name = entry.key
         try:
             template = (folder / name).read_text(encoding="utf-8-sig")
         except FileNotFoundError:
@@ -2904,13 +2945,16 @@ class MainWindow(QMainWindow):
 
     def _refresh_template_commands(self) -> None:
         """Jede Vorlage als eigener Befehl in der Command Palette („Vorlage: Besprechung“)."""
-        from notex.core.templates import list_templates
+        from notex.core import template_catalog
         for command in list(self.registry.all()):
             if command.id.startswith("template:"):
                 self.registry.remove(command.id)
-        for path in list_templates(self.templates_folder()):
-            self.registry.add(f"template:{path.name}", f"Vorlage: {path.stem}", lambda n=path.name: self.new_from_template(n),
-                              category="Datei", keywords="neu vorlage template")
+        for entry in template_catalog.scan(self.templates_folder()):
+            if entry.kind != "file":                    # Fragebögen: eigener Befehl „Fragebogen ausfüllen“
+                continue
+            self.registry.add(f"template:{entry.key}", f"Vorlage: {entry.category} › {entry.title}",
+                              lambda n=entry.key: self.new_from_template(n), category="Datei",
+                              keywords=f"neu vorlage template {entry.category} {entry.name}")
 
     # ---- Verschlüsselte Notizen ------------------------------------------------------------
     def eventFilter(self, watched, event) -> bool:
@@ -3302,13 +3346,12 @@ class MainWindow(QMainWindow):
                 if line:
                     target.goto_line(line)
             return
-        # Kaputter Link: Datei anlegen, Ordner wählbar (Standard: Ordner der aktuellen Datei)
+        # Kaputter Link: Datei im Ordner der aktuellen Datei anlegen (externe Datei: data/)
         default_folder = editor.path.parent if not self.tabs.is_external(editor.path) else self.root
         if not dialogs.confirm(self, "Link-Ziel anlegen", f"„{span.target}“ existiert noch nicht.",
                                yes="Datei anlegen", informative=f"Neue Datei {span.target}.md im Ordner {self.tabs.relative(default_folder) or 'data'}?"):
             return
-        from PySide6.QtWidgets import QFileDialog
-        folder = QFileDialog.getExistingDirectory(self, "Ordner für die neue Datei", str(default_folder)) if False else str(default_folder)
+        folder = str(default_folder)
         name = span.target.replace("\\", "/").rsplit("/", 1)[-1]
         new_path = Path(folder) / f"{name}.md"
         if "/" in span.target:
@@ -3474,6 +3517,10 @@ class MainWindow(QMainWindow):
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
         self.registry.add("doc:templates", "Neue Datei aus Vorlage", lambda: self.new_from_template(), category="Datei",
                           shortcut="Ctrl+Shift+T", keywords="vorlage template neu dokument")
+        self.registry.add("modules:all_on", "Module: alle aktivieren", lambda: self.set_all_modules(True),
+                          category="Einstellungen", keywords="module alle an aktivieren einschalten werkzeuge")
+        self.registry.add("modules:all_off", "Module: alle deaktivieren", lambda: self.set_all_modules(False),
+                          category="Einstellungen", keywords="module alle aus deaktivieren ausschalten")
         self.registry.add("tools:overview", "Werkzeug-Übersicht", self.show_tool_overview, category="Werkzeuge",
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum

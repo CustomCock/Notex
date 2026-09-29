@@ -5,7 +5,7 @@ flüssig. Ist der Text ungültig, zeigt die Ansicht den Fehler mit „Zur Stelle
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton,
                                QStackedWidget, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 

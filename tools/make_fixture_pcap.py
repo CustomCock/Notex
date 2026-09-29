@@ -1,6 +1,6 @@
 """Erzeugt tests/fixtures/beispiel_traffic.pcap mit den in Block L4 festgelegten Sollwerten."""
 from __future__ import annotations
-import socket, struct, sys
+import socket
 from pathlib import Path
 import dpkt
 

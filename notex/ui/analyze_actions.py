@@ -7,7 +7,7 @@ Command Palette auf (siehe register_commands).
 """
 from __future__ import annotations
 
-from PySide6.QtGui import QGuiApplication, QDesktopServices
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtCore import QUrl
 
 from notex.core import convert, detect, fileops, ports

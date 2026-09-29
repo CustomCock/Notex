@@ -12,11 +12,17 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen      # UI-Tests ohne Bildschirm (echtes Hauptfenster, Menüs, Dialoge)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # Die Tests decken nur core/ ab und brauchen kein Qt – aber alle Qt-freien Laufzeitpakete aus requirements.txt
-      - run: pip install pytest send2trash "Pygments>=2.17,<3" "markdown-it-py>=3.0,<5" "regex>=2024.5.15" "cryptography>=44,<52" "PyYAML==6.0.3" "pypdf==6.19.0" "yara-python==4.5.4" "evtx==0.13.1" "dpkt==1.9.8"
-      - run: python -m pytest -q
+      # Qt braucht unter Linux ein paar Systembibliotheken (offscreen: EGL/GL, xkbcommon, fontconfig; enchant für
+      # die Rechtschreibung). Windows bringt alles im PySide6-Wheel mit.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libenchant-2-2
+      # Alle Laufzeitpakete aus requirements.txt (inkl. PySide6) – Kern- UND UI-Tests laufen auf beiden Systemen
+      - run: pip install -r requirements.txt "pytest>=8"
+      - run: python -m pytest -q -rs

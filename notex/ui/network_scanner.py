@@ -19,7 +19,7 @@ from PySide6.QtGui import QColor, QGuiApplication, QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QInputDialog,
                                QLabel, QLineEdit, QMenu, QMessageBox, QProgressBar, QPushButton, QTableWidget,
-                               QTableWidgetItem, QVBoxLayout, QWidget)
+                               QTableWidgetItem, QVBoxLayout)
 
 from notex.core import netdetect, oui, scan
 from notex.theme.icons import icon
@@ -113,6 +113,50 @@ class ScannerThread(QThread):
         self.done.emit()
 
 
+class JobThread(QThread):
+    """Einzelne Host-Aktion (Ping, Traceroute) im Hintergrund – nie im UI-Thread, Fehler als Text."""
+    finished_job = Signal(object, str)       # Ergebnis, Fehlertext
+
+    def __init__(self, job, parent=None) -> None:
+        super().__init__(parent)             # Eltern = Hauptfenster: überlebt das Schließen des Dialogs
+        self.job = job
+        self.finished.connect(self.deleteLater)
+
+    def run(self) -> None:
+        try:
+            self.finished_job.emit(self.job(), "")
+        except Exception as error:            # noqa: BLE001 – im Dialog melden statt lautlos abbrechen
+            self.finished_job.emit(None, f"{type(error).__name__}: {error}")
+
+
+def show_text(parent, title: str, text: str) -> QDialog:
+    """Kleines Textfenster (nicht modal) für Befehlsausgaben – markier- und kopierbar."""
+    from PySide6.QtGui import QFont
+    from PySide6.QtWidgets import QPlainTextEdit
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+    dialog.resize(640, 420)
+    layout = QVBoxLayout(dialog)
+    view = QPlainTextEdit(text)
+    view.setReadOnly(True)
+    font = QFont("JetBrains Mono")
+    font.setStyleHint(QFont.StyleHint.Monospace)
+    view.setFont(font)
+    layout.addWidget(view)
+    row = QHBoxLayout()
+    copy = QPushButton("Kopieren")
+    copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(view.toPlainText()))
+    close = QPushButton("Schließen")
+    close.clicked.connect(dialog.close)
+    row.addStretch(1)
+    row.addWidget(copy)
+    row.addWidget(close)
+    layout.addLayout(row)
+    dialog.show()
+    return dialog
+
+
 def _rtt(ip: str, ports: list[int]) -> int | None:
     """Grobe Antwortzeit: TCP-Connect zu einem offenen Port (oder gängigen Ports) messen."""
     candidates = ports[:1] or [80, 443, 22, 445]
@@ -147,6 +191,7 @@ class NetworkScannerDialog(QDialog):
         self.setWindowTitle("Netzwerk-Scanner")
         self.resize(1080, 680)
         self.thread: ScannerThread | None = None
+        self._jobs: list[JobThread] = []
         self.devices: dict[str, Device] = {}
         self._build()
         self._autofill_target()
@@ -247,11 +292,11 @@ class NetworkScannerDialog(QDialog):
             return
         targets_text = self.target.text().strip()
         if not targets_text:
+            self.status.setText("Erst ein Ziel eingeben (z. B. 192.168.1.0/24)")
             return
-        try:
-            targets = scan.parse_targets(targets_text)
-        except scan.ScanError as error:
-            QMessageBox.warning(self, "Ziel", str(error))
+        targets, warnings = scan.parse_targets(targets_text)     # (Ziele, Warnungen) – nie eine Exception
+        if not targets:
+            self.status.setText("Keine gültigen Ziele. " + " ".join(warnings))
             return
         excluded = netdetect.parse_exclusions(self.exclude.text())
         if excluded:
@@ -273,13 +318,13 @@ class NetworkScannerDialog(QDialog):
         self.table.setSortingEnabled(False)
         self.progress.setRange(0, len(targets))
         self.progress.setValue(0)
-        self.status.setText(f"Scanne {len(targets)} Adressen …")
+        self.status.setText(f"Scanne {len(targets)} Adressen …" + (" · " + " ".join(warnings) if warnings else ""))
         self.start_button.setText("Stopp")
         self.thread = ScannerThread(targets, config, netbios=self.opt_netbios.isChecked(),
                                     use_ping=self.opt_ping.isChecked())
         self.thread.device.connect(self._on_device)
         self.thread.progress.connect(lambda d, t: self.progress.setValue(d))
-        self.thread.failed.connect(lambda msg: self.status.setText(msg))
+        self.thread.failed.connect(self._on_failed)
         self.thread.done.connect(self._on_done)
         self.thread.start()
 
@@ -315,6 +360,24 @@ class NetworkScannerDialog(QDialog):
         alive = sum(1 for d in self.devices.values() if d.alive)
         self.status.setText(f"{alive} Geräte gefunden")
         self.progress.setValue(self.progress.maximum())
+
+    def _on_failed(self, message: str) -> None:
+        self.start_button.setText("Scannen")
+        self.table.setSortingEnabled(True)
+        self.status.setText(f"Scan abgebrochen: {message}")
+
+    def _start_job(self, job, on_result) -> JobThread:
+        worker = JobThread(job, self.window_)
+
+        def finished(result, error: str) -> None:
+            if worker in self._jobs:
+                self._jobs.remove(worker)
+            on_result(result, error)
+
+        worker.finished_job.connect(finished)
+        self._jobs.append(worker)
+        worker.start()
+        return worker
 
     # ---- Tabelle --------------------------------------------------------------------------------
     def _visible_devices(self) -> list[Device]:
@@ -382,6 +445,9 @@ class NetworkScannerDialog(QDialog):
         if self.thread is not None and self.thread.isRunning():
             self.thread.cancel()
             self.thread.wait(2000)
+        for worker in list(self._jobs):          # laufen zu Ende (Timeout im Befehl), Ergebnis wird verworfen
+            worker.finished_job.disconnect()
+        self._jobs.clear()
         super().closeEvent(event)
 
     # ---- Host-Aktionen --------------------------------------------------------------------------
@@ -444,14 +510,21 @@ class NetworkScannerDialog(QDialog):
                     return
 
     def _ping(self, device: Device) -> None:
-        ok = scan.system_ping(device.ip, timeout=2.0)
-        self.status.setText(f"{device.ip}: {'erreichbar' if ok else 'keine Antwort'}")
+        self.status.setText(f"Ping an {device.ip} …")
+
+        def done(ok, error: str) -> None:
+            self.status.setText(f"Ping {device.ip}: Fehler – {error}" if error
+                                else f"{device.ip}: {'erreichbar' if ok else 'keine Antwort'}")
+        self._start_job(lambda: scan.system_ping(device.ip, timeout=2.0), done)
 
     def _traceroute(self, device: Device) -> None:
-        cmd = ["tracert", "-d", "-h", "15", device.ip] if sys.platform.startswith("win") else \
-              ["traceroute", "-n", "-m", "15", device.ip]
-        self.status.setText(f"Traceroute zu {device.ip} …")
-        self._run(cmd)
+        """Im Hintergrund ausführen, Ausgabe in einem Textfenster zeigen (vorher: Konsole ohne sichtbare Ausgabe)."""
+        self.status.setText(f"Traceroute zu {device.ip} läuft … (bis zu {int(scan.TRACE_TIMEOUT)} s)")
+
+        def done(output, error: str) -> None:
+            self.status.setText(f"Traceroute zu {device.ip} fertig" if not error else f"Traceroute: {error}")
+            show_text(self, f"Traceroute zu {device.ip}", output if not error else f"Fehler: {error}")
+        self._start_job(lambda: scan.traceroute(device.ip), done)
 
     def _deep_scan(self, device: Device) -> None:
         self.target.setText(device.ip)

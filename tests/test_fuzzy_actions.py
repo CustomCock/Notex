@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from notex.core.actions import ActionRegistry, Command
+from notex.core.actions import ActionRegistry
 from notex.core.file_index import FileIndex, scan_files
 from notex.core.fuzzy import highlight, match, parse_goto
 

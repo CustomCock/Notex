@@ -8,7 +8,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from notex.core import lookup as lk
 from notex.core.lookup import (Definition, Disambiguation, InvalidResponse, LookupService, NotFound, Offline,
                                RateLimited, SendGuard, Summary, Timeout, WikipediaClient, WiktionaryClient,
                                clean_wikitext, confirmation_text, fetch_json, languages_for, menu_label, place_card,

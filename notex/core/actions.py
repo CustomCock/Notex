@@ -6,7 +6,7 @@ bevorzugt zuletzt benutzte Befehle.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 
 from notex.core.fuzzy import Match, match

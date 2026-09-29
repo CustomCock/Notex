@@ -2,6 +2,41 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+- **Module: „Alle aktivieren“ / „Alle deaktivieren“** in Einstellungen → Module, dazu ein Tri-State-Schalter
+  „Alle Module“ (an / teils / aus) mit Zähler. Wirkt sofort ohne Neustart, wird gespeichert, „Abbrechen“ stellt
+  den vorherigen Stand her. Auch als Palette-Befehle „Module: alle aktivieren/deaktivieren“.
+
+### Geändert
+- **Vorlagen nach Kategorien** (`Ctrl+Shift+T`): Auswahl mit Abschnitten (Ausbildung, Kunde/Einsatz, E-Mail,
+  Tabellen, Planung & Notizen, Sicherheit & Forensik, Sonstiges), alphabetisch, mit Suche nach Name und Kategorie.
+  Fragebögen (Berichtsheft, Systemcheck, Sicherheits-Check) stehen mit in der Liste. Unterordner in `templates/`
+  werden zu eigenen Kategorien. Keine Vorlage wird verschoben; Palette-Einträge heißen „Vorlage: Kategorie › Name“.
+
+### Behoben
+- **Nichts passiert mehr lautlos**: Der Windows-Build hat keine Konsole – Fehler in Menü-/Knopf-Aktionen verschwanden
+  bisher spurlos („Klick tut nichts“). Jetzt erscheint ein Hinweis, und `logs/notex-fehler.log` hält Datei:Zeile und
+  eine Kurzmeldung fest (keine Inhalte).
+- **Ping, Traceroute, ipconfig, ARP auf deutschem Windows**: Die Ausgabe (OEM-Codepage cp850) wurde als cp1252
+  gelesen; schon „Ping-Statistik für“ ließ jeden Ping abstürzen. Scanner-Ping läuft jetzt im Hintergrund, ein
+  abgebrochener Scan setzt den Start-Knopf zurück.
+- **Traceroute** zeigt sein Ergebnis (Hintergrund, kopierbares Fenster) statt einer unsichtbaren Konsole.
+- **Werkzeuge-Menü/Blatt-Leiste in der geteilten Ansicht**: wirkten auf die Datei der anderen Gruppe (oft fast alles
+  ausgegraut), bis man die Datei neu öffnete. Ein Klick ins Blatt – auch auf die Leiste – wählt jetzt dessen Gruppe.
+- **Werkzeuge-Menü**: alte Untermenüs werden beim Neuaufbau gelöscht (Speicherleck); ein fehlerhafter Eintrag leert
+  nicht mehr das ganze Menü. „IP-Übersicht“ und nicht verfügbare Werkzeuge melden sich mit Hinweis statt stumm.
+- **Geräte-Scanner: „Scannen“ tat nichts** – die Zielliste wurde falsch ausgewertet (Absturz direkt beim Start,
+  im Windows-Build unsichtbar). Leeres oder ungültiges Ziel wird jetzt gemeldet.
+- **Standardvorlagen fehlten**, wenn zuerst „Fragebogen ausfüllen“ benutzt wurde (templates/ galt dann als schon
+  eingerichtet). Vom Nutzer gelöschte Vorlagen bleiben weiterhin gelöscht.
+- **IP-Übersicht „Aktualisieren“** kurz nach dem Start oder während eines Abgleichs wurde verworfen – wird nachgeholt.
+
+### Tests
+- UI-Tests mit echtem Hauptfenster für alle Netzwerk-Werkzeuge und das Werkzeuge-Menü; die CI installiert jetzt
+  PySide6 und fährt sie auf Windows und Ubuntu. Manuelle Checkliste: `docs/TESTPLAN-WINDOWS.md`.
+
 ## [1.16.0] – 2026-09-28
 
 ### Hinzugefügt

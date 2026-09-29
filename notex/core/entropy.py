@@ -61,9 +61,6 @@ class Profile:
     def offset_of(self, index: int) -> int:
         return index * self.block_size
 
-    def index_at(self, offset: int) -> int:
-        return max(0, min(len(self.values) - 1, offset // self.block_size))
-
 
 def profile(path: Path | str, block_size: int | None = None, *, progress: Callable[[int, int], None] | None = None,
             cancelled: Callable[[], bool] | None = None) -> Profile:

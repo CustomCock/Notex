@@ -24,7 +24,6 @@ from notex.ui.toolbar import EditorToolbar
 VIEW_MODES = ("edit", "preview", "split")
 DATA_MODES = ("table", "tree", "live")   # Datenansicht statt Vorschau: CSV/TSV → Tabelle, JSON/YAML → Baum,
                                           # „live“ = Datei verfolgen (jede Textdatei, nicht im Ctrl+Shift+V-Zyklus)
-ALL_MODES = VIEW_MODES + DATA_MODES
 PREVIEW_DEBOUNCE_MS = 300
 
 SHADOW_BLUR = 28      # wie weit der Schatten nach außen reicht

@@ -11,11 +11,10 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import Qt, QThread, QTimer, QRect, Signal
-from PySide6.QtGui import QColor, QGuiApplication
+from PySide6.QtGui import QCursor, QGuiApplication
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from notex.core import lookup as lk
-from notex.theme.icons import icon
 from notex.theme.tokens import COLORS, DURATION, SPACING
 from notex.ui import anim
 from notex.ui.widgets import IconButton
@@ -235,8 +234,6 @@ class AnalysisCard(QWidget):
     # ---- Anzeigen / Platzieren --------------------------------------------------------------------
     def show_near(self, anchor: QRect | None = None) -> None:
         if anchor is None:
-            pos = QGuiApplication.instance().overrideCursor()
-            from PySide6.QtGui import QCursor
             p = QCursor.pos()
             anchor = QRect(p.x(), p.y(), 1, 1)
         self.anchor = anchor
