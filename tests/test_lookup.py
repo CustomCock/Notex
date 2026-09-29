@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
+from notex import APP_NAME
+
 from notex.core.lookup import (Definition, Disambiguation, InvalidResponse, LookupService, NotFound, Offline,
                                RateLimited, SendGuard, Summary, Timeout, WikipediaClient, WiktionaryClient,
                                clean_wikitext, confirmation_text, fetch_json, languages_for, menu_label, place_card,
@@ -165,7 +167,7 @@ def test_wikipedia_exact_hit(server) -> None:
     result = wp.lookup("Haus", "de")
     assert isinstance(result, Summary) and result.title == "Haus" and result.extract == "Ein Haus ist ein Gebäude."
     assert result.url == "https://de.wikipedia.org/wiki/Haus" and result.lang == "de"
-    assert Handler.agent.startswith("Notex/") and "github.com/CustomCock/Notex" in Handler.agent
+    assert Handler.agent.startswith(f"{APP_NAME}/") and "github.com/CustomCock/Notex" in Handler.agent
 
 
 def test_wikipedia_fuzzy_term_uses_search(server) -> None:

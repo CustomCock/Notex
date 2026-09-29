@@ -1,6 +1,6 @@
 # Lizenzen der gebündelten Drittkomponenten
 
-Notex selbst steht unter der MIT-Lizenz (siehe LICENSE). Die portable App bündelt
+fckNotes selbst steht unter der MIT-Lizenz (siehe LICENSE). Die portable App bündelt
 folgende Komponenten. Die vollständigen Lizenztexte liegen an den genannten Orten
 und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 `_internal/notex/dictionaries/...`, `licenses/`).
@@ -38,14 +38,14 @@ und werden mit in den Build-Ordner kopiert (`_internal/notex/assets/...`,
 
 ## Einordnung
 
-- **MIT für Notex** ist mit allen Komponenten verträglich. LGPL-Bibliotheken (Qt, PySide6,
+- **MIT für fckNotes** ist mit allen Komponenten verträglich. LGPL-Bibliotheken (Qt, PySide6,
   pyenchant/Enchant) werden nur benutzt, nicht verändert, und liegen als eigenständige Dateien
   im Ordner `_internal`, sodass sie austauschbar sind – das ist die Bedingung der LGPL für
   proprietär oder MIT lizenzierte Anwendungen.
-- Das **deutsche Wörterbuch** ist GPL-lizenziert. Es ist ein Datenwerk, das Notex nur einliest;
+- Das **deutsche Wörterbuch** ist GPL-lizenziert. Es ist ein Datenwerk, das fckNotes nur einliest;
   es wird nicht in den Code eingebaut. Die Auslieferung nebeneinander im selben ZIP ist eine
-  „bloße Aggregation“ im Sinne der GPL und verpflichtet Notex nicht zur GPL. Der GPL-Text und
-  die Herkunft liegen bei. Wer Notex weiterverteilt, muss das Wörterbuch weiterhin unter GPL
+  „bloße Aggregation“ im Sinne der GPL und verpflichtet fckNotes nicht zur GPL. Der GPL-Text und
+  die Herkunft liegen bei. Wer fckNotes weiterverteilt, muss das Wörterbuch weiterhin unter GPL
   weitergeben (oder weglassen).
 - **PyInstaller** (GPL v2 mit Ausnahme) ist nur Build-Werkzeug; sein Bootloader darf mit
   beliebig lizenzierten Programmen ausgeliefert werden.

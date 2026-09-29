@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QF
                                QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
                                QScrollArea, QSlider, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
+from notex import APP_NAME
 from notex.core.theme_model import (DENSITIES, PAPER_VARIANTS, PRESETS, SPEEDS, SYNTAX_CLASSES, contrast_warnings,
                                     default_theme, theme_from_preset)
 from notex.core.syntax import LEXERS
@@ -539,7 +540,7 @@ class SettingsDialog(QDialog):
         page.note("Ein Hash ist eine Einwegfunktion, keine Verschlüsselung – er wird nicht „entschlüsselt“, sondern "
                   "höchstens in einer öffentlichen Datenbank nachgeschlagen. Der Lookup deckt nur ungesalzene Hashes "
                   "ab (MD5 über die Nitrxgen-Datenbank); gesalzene Formate (bcrypt/argon2/sha512crypt) sind sinnlos "
-                  "abzufragen. Vor dem ersten Senden fragt Notex nach. Aus verschlüsselten Notizen (.ntx) ist der "
+                  f"abzufragen. Vor dem ersten Senden fragt {APP_NAME} nach. Aus verschlüsselten Notizen (.ntx) ist der "
                   "Online-Lookup gesperrt. Offline-Cracking mit Wortlisten ist bewusst NICHT enthalten – dafür gibt "
                   "es eigene Werkzeuge wie hashcat oder John the Ripper.")
         return page
@@ -563,7 +564,7 @@ class SettingsDialog(QDialog):
         thumbs.toggled.connect(lambda on: cfg.__setitem__("thumbnails", on))
         page.row("", thumbs)
         page.note("Rechtsklick auf ein Wort oder eine Markierung → Wikipedia (Ctrl+Alt+W) oder Wiktionary (Ctrl+Alt+T) "
-                  "zeigt eine kleine Karte, ein Klick darauf öffnet den Artikel im Browser. Notex fragt nur bei dieser "
+                  f"zeigt eine kleine Karte, ein Klick darauf öffnet den Artikel im Browser. {APP_NAME} fragt nur bei dieser "
                   "Aktion, nie beim bloßen Markieren; wird nichts gefunden, versucht es die andere Sprache.")
 
         page.section("Websuche")
@@ -581,8 +582,8 @@ class SettingsDialog(QDialog):
         custom.editingFinished.connect(lambda: cfg.__setitem__("custom_url", custom.text().strip()))
         page.row("Suchmaschine", engine)
         page.row("Eigene URL", custom)
-        page.note("Ctrl+Alt+G öffnet nur den Browser mit der Suche – Notex selbst ruft dabei nichts ab. "
-                  "Aus verschlüsselten Notizen (.ntx) fragt Notex vor jedem Senden nach.")
+        page.note(f"Ctrl+Alt+G öffnet nur den Browser mit der Suche – {APP_NAME} selbst ruft dabei nichts ab. "
+                  f"Aus verschlüsselten Notizen (.ntx) fragt {APP_NAME} vor jedem Senden nach.")
         return page
 
     def _set_all_modules(self, on: bool) -> None:
@@ -673,7 +674,7 @@ class SettingsDialog(QDialog):
             return page
         from notex.ui.variables_dialog import VariablesPanel
         page.add(VariablesPanel(self.window_, service))
-        page.note("Im Text steht das Token (§gruss); Notex zeigt den Wert. Nach dem Präfix schlägt Notex passende "
+        page.note(f"Im Text steht das Token (§gruss); {APP_NAME} zeigt den Wert. Nach dem Präfix schlägt {APP_NAME} passende "
                   "Variablen vor (Ctrl+Alt+V fügt das Präfix ein). Rechtsklick auf eine Variable: entfernen (bleibt als "
                   "Text), durch Wert ersetzen oder bearbeiten.")
         return page

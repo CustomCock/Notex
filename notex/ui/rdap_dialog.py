@@ -7,6 +7,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
                                QWidget)
 
+from notex import APP_NAME
 from notex.core import rdap
 from notex.theme.tokens import COLORS, SPACING
 
@@ -83,7 +84,7 @@ class RdapDialog(QDialog):
             kind, value = rdap.classify(text)
             if kind == "ip" and rdap.local_reason(value):
                 self._set_card(None)
-                self.status.setText(f"{value} ist {rdap.local_reason(value)} – solche Adressen fragt Notex nie ab.")
+                self.status.setText(f"{value} ist {rdap.local_reason(value)} – solche Adressen fragt {APP_NAME} nie ab.")
                 return
         except rdap.RdapError as error:
             self._set_card(None)

@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QCheckBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
                                QWidget)
 
+from notex import APP_NAME
 from notex.theme.icons import pixmap
 from notex.theme.tokens import COLORS, SPACING
 
@@ -158,7 +159,7 @@ class LockOverlay(QFrame):
         self.icon.setPixmap(pixmap("lock", 32, COLORS.text_muted, self.devicePixelRatioF()))
         if mode == "set":
             self.subtitle.setText("Neue verschlüsselte Notiz. Lege ein Passwort fest – ohne es kommt niemand an "
-                                  "den Inhalt, auch Notex nicht.")
+                                  f"den Inhalt, auch {APP_NAME} nicht.")
             self.button.setText("Passwort festlegen")
         else:
             self.subtitle.setText("Diese Notiz ist verschlüsselt.")

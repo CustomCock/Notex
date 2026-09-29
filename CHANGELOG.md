@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 
 ## [Unveröffentlicht]
 
+### Umbenannt
+- **Notex heißt vorläufig „fckNotes“** (der alte Name ist geschützt). Fenstertitel, Menüs, Dialoge, EXE
+  (`fckNotes.exe`), Release-ZIP, Export-Fußzeile und User-Agent tragen den neuen Namen; ein späterer Wechsel ist
+  eine Zeile (`APP_NAME` in `notex/__init__.py`). **Unverändert und kompatibel:** verschlüsselte `.ntx`-Notizen
+  (Dateikennung `NOTEXENC`), `data/`/`config.json`, Python-Paket `notex/`, Repo-URL, Registry-Schlüssel der
+  Dateizuordnung. Beim ersten Start meldet sich die Dateizuordnung als veraltet – „Pfad aktualisieren“ entfernt
+  dabei auch den alten „Notex“-Eintrag aus „Öffnen mit“. Fehlerprotokoll heißt jetzt `logs/fehlerprotokoll.log`.
+
 ### Hinzugefügt
 - **Module: „Alle aktivieren“ / „Alle deaktivieren“** in Einstellungen → Module, dazu ein Tri-State-Schalter
   „Alle Module“ (an / teils / aus) mit Zähler. Wirkt sofort ohne Neustart, wird gespeichert, „Abbrechen“ stellt
@@ -17,7 +25,7 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 
 ### Behoben
 - **Nichts passiert mehr lautlos**: Der Windows-Build hat keine Konsole – Fehler in Menü-/Knopf-Aktionen verschwanden
-  bisher spurlos („Klick tut nichts“). Jetzt erscheint ein Hinweis, und `logs/notex-fehler.log` hält Datei:Zeile und
+  bisher spurlos („Klick tut nichts“). Jetzt erscheint ein Hinweis, und `logs/fehlerprotokoll.log` hält Datei:Zeile und
   eine Kurzmeldung fest (keine Inhalte).
 - **Ping, Traceroute, ipconfig, ARP auf deutschem Windows**: Die Ausgabe (OEM-Codepage cp850) wurde als cp1252
   gelesen; schon „Ping-Statistik für“ ließ jeden Ping abstürzen. Scanner-Ping läuft jetzt im Hintergrund, ein

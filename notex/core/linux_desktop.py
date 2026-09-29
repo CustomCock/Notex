@@ -58,7 +58,7 @@ def desktop_entry(exe: str) -> str:
         "Terminal=false\n"
         "Categories=Utility;TextEditor;\n"
         f"MimeType={';'.join(MIME_TYPES)};\n"
-        "StartupWMClass=Notex\n"
+        f"StartupWMClass={APP_NAME}\n"
         f"X-Notex-Version={__version__}\n"
     )
 
@@ -68,7 +68,7 @@ def mime_xml() -> str:
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">\n'
         f'  <mime-type type="{NTX_MIME}">\n'
-        "    <comment>Verschlüsselte Notex-Notiz</comment>\n"
+        f"    <comment>Verschlüsselte {APP_NAME}-Notiz</comment>\n"
         '    <magic priority="80"><match type="string" offset="0" value="NOTEXENC"/></magic>\n'
         '    <glob pattern="*.ntx"/>\n'
         "  </mime-type>\n"

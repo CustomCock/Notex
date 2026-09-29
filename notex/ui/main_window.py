@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence, QTextCursor
 from PySide6.QtWidgets import QMainWindow, QSplitter, QStackedWidget, QVBoxLayout, QWidget
 
-from notex import APP_NAME
+from notex import APP_NAME, EXE_FILE
 from notex.core.encoding import read_text_file
 from notex.ui import dialogs
 from notex.ui.editor_area import EditorArea
@@ -509,19 +509,19 @@ class MainWindow(QMainWindow):
         auf die alte EXE – dann einmal nachfragen, ob sie auf den neuen Pfad umgeschrieben werden soll."""
         exe = current_exe()
         if exe and is_temporary_location(exe):
-            dialogs.warn(self, "Notex läuft aus einem temporären Ordner",
-                         "Die Notex.exe wurde vermutlich direkt aus der ZIP gestartet.",
+            dialogs.warn(self, f"{APP_NAME} läuft aus einem temporären Ordner",
+                         f"Die {EXE_FILE} wurde vermutlich direkt aus der ZIP gestartet.",
                          informative="Windows hat sie nach %TEMP% entpackt. Notizen (data/) und Einstellungen würden "
                                      "dort landen und beim nächsten Aufräumen verschwinden.\n\n"
                                      "Bitte die ZIP komplett entpacken (Rechtsklick → „Alle extrahieren…“), "
-                                     "z. B. nach C:\\Apps\\Notex, und Notex.exe von dort starten.")
+                                     f"z. B. nach C:\\Apps\\{APP_NAME}, und {EXE_FILE} von dort starten.")
             return
         linux = self._linux_integration()
         if linux is not None:
             try:
                 status = linux.status()
                 if status.registered and not status.matches(linux.exe) and dialogs.confirm(
-                        self, "Notex-Ordner verschoben", "Der Starter im Anwendungsmenü zeigt noch auf den alten Ort.",
+                        self, f"{APP_NAME}-Ordner verschoben", "Der Starter im Anwendungsmenü zeigt noch auf den alten Ort.",
                         yes="Neu registrieren", no="Später", informative=f"Registriert: {status.exe_path}\nJetzt hier: {linux.exe}"):
                     linux.install()
             except OSError:
@@ -536,12 +536,12 @@ class MainWindow(QMainWindow):
         if not status.registered or status.matches(self.association.exe_path):
             return
         where = "existiert nicht mehr" if not status.exe_exists else "ist eine andere Kopie"
-        if dialogs.confirm(self, "Notex-Ordner verschoben",
-                           "Die Dateizuordnung zeigt noch auf die alte Notex.exe.",
+        if dialogs.confirm(self, "Dateizuordnung veraltet",      # Ordner verschoben oder EXE umbenannt
+                           "Die Dateizuordnung zeigt noch auf einen alten Pfad.",
                            yes="Pfad aktualisieren", no="Später",
                            informative=f"Registriert: {status.exe_path} ({where}).\n"
                                        f"Jetzt hier: {self.association.exe_path}\n\n"
-                                       "Solange der alte Pfad eingetragen ist, blendet Windows Notex unter „Öffnen mit“ "
+                                       f"Solange der alte Pfad eingetragen ist, blendet Windows {APP_NAME} unter „Öffnen mit“ "
                                        "und in den Standard-Apps aus. Aktualisieren schreibt nur die Pfade neu, die "
                                        "gewählten Endungen bleiben."):
             try:
@@ -574,7 +574,7 @@ class MainWindow(QMainWindow):
         check_widget.setLayout(check_row)
         page.add(check_widget)
         page.note("Es wird nur die öffentliche Release-Liste abgerufen (api.github.com), ohne Kennung oder "
-                  "Nutzungsdaten. Notex lädt und installiert nie etwas selbst – es zeigt nur einen Hinweis.")
+                  f"Nutzungsdaten. {APP_NAME} lädt und installiert nie etwas selbst – es zeigt nur einen Hinweis.")
 
         import sys as _sys
         if _sys.platform.startswith("linux"):
@@ -591,7 +591,7 @@ class MainWindow(QMainWindow):
         chips_row.setContentsMargins(0, 0, 0, 0)
         chosen = set(self.config.get("association_extensions", [".txt"]))
         for ext in SUPPORTED_EXTENSIONS:
-            chip = Chip(ext, f"{ext}-Dateien mit Notex öffnen")
+            chip = Chip(ext, f"{ext}-Dateien mit {APP_NAME} öffnen")
             chip.setChecked(ext in chosen)
 
             def toggled(on: bool, e=ext) -> None:
@@ -606,7 +606,7 @@ class MainWindow(QMainWindow):
         chips.setLayout(chips_row)
         page.row("Dateitypen", chips)
 
-        register = QPushButton("Notex für Dateitypen registrieren")
+        register = QPushButton(f"{APP_NAME} für Dateitypen registrieren")
         update = QPushButton("Pfad aktualisieren")
         remove = QPushButton("Registrierung entfernen")
         defaults = QPushButton("Windows-Standard-Apps öffnen")
@@ -625,7 +625,7 @@ class MainWindow(QMainWindow):
 
         def refresh() -> None:
             if self.association is None:
-                reason = ("Nur aus der gebauten Notex.exe möglich, nicht im Dev-Modus." if current_exe() is None
+                reason = (f"Nur aus der gebauten {EXE_FILE} möglich, nicht im Dev-Modus." if current_exe() is None
                           else "Nur unter Windows verfügbar.")
                 status_label.setText(f"Nicht verfügbar: {reason}")
                 for button in (register, update, remove):
@@ -638,15 +638,15 @@ class MainWindow(QMainWindow):
                 if same:
                     hint = ""
                 elif status.exe_exists:
-                    hint = "\nAchtung: zeigt auf eine andere Kopie von Notex. „Pfad aktualisieren“ trägt diese hier ein."
+                    hint = f"\nAchtung: zeigt auf eine andere Kopie von {APP_NAME}. „Pfad aktualisieren“ trägt diese hier ein."
                 else:
-                    hint = ("\nAchtung: diese Notex.exe existiert nicht mehr (Ordner verschoben oder gelöscht). Windows "
-                            "blendet Notex deshalb unter „Öffnen mit“ aus – „Pfad aktualisieren“ behebt das.")
+                    hint = (f"\nAchtung: diese {EXE_FILE} existiert nicht mehr (Ordner verschoben oder gelöscht). Windows "
+                            f"blendet {APP_NAME} deshalb unter „Öffnen mit“ aus – „Pfad aktualisieren“ behebt das.")
                 status_label.setText(f"Registriert: ja · Endungen: {', '.join(status.extensions) or '–'}\n"
                                      f"Pfad: {status.exe_path}{hint}")
             else:
                 status_label.setText("Registriert: nein. Die Registrierung schreibt nur in HKCU (kein Admin) und "
-                                     "überschreibt keine bestehende Zuordnung – Notex erscheint unter „Öffnen mit“ "
+                                     f"überschreibt keine bestehende Zuordnung – {APP_NAME} erscheint unter „Öffnen mit“ "
                                      "und in den Standard-Apps.")
             update.setEnabled(status.registered and not status.matches(self.association.exe_path))
             remove.setEnabled(status.registered)
@@ -659,16 +659,16 @@ class MainWindow(QMainWindow):
                 return
             refresh()
             if dialogs.confirm(self, "Registriert",
-                               "Notex ist jetzt bei Windows bekannt und erscheint unter „Öffnen mit“ sowie im "
-                               "Kontextmenü („Mit Notex öffnen“).",
+                               f"{APP_NAME} ist jetzt bei Windows bekannt und erscheint unter „Öffnen mit“ sowie im "
+                               f"Kontextmenü („Mit {APP_NAME} öffnen“).",
                                yes="Standard-Apps öffnen", no="Später",
-                               informative="Damit ein Doppelklick Notex startet, wähle es in den Windows-Einstellungen "
+                               informative=f"Damit ein Doppelklick {APP_NAME} startet, wähle es in den Windows-Einstellungen "
                                            "unter Standard-Apps für .txt (und die anderen Endungen) aus. Windows lässt "
                                            "das nur dich selbst festlegen."):
                 QDesktopServices.openUrl(QUrl("ms-settings:defaultapps"))
 
         def do_remove() -> None:
-            if dialogs.confirm(self, "Registrierung entfernen", "Alle Notex-Einträge aus der Registry entfernen?",
+            if dialogs.confirm(self, "Registrierung entfernen", f"Alle {APP_NAME}-Einträge aus der Registry entfernen?",
                                yes="Entfernen", danger=True):
                 self.association.unregister()
                 refresh()
@@ -683,8 +683,8 @@ class MainWindow(QMainWindow):
         remove.clicked.connect(do_remove)
         update.clicked.connect(do_update)
         refresh()
-        page.note("Der Kontextmenü-Eintrag „Mit Notex öffnen“ erscheint unter Windows 11 im klassischen Menü "
-                  "(„Weitere Optionen anzeigen“). Notex bleibt portabel: Wird der Ordner verschoben, meldet sich "
+        page.note(f"Der Kontextmenü-Eintrag „Mit {APP_NAME} öffnen“ erscheint unter Windows 11 im klassischen Menü "
+                  f"(„Weitere Optionen anzeigen“). {APP_NAME} bleibt portabel: Wird der Ordner verschoben, meldet sich "
                   "beim Start ein Hinweis, und „Pfad aktualisieren“ schreibt den neuen Pfad.")
 
     def open_settings(self, category: str | None = None) -> None:
@@ -2520,14 +2520,14 @@ class MainWindow(QMainWindow):
         buttons.setLayout(row)
         page.add(buttons)
         page.note("Legt nur Dateien in ~/.local/share an (notex.desktop, MIME-Typ für .ntx, Icon) – kein root, "
-                  "nichts systemweit. Danach steht Notex im Anwendungsmenü und unter „Öffnen mit“. Zum Standardprogramm "
+                  f"nichts systemweit. Danach steht {APP_NAME} im Anwendungsmenü und unter „Öffnen mit“. Zum Standardprogramm "
                   "macht man es selbst, z. B. über die Dateieigenschaften oder `xdg-mime default notex.desktop text/plain`. "
-                  "Nach dem Verschieben des Notex-Ordners einfach erneut registrieren.")
+                  f"Nach dem Verschieben des {APP_NAME}-Ordners einfach erneut registrieren.")
 
         def refresh() -> None:
             integration = self._linux_integration()
             if integration is None:
-                status_label.setText("Nicht verfügbar: nur aus der gebauten App (Notex-Ordner mit ausführbarer Datei).")
+                status_label.setText(f"Nicht verfügbar: nur aus der gebauten App ({APP_NAME}-Ordner mit ausführbarer Datei).")
                 register.setEnabled(False)
                 remove.setEnabled(False)
                 return
@@ -2548,7 +2548,7 @@ class MainWindow(QMainWindow):
                 dialogs.warn(self, "Registrieren", str(error))
                 return
             refresh()
-            self.toast.show_message("Notex im Anwendungsmenü registriert", "check")
+            self.toast.show_message(f"{APP_NAME} im Anwendungsmenü registriert", "check")
 
         def do_remove() -> None:
             integration = self._linux_integration()
@@ -2750,7 +2750,7 @@ class MainWindow(QMainWindow):
         box = QMessageBox(self)
         box.setWindowTitle("Aus verschlüsselter Notiz senden?")
         box.setText(confirmation_text(service))
-        box.setInformativeText("Die Notiz ist verschlüsselt – der markierte Begriff verlässt Notex dabei unverschlüsselt.")
+        box.setInformativeText(f"Die Notiz ist verschlüsselt – der markierte Begriff verlässt {APP_NAME} dabei unverschlüsselt.")
         box.setIcon(QMessageBox.Icon.Warning)
         remember = QCheckBox("In dieser Sitzung nicht mehr fragen")
         box.setCheckBox(remember)
@@ -2999,7 +2999,7 @@ class MainWindow(QMainWindow):
             dialogs.warn(self, "Neue verschlüsselte Notiz", f"„{name}“ gibt es schon.")
             return
         dialog = PasswordDialog(self, "Passwort festlegen", f"Passwort für „{name}“. Ohne dieses Passwort kommt niemand "
-                                "an den Inhalt – auch Notex nicht. Es gibt keine Wiederherstellung.")
+                                f"an den Inhalt – auch {APP_NAME} nicht. Es gibt keine Wiederherstellung.")
         if not dialog.exec():
             return
         from PySide6.QtWidgets import QApplication

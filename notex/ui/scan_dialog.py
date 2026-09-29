@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QF
                                QHeaderView, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox, QTableWidget,
                                QTableWidgetItem, QVBoxLayout)
 
+from notex import APP_NAME
 from notex.core import fileops, scan
 from notex.theme.icons import icon
 from notex.theme.tokens import SPACING
@@ -350,7 +351,7 @@ class ScanDialog(QDialog):
         if not self.hosts:
             return
         start = str(self._scans_dir())
-        path, _ = QFileDialog.getOpenFileName(self, "Früheren Scan wählen", start, "Notex-Scan (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Früheren Scan wählen", start, f"{APP_NAME}-Scan (*.json)")
         if not path:
             return
         try:

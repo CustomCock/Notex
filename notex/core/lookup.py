@@ -32,9 +32,9 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from notex import __version__
+from notex import APP_NAME, __version__
 
-USER_AGENT = f"Notex/{__version__} (https://github.com/CustomCock/Notex)"
+USER_AGENT = f"{APP_NAME}/{__version__} (https://github.com/CustomCock/Notex)"
 TIMEOUT = 5.0
 MAX_BYTES = 2 * 1024 * 1024
 MAX_TERM = 200

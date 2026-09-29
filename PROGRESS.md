@@ -1,4 +1,4 @@
-# Notex – Fortschritt
+# fckNotes (vorher Notex) – Fortschritt
 
 Dieses Dokument ist der Einstiegspunkt für jede Arbeitssession: **zuerst lesen**, nach jedem
 Feature aktualisieren (erledigt / offen / Entscheidungen / nächster Schritt). Es ersetzt kein
@@ -458,7 +458,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 ### Plan R (Fehlerbehebung + Aufräumen, ab 29.09.2026)
 - **R1 Netzwerk-Tools + totes Werkzeuge-Menü – erledigt.** Diagnose per Offscreen-Szenarien (20 Zustände):
   0) gemeinsame Ursache: `--windowed`-Build ohne Exception-Hook → jeder Slot-Fehler lautlos. Neu `core/errorlog.py`
-     + `ui/error_hook.py` (sys/threading.excepthook → `logs/notex-fehler.log` + gedrosselter Toast).
+     + `ui/error_hook.py` (sys/threading.excepthook → `logs/fehlerprotokoll.log` + gedrosselter Toast).
   1) Windows-Konsolenausgabe ist OEM (cp850), `text=True` las cp1252 → UnicodeDecodeError bei jedem deutschen Ping.
      Neu `core/syscmd.py` (Bytes lesen, OEM dekodieren, errors=replace); Scanner-Ping im `JobThread`.
   2) Traceroute: `scan.traceroute()` + Textfenster statt Popen ohne Ausgabe.
@@ -500,6 +500,18 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Schalten); Palette `modules:all_on/all_off`. Persistenz über Config-Autosave, Abbrechen über den Snapshot.
 - Test-Infrastruktur: `close_window` führt `deleteLater` aus (Suite 86 s → 23 s; alte Fenster samt App-Filtern
   sammelten sich an).
+
+### Umbenennung (29.09.2026, Besitzer)
+- „Notex“ ist geschützt → **vorläufiger Anzeigename „fckNotes“**, bis der Besitzer einen freien Namen hat.
+- **Entscheidung:** nur der Anzeigename wechselt. `notex/__init__.py`: `APP_NAME` (sichtbar), `EXE_NAME`/`EXE_FILE`
+  (Build, Texte), dazu **stabile interne Kennungen** `APP_ID`, `PROG_ID`, `REG_KEY = "Notex"` (Registry) und
+  `LEGACY_EXE_FILES` (alter „Öffnen mit“-Eintrag wird beim Registrieren/Entfernen aufgeräumt). Alle sichtbaren
+  Texte lesen `APP_NAME`/`EXE_FILE` (55 Literale umgestellt); `build.py` und `release.yml` holen den Namen aus dem
+  Paket. **Nie ändern:** `.ntx`-Magic `NOTEXENC`, Paketname `notex/`, `REPO` im Update-Check, Scan-JSON-Schlüssel
+  `notex_scan`, Linux-Desktop-ID `notex.desktop`, Env `NOTEX_ROOT`.
+- Nächster Namenswechsel: `APP_NAME` ändern, README/CHANGELOG-Titel anpassen, Screenshots neu erzeugen.
+  Die Screenshots in `docs/` zeigen noch „Notex“ (werden mit `python tools/screenshot.py` neu erzeugt, sobald der
+  endgültige Name feststeht).
 
 ## Offen
 

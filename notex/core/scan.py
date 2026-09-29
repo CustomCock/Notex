@@ -20,6 +20,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Iterable
+from notex import APP_NAME
 
 # Kleine Standardprofile (nur zur Auswahl; eigene Portlisten sind möglich)
 TOP_100 = [7, 20, 21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 161, 179, 199, 389, 443, 445, 465, 514, 515, 543,
@@ -241,7 +242,7 @@ async def _probe_port(ip: str, port: int, timeout: float, grab_banner: bool, con
 async def _grab(ip: str, port: int, reader, writer, timeout: float) -> str:
     if port in HTTP_PORTS or port not in BANNER_PORTS:
         if port in HTTP_PORTS:
-            writer.write(f"GET / HTTP/1.0\r\nHost: {ip}\r\nUser-Agent: Notex\r\nConnection: close\r\n\r\n"
+            writer.write(f"GET / HTTP/1.0\r\nHost: {ip}\r\nUser-Agent: {APP_NAME}\r\nConnection: close\r\n\r\n"
                          .encode("latin-1"))
             await asyncio.wait_for(writer.drain(), timeout)
             data = await asyncio.wait_for(reader.read(4096), timeout)
@@ -508,7 +509,7 @@ def from_dict(data: dict) -> list[Host]:
 def load(text: str) -> list[Host]:
     data = json.loads(text)
     if data.get("notex_scan") != 1:
-        raise ScanError("Keine Notex-Scan-Datei")
+        raise ScanError(f"Keine {APP_NAME}-Scan-Datei")
     return from_dict(data)
 
 

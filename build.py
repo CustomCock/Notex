@@ -1,8 +1,8 @@
-"""Baut die portable App mit PyInstaller nach dist/Notex/.
+"""Baut die portable App mit PyInstaller nach dist/<APP_NAME>/ (Name aus notex/__init__.py).
 
 Aufruf:  python build.py
-Ergebnis: dist/Notex/Notex.exe (Windows) plus _internal/ mit allen Abhängigkeiten.
-Den Ordner dist/Notex kann man komplett kopieren; data/ und config.json
+Ergebnis: dist/<APP_NAME>/<APP_NAME>.exe (Windows) plus _internal/ mit allen Abhängigkeiten.
+Den Ordner dist/<APP_NAME> kann man komplett kopieren; data/ und config.json
 entstehen beim ersten Start daneben.
 """
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import PyInstaller.__main__
 
-from notex import APP_NAME, __version__
+from notex import APP_NAME, EXE_NAME, __version__
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE = ROOT / "notex"
@@ -36,7 +36,7 @@ VSVersionInfo(
       StringStruct('FileDescription', '{APP_NAME} – portabler Explorer + Editor für Textdateien'),
       StringStruct('FileVersion', '{__version__}'),
       StringStruct('InternalName', '{APP_NAME}'),
-      StringStruct('OriginalFilename', '{APP_NAME}.exe'),
+      StringStruct('OriginalFilename', '{EXE_NAME}.exe'),
       StringStruct('ProductName', '{APP_NAME}'),
       StringStruct('ProductVersion', '{__version__}')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
@@ -67,13 +67,13 @@ def check_dependencies() -> None:
 def main() -> None:
     os.chdir(ROOT)
     check_dependencies()
-    for stale in (ROOT / "build", ROOT / "dist" / "Notex"):
+    for stale in (ROOT / "build", ROOT / "dist" / EXE_NAME):
         shutil.rmtree(stale, ignore_errors=True)
     version_file = write_version_file()
 
     args = [
         str(ROOT / "main.py"),
-        "--name", "Notex",
+        "--name", EXE_NAME,
         "--noconfirm",
         "--clean",
         "--windowed",                       # kein Konsolenfenster
@@ -101,7 +101,7 @@ def main() -> None:
     ]
     PyInstaller.__main__.run(args)
     # Lizenzen gehören in den Build-Ordner: eigene Lizenz, Übersicht und die Texte der Bibliotheken
-    target = ROOT / "dist" / "Notex"
+    target = ROOT / "dist" / EXE_NAME
     for name in ("LICENSE", "THIRD_PARTY_LICENSES.md", "CHANGELOG.md"):
         shutil.copyfile(ROOT / name, target / name)
     shutil.copytree(ROOT / "licenses", target / "licenses", dirs_exist_ok=True)

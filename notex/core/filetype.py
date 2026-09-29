@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from notex import APP_NAME
 
 HEAD_BYTES = 8192
 
@@ -53,7 +54,7 @@ ELF = _t("elf", "ELF-Programm (Linux)", ["", ".so", ".o", ".elf"], "executable")
 PE = _t("pe", "Windows-Programm (PE/EXE)", [".exe", ".dll", ".sys", ".scr", ".cpl", ".ocx", ".efi"], "executable")
 MACHO = _t("macho", "Mach-O-Programm (macOS)", ["", ".dylib"], "executable")
 SQLITE = _t("sqlite", "SQLite-Datenbank", [".sqlite", ".sqlite3", ".db", ".db3"], "database")
-NTX = _t("ntx", "Verschlüsselte Notex-Notiz", [".ntx"], "encrypted")
+NTX = _t("ntx", f"Verschlüsselte {APP_NAME}-Notiz", [".ntx"], "encrypted")
 CLASS = _t("class", "Java-Klasse", [".class"], "executable")
 WASM = _t("wasm", "WebAssembly", [".wasm"], "executable")
 MP3 = _t("mp3", "MP3-Audio", [".mp3"], "media")

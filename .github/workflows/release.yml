@@ -41,10 +41,11 @@ jobs:
       - name: ZIP packen
         shell: pwsh
         run: |
-          $name = "Notex-${{ github.ref_name }}-windows.zip"
-          if ("${{ github.ref_type }}" -eq "tag") { $name = "Notex-${{ github.ref_name }}.zip" }
+          $app = python -c "from notex import EXE_NAME; print(EXE_NAME)"   # Name nur in notex/__init__.py
+          $name = "$app-${{ github.ref_name }}-windows.zip"
+          if ("${{ github.ref_type }}" -eq "tag") { $name = "$app-${{ github.ref_name }}.zip" }
           $name = $name -replace '/', '-'
-          Compress-Archive -Path dist/Notex -DestinationPath $name
+          Compress-Archive -Path dist/$app -DestinationPath $name
           "ASSET=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Artefakt ablegen (manueller Lauf)
@@ -86,8 +87,9 @@ jobs:
 
       - name: tar.gz packen
         run: |
-          name="Notex-${GITHUB_REF_NAME//\//-}-linux-x86_64.tar.gz"
-          tar -czf "$name" -C dist Notex
+          app=$(python -c "from notex import EXE_NAME; print(EXE_NAME)")   # Name nur in notex/__init__.py
+          name="$app-${GITHUB_REF_NAME//\//-}-linux-x86_64.tar.gz"
+          tar -czf "$name" -C dist "$app"
           echo "ASSET=$name" >> "$GITHUB_ENV"
 
       - name: Artefakt ablegen (manueller Lauf)

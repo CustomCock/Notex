@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSplitter,
                                QTextEdit, QVBoxLayout, QWidget)
 
+from notex import APP_NAME
 from notex.core.history import History, diff_lines, diff_stats, format_age
 from notex.theme.fonts import MONO_FAMILIES
 from notex.theme.tokens import COLORS, SPACING
@@ -83,7 +84,7 @@ class HistoryDialog(QDialog):
             item.setData(ROLE_SHA, version.sha)
             self.list.addItem(item)
         if not versions:
-            self.summary.setText("Noch keine Versionen. Notex legt bei jedem Speichern einen Schnappschuss an.")
+            self.summary.setText(f"Noch keine Versionen. {APP_NAME} legt bei jedem Speichern einen Schnappschuss an.")
             self.diff.clear()
             return
         self.list.setCurrentRow(1 if len(versions) > 1 and versions[0].sha == _sha(self.current_text) else 0)
