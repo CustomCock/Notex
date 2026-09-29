@@ -129,6 +129,34 @@ class JobThread(QThread):
             self.finished_job.emit(None, f"{type(error).__name__}: {error}")
 
 
+def show_text(parent, title: str, text: str) -> QDialog:
+    """Kleines Textfenster (nicht modal) für Befehlsausgaben – markier- und kopierbar."""
+    from PySide6.QtGui import QFont
+    from PySide6.QtWidgets import QPlainTextEdit
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+    dialog.resize(640, 420)
+    layout = QVBoxLayout(dialog)
+    view = QPlainTextEdit(text)
+    view.setReadOnly(True)
+    font = QFont("JetBrains Mono")
+    font.setStyleHint(QFont.StyleHint.Monospace)
+    view.setFont(font)
+    layout.addWidget(view)
+    row = QHBoxLayout()
+    copy = QPushButton("Kopieren")
+    copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(view.toPlainText()))
+    close = QPushButton("Schließen")
+    close.clicked.connect(dialog.close)
+    row.addStretch(1)
+    row.addWidget(copy)
+    row.addWidget(close)
+    layout.addLayout(row)
+    dialog.show()
+    return dialog
+
+
 def _rtt(ip: str, ports: list[int]) -> int | None:
     """Grobe Antwortzeit: TCP-Connect zu einem offenen Port (oder gängigen Ports) messen."""
     candidates = ports[:1] or [80, 443, 22, 445]
@@ -490,10 +518,13 @@ class NetworkScannerDialog(QDialog):
         self._start_job(lambda: scan.system_ping(device.ip, timeout=2.0), done)
 
     def _traceroute(self, device: Device) -> None:
-        cmd = ["tracert", "-d", "-h", "15", device.ip] if sys.platform.startswith("win") else \
-              ["traceroute", "-n", "-m", "15", device.ip]
-        self.status.setText(f"Traceroute zu {device.ip} …")
-        self._run(cmd)
+        """Im Hintergrund ausführen, Ausgabe in einem Textfenster zeigen (vorher: Konsole ohne sichtbare Ausgabe)."""
+        self.status.setText(f"Traceroute zu {device.ip} läuft … (bis zu {int(scan.TRACE_TIMEOUT)} s)")
+
+        def done(output, error: str) -> None:
+            self.status.setText(f"Traceroute zu {device.ip} fertig" if not error else f"Traceroute: {error}")
+            show_text(self, f"Traceroute zu {device.ip}", output if not error else f"Fehler: {error}")
+        self._start_job(lambda: scan.traceroute(device.ip), done)
 
     def _deep_scan(self, device: Device) -> None:
         self.target.setText(device.ip)

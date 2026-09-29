@@ -414,6 +414,32 @@ def system_ping(ip: str, timeout: float = 1.0,
     return ping_alive(output, code)
 
 
+TRACE_HOPS = 15
+TRACE_TIMEOUT = 90.0             # Sekunden – 15 Hops × 3 Proben × 1 s Warten + Puffer
+
+
+def traceroute_command(ip: str, platform: str | None = None) -> list[str]:
+    """Plattformgerechter Traceroute-Befehl (Windows: tracert, sonst traceroute), numerisch, max. 15 Hops."""
+    if (platform or sys.platform).startswith("win"):
+        return ["tracert", "-d", "-h", str(TRACE_HOPS), "-w", "1000", ip]
+    return ["traceroute", "-n", "-m", str(TRACE_HOPS), "-w", "1", ip]
+
+
+def traceroute(ip: str, runner: Callable[[list[str]], tuple[int, str]] | None = None) -> str:
+    """Traceroute ausführen und die Ausgabe als Text liefern. Fehlt das Programm, eine verständliche Meldung."""
+    from notex.core import syscmd
+    command = traceroute_command(ip)
+    run = runner or (lambda cmd: syscmd.run(cmd, timeout=TRACE_TIMEOUT))
+    try:
+        _code, output = run(command)
+    except FileNotFoundError:
+        hint = "" if sys.platform.startswith("win") else " (Paket „traceroute“ installieren)"
+        return f"„{command[0]}“ ist auf diesem System nicht vorhanden{hint}."
+    except subprocess.TimeoutExpired:
+        return f"Keine vollständige Antwort innerhalb von {int(TRACE_TIMEOUT)} s."
+    return output.strip() or "Keine Ausgabe."
+
+
 def _run_command(command: list[str]) -> tuple[int, str]:
     from notex.core import syscmd
     return syscmd.run(command, timeout=10)      # OEM-Codepage unter Windows, siehe core/syscmd.py

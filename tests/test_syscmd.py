@@ -75,3 +75,21 @@ def test_system_ping_survives_decode_errors():
 def test_missing_program_raises_oserror_only():
     with pytest.raises((OSError, subprocess.SubprocessError)):
         syscmd.run(["notex-gibt-es-nicht-xyz"])
+
+
+def test_traceroute_command_per_platform():
+    assert scan.traceroute_command("1.2.3.4", "win32")[:2] == ["tracert", "-d"]
+    assert scan.traceroute_command("1.2.3.4", "linux")[:2] == ["traceroute", "-n"]
+    assert scan.traceroute_command("1.2.3.4", "linux")[-1] == "1.2.3.4"
+
+
+def test_traceroute_output_and_missing_program():
+    assert scan.traceroute("1.2.3.4", runner=lambda cmd: (0, " 1  10.0.0.1  1 ms  ")) == "1  10.0.0.1  1 ms"
+
+    def missing(cmd):
+        raise FileNotFoundError(cmd[0])
+    assert "nicht vorhanden" in scan.traceroute("1.2.3.4", runner=missing)
+
+    def slow(cmd):
+        raise subprocess.TimeoutExpired(cmd, 1)
+    assert "Keine vollständige Antwort" in scan.traceroute("1.2.3.4", runner=slow)

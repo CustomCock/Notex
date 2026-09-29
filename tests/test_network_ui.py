@@ -70,3 +70,15 @@ def test_failed_scan_resets_button(dialog):
     dialog._on_failed("UnicodeDecodeError: kaputt")
     assert dialog.start_button.text() == "Scannen"
     assert "kaputt" in dialog.status.text()
+
+
+def test_traceroute_shows_output_window(dialog, monkeypatch):
+    monkeypatch.setattr(scan, "traceroute", lambda ip, runner=None: " 1  192.168.1.1  2 ms")
+    before = set(QApplication.topLevelWidgets())
+    dialog._traceroute(device())
+    assert "läuft" in dialog.status.text()
+    assert wait_for(lambda: "fertig" in dialog.status.text())
+    new = [w for w in QApplication.topLevelWidgets() if w not in before and w.isVisible()]
+    assert any("Traceroute zu 192.168.1.5" in w.windowTitle() for w in new)
+    for w in new:
+        w.close()
