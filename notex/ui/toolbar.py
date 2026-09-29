@@ -264,6 +264,9 @@ class EditorToolbar(QFrame):
     def _build_tools_button_menu(self) -> None:
         """Das Werkzeuge-Menü der Blatt-Leiste aus der Registry bauen (nur passende Werkzeuge)."""
         menu = self.tools_button.menu_
+        area = getattr(self.tabs, "area", None)
+        if area is not None:                     # geteilte Ansicht: Menü gehört zu DIESEM Blatt
+            area.activate_group_of(self)
         builder = getattr(self.tabs, "tools_menu_builder", None)
         if builder is not None:
             builder(menu)

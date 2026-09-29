@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QSplitter, QVBoxLayout, QWidget
 
 from notex.core import split_state
@@ -63,6 +63,9 @@ class EditorArea(QWidget):
         self._refresh_keys()
         self.set_orientation(config.get("split", {}).get("orientation", "horizontal"))
         QApplication.instance().focusChanged.connect(self._on_focus_changed)
+        # Klicks ohne Fokuswechsel (Leisten-Knöpfe, Werkzeuge-Menü des Blatts) wählen die Gruppe ebenfalls –
+        # sonst wirken Leiste und Menü „Werkzeuge" auf die Datei der ANDEREN Gruppe
+        QApplication.instance().installEventFilter(self)
 
     # ---- Attribute durchreichen ----------------------------------------------------------------
     def __getattr__(self, name: str):
@@ -128,6 +131,21 @@ class EditorArea(QWidget):
     def _on_focus_changed(self, _old, new) -> None:
         for group in self.groups:
             if new is not None and group.isAncestorOf(new):
+                self.set_active(group)
+                return
+
+    def eventFilter(self, watched, event) -> bool:
+        if len(self.groups) > 1 and event.type() == QEvent.Type.MouseButtonPress and isinstance(watched, QWidget):
+            for group in self.groups:
+                if watched is group or group.isAncestorOf(watched):
+                    self.set_active(group)
+                    break
+        return False
+
+    def activate_group_of(self, widget: QWidget) -> None:
+        """Die Gruppe aktiv machen, die `widget` enthält (z. B. die Leiste, deren Menü gerade aufgeht)."""
+        for group in self.groups:
+            if group.isAncestorOf(widget):
                 self.set_active(group)
                 return
 
