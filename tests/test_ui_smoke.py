@@ -96,3 +96,66 @@ def test_ip_overview_without_index_shows_toast(win, monkeypatch):
     win.ip_index = None
     win.show_ip_overview()
     assert messages and "IP-Konflikte" in messages[-1]
+
+
+# ---- Das ursprüngliche Problem (R1): nach Tab-Wechsel & Co. reagieren Menü, Leiste und Netzwerk-Werkzeug -----------
+def _scenario(win, name: str) -> None:
+    tabs, files = win.tabs, win.files
+    tabs.open_file(files["log"])
+    tabs.open_file(files["md"])
+    QApplication.processEvents()
+    if name == "tab_wechsel":
+        tabs.setCurrentIndex(0)
+    elif name == "hex_und_zurueck":
+        win.open_as_hex(files["log"])
+        QApplication.processEvents()
+        tabs.open_file(files["log"])
+    elif name == "vorschau":
+        tabs.setCurrentIndex(1)
+        win.set_preview_mode("preview")
+    elif name == "schliessen_neu_oeffnen":
+        tabs.setCurrentIndex(0)
+        tabs.close_current()
+        QApplication.processEvents()
+        tabs.open_file(files["log"])
+    elif name == "teilen_und_aufheben":
+        tabs.setCurrentIndex(0)
+        tabs.split()
+        QApplication.processEvents()
+        tabs.unsplit()
+    elif name == "letzte_gruppe_geschlossen":
+        tabs.split(share_current=False)
+        tabs.open_file(files["png"])
+        QApplication.processEvents()
+        group = tabs.groups[1]
+        while group.count():
+            group.close_tab(0)
+            QApplication.processEvents()
+        tabs.open_file(files["log"])
+    QApplication.processEvents()
+
+
+@pytest.mark.parametrize("name", ["tab_wechsel", "hex_und_zurueck", "vorschau", "schliessen_neu_oeffnen",
+                                  "teilen_und_aufheben", "letzte_gruppe_geschlossen"])
+def test_menus_and_network_tool_react_after(win, name):
+    from uihelp import label, visible_windows
+    _scenario(win, name)
+    current = win._current_file()
+    assert current is not None
+    # Menü „Werkzeuge": gefüllt, Netzwerk-Werkzeuge aktiv
+    names = open_tools_menu(win)
+    assert "Port nachschlagen" in names and "Netzwerk-Scanner" in names and len(names) >= 10
+    # Blatt-Leiste (falls das aktuelle Blatt eine hat): gefüllt und passend zur Datei
+    page = win.tabs.current_page()
+    if page is not None and page.toolbar is not None:
+        bar = open_toolbar_menu(page)
+        assert "Port nachschlagen" in bar and len(bar) >= 5
+        before = visible_windows()
+        next(a for a in leaves(page.toolbar.tools_button.menu_) if label(a) == "Port nachschlagen").trigger()
+        QApplication.processEvents()
+        assert any("Port nachschlagen" in w.windowTitle() for w in visible_windows() - before)
+    # Netzwerk-Werkzeug aus dem Hauptmenü öffnet ein Fenster
+    before = visible_windows()
+    next(a for a in leaves(win.tools_menu) if label(a) == "Netzwerk-Scanner").trigger()
+    QApplication.processEvents()
+    assert any("Netzwerk-Scanner" in w.windowTitle() for w in visible_windows() - before)
