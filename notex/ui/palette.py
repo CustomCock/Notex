@@ -13,10 +13,9 @@ from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QLabel, QListWidge
 
 from notex.core.actions import ActionRegistry
 from notex.core.file_index import FileIndex
-from notex.core.fuzzy import highlight, parse_goto
+from notex.core.fuzzy import parse_goto
 from notex.core.recent import shorten_path
 from notex.theme.icons import icon
-from notex.theme.theme import add_shadow
 from notex.theme.tokens import COLORS, DURATION, LAYOUT, SPACING
 from notex.ui import anim
 from notex.ui.search_results import HtmlDelegate

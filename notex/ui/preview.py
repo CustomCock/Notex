@@ -113,7 +113,7 @@ class MarkdownPreview(QTextBrowser):
         result = render(self._text, options)
         body = result.html
         for url, error in self._errors.items():
-            body = body.replace(f'>Bild laden</a>', f'>Bild laden</a> <span style="color:{COLORS.danger}">({error})</span>', 1) \
+            body = body.replace('>Bild laden</a>', f'>Bild laden</a> <span style="color:{COLORS.danger}">({error})</span>', 1) \
                 if url in result.external_images else body
         self.document().setDefaultStyleSheet(stylesheet(self.colors(), self._font_family, self._font_size, MONO_FAMILIES[0]))
         self._syncing = True

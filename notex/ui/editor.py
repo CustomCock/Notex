@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QFrame, QMenu, QTextEdit, QWidget
 from notex.core.encoding import TextFile
 from notex.core import text_ops as ops
 from notex.core.text_ops import hanging_prefix
-from notex.core.spell import SpellChecker, LANGUAGE_LABELS
+from notex.core.spell import SpellChecker
 from notex.theme.icons import icon
 from notex.theme.theme import style_menu
 from notex.ui.spell_highlighter import Issue, SpellHighlighter

@@ -1791,7 +1791,6 @@ class MainWindow(QMainWindow):
         return undo
 
     def analyze_pcap(self, path: Path | None = None) -> None:
-        from notex.core import pcapinfo
         from notex.ui.pcap_dialog import PcapDialog
         target = self._analysis_target(path)
         if target is None:
@@ -2067,7 +2066,6 @@ class MainWindow(QMainWindow):
         editor = self.tabs.current_editor()
         if editor is None:
             return
-        from PySide6.QtGui import QTextCursor
         cursor = editor.textCursor()
         cursor.setPosition(min(offset, len(editor.toPlainText())))
         editor.setTextCursor(cursor)

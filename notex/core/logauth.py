@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Iterable, Iterator
+from typing import Callable, Iterator
 from xml.etree import ElementTree as ET
 
 MAX_EVENTS = 500_000

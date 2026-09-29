@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSplitter,
                                QTextEdit, QVBoxLayout, QWidget)
 
-from notex.core.history import History, Version, diff_lines, diff_stats, format_age
+from notex.core.history import History, diff_lines, diff_stats, format_age
 from notex.theme.fonts import MONO_FAMILIES
 from notex.theme.tokens import COLORS, SPACING
 

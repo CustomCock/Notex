@@ -7,7 +7,7 @@ Inline-Code (`…`) zählen nicht.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 LINK_RE = re.compile(r"\[\[([^\[\]|#\n]+?)(?:#([^\[\]|\n]+?))?(?:\|([^\[\]\n]+?))?\]\]")
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")

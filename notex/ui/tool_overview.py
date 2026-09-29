@@ -2,7 +2,6 @@
 Klick startet das Werkzeug; ist das Modul aus, gibt es einen „Aktivieren"-Knopf."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QScrollArea, QVBoxLayout, QWidget)
 

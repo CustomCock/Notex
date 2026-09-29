@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from pygments.lexers import get_lexer_by_name
-from pygments.token import Comment, Keyword, Literal, Name, Number, Operator, Punctuation, String, Token
+from pygments.token import Comment, Keyword, Literal, Name, Number, Operator, String, Token
 from pygments.util import ClassNotFound
 
 # Endung -> Pygments-Lexername

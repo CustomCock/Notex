@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 WORK = Path(tempfile.mkdtemp(prefix="notex-shots-"))
 os.environ["NOTEX_ROOT"] = str(WORK)
 
-from PySide6.QtCore import QPoint, QTimer, Qt  # noqa: E402
+from PySide6.QtCore import QPoint, QTimer  # noqa: E402
 from PySide6.QtGui import QImage, QPainter  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 

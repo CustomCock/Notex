@@ -11,7 +11,6 @@ in ein „…“-Menü – die Leiste bricht nie um.
 """
 from __future__ import annotations
 
-from typing import Callable
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction

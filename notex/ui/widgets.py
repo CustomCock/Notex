@@ -1,7 +1,7 @@
 """Kleine, wiederverwendbare Bausteine: Chips, Tab-Buttons, Suchfeld."""
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QEvent, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QPointF, QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QTabBar, QToolButton, QWidget
 

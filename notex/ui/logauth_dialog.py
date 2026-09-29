@@ -8,11 +8,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu,
+from PySide6.QtWidgets import (QComboBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMenu,
                                QPushButton, QTableWidget, QTableWidgetItem, QWidget)
 
 from notex.core import logauth
-from notex.theme.tokens import COLORS, FONT_SIZE, SPACING
+from notex.theme.tokens import COLORS, FONT_SIZE
 from notex.ui.analysis_dialog import AnalysisDialog
 
 HEADERS = ["Zeit", "Ereignis", "Benutzer", "IP", "Detail"]

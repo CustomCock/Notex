@@ -11,11 +11,10 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import Qt, QThread, QTimer, QRect, Signal
-from PySide6.QtGui import QColor, QGuiApplication
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from notex.core import lookup as lk
-from notex.theme.icons import icon
 from notex.theme.tokens import COLORS, DURATION, SPACING
 from notex.ui import anim
 from notex.ui.widgets import IconButton

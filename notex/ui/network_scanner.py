@@ -19,7 +19,7 @@ from PySide6.QtGui import QColor, QGuiApplication, QDesktopServices
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QInputDialog,
                                QLabel, QLineEdit, QMenu, QMessageBox, QProgressBar, QPushButton, QTableWidget,
-                               QTableWidgetItem, QVBoxLayout, QWidget)
+                               QTableWidgetItem, QVBoxLayout)
 
 from notex.core import netdetect, oui, scan
 from notex.theme.icons import icon

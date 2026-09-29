@@ -12,7 +12,7 @@ import html
 from typing import Callable
 
 from PySide6.QtCore import QEvent, QRect, Qt, QThread, QUrl, Signal
-from PySide6.QtGui import QCursor, QDesktopServices, QGuiApplication, QPixmap
+from PySide6.QtGui import QDesktopServices, QGuiApplication, QPixmap
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from notex.core import lookup as lk

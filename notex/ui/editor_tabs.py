@@ -662,7 +662,6 @@ class EditorTabs(QTabWidget):
         """Passwort prüfen, entschlüsseln, Text in den Editor. Bei leerer Datei: Passwort festlegen."""
         from PySide6.QtWidgets import QApplication
         from notex.core import crypto_notes
-        from notex.core.encoding import TextFile
         editor = page.editor
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)   # Argon2id braucht einen Moment
         try:
