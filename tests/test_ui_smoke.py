@@ -1,9 +1,6 @@
 """UI-Smoke-Tests mit echtem Hauptfenster (offscreen): Werkzeuge-Menü, Blatt-Leiste und Netzwerk-Werkzeuge
 müssen nach Tab-Wechsel, Teilen und Neuöffnen sichtbar reagieren (R1/R3)."""
 import os
-import struct
-import zlib
-from pathlib import Path
 
 import pytest
 
@@ -12,74 +9,9 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtCore import QPoint, Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
-
-def _png() -> bytes:
-    def chunk(tag, data):
-        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
-            + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00")) + chunk(b"IEND", b""))
-
-
-@pytest.fixture
-def win(tmp_path, monkeypatch):
-    monkeypatch.setenv("NOTEX_ROOT", str(tmp_path))
-    monkeypatch.setattr(QDialog, "exec", lambda self: 0)          # modale Dialoge nie blockieren
-    monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-    app = QApplication.instance() or QApplication([])
-    from notex.core.config import default_config
-    from notex.core.modules import MODULES
-    from notex.ui.main_window import MainWindow
-    root = tmp_path / "data"
-    root.mkdir()
-    config = default_config()
-    config["modules"] = {m.key: True for m in MODULES}
-    window = MainWindow(root, config, on_save_config=lambda c: None)
-    window.show()
-    app.processEvents()
-    window.files = {
-        "log": _write(root / "server.log", "2024-01-01 ERROR 10.0.0.5:443 fehlgeschlagen\n"),
-        "md": _write(root / "notiz.md", "# Notiz\n\nIP 192.168.1.10\n"),
-        "png": root / "bild.png",
-    }
-    window.files["png"].write_bytes(_png())
-    yield window
-    for widget in QApplication.topLevelWidgets():
-        if widget is not window and widget.isVisible():
-            widget.close()
-    window.close()
-    window.deleteLater()
-    app.processEvents()
-
-
-def _write(path: Path, text: str) -> Path:
-    path.write_text(text, encoding="utf-8")
-    return path
-
-
-def leaves(menu):
-    for action in menu.actions():
-        if action.menu():
-            yield from leaves(action.menu())
-        elif not action.isSeparator():
-            yield action
-
-
-def enabled_names(menu) -> list[str]:
-    return [a.text().split("\t")[0] for a in leaves(menu) if a.isEnabled()]
-
-
-def open_tools_menu(win) -> list[str]:
-    win.tools_menu.aboutToShow.emit()
-    QApplication.processEvents()
-    return enabled_names(win.tools_menu)
-
-
-def open_toolbar_menu(page) -> list[str]:
-    page.toolbar.tools_button.menu_.aboutToShow.emit()
-    QApplication.processEvents()
-    return enabled_names(page.toolbar.tools_button.menu_)
+from uihelp import capture_toasts as _capture_toasts, leaves, open_toolbar_menu, open_tools_menu  # noqa: E402
 
 
 # ---- Geteilte Ansicht: Menüs gehören zum angeklickten Blatt -------------------------------------------------------
@@ -146,12 +78,6 @@ def test_tools_menu_survives_broken_entry(win, monkeypatch):
 
 
 # ---- Stille Rückgaben zeigen einen Hinweis ------------------------------------------------------------------------
-def _capture_toasts(win, monkeypatch):
-    messages = []
-    monkeypatch.setattr(win.toast, "show_message", lambda text, *a, **k: messages.append(text))
-    return messages
-
-
 def test_run_tool_with_module_off_shows_toast(win, monkeypatch):
     messages = _capture_toasts(win, monkeypatch)
     win.modules.set_enabled("scanner", False)

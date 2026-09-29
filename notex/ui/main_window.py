@@ -1553,8 +1553,12 @@ class MainWindow(QMainWindow):
         from notex.core import ipmap
         from notex.ui.analysis_dialog import AnalysisWorker
         index = self.ip_index
-        if index is None or getattr(self, "_ip_worker", None) is not None:
+        if index is None:
             return
+        if getattr(self, "_ip_worker", None) is not None:
+            self._ip_refresh_pending = True       # nicht verwerfen: nach dem laufenden Abgleich nachholen
+            return
+        self._ip_refresh_pending = False
         snapshot = dict(index.files)
 
         def job(_progress, _cancelled):
@@ -1569,12 +1573,15 @@ class MainWindow(QMainWindow):
             if result is not None and self.ip_index is index:
                 index.files = result
                 self._mark_ip_conflicts()
+            if self._ip_refresh_pending:
+                self.refresh_ip_index()
         worker = AnalysisWorker(job)
         worker.done.connect(done)
         self._ip_worker = worker
         worker.start()
 
     _ip_worker = None
+    _ip_refresh_pending = False
 
     def _ip_file_saved(self, path: Path) -> None:
         if self.ip_index is not None and self.ip_index.update_file(path):
