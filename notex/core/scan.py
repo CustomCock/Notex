@@ -409,15 +409,14 @@ def system_ping(ip: str, timeout: float = 1.0,
     run = runner or _run_command
     try:
         code, output = run(command)
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError, ValueError):   # ValueError: u. a. UnicodeDecodeError
         return False
     return ping_alive(output, code)
 
 
 def _run_command(command: list[str]) -> tuple[int, str]:
-    result = subprocess.run(command, capture_output=True, text=True, timeout=10,
-                            creationflags=0x08000000 if sys.platform.startswith("win") else 0)
-    return result.returncode, (result.stdout or "") + (result.stderr or "")
+    from notex.core import syscmd
+    return syscmd.run(command, timeout=10)      # OEM-Codepage unter Windows, siehe core/syscmd.py
 
 
 # ---- ARP-Tabelle des Systems -------------------------------------------------------------------------------------

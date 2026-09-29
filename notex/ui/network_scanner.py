@@ -113,6 +113,22 @@ class ScannerThread(QThread):
         self.done.emit()
 
 
+class JobThread(QThread):
+    """Einzelne Host-Aktion (Ping, Traceroute) im Hintergrund – nie im UI-Thread, Fehler als Text."""
+    finished_job = Signal(object, str)       # Ergebnis, Fehlertext
+
+    def __init__(self, job, parent=None) -> None:
+        super().__init__(parent)             # Eltern = Hauptfenster: überlebt das Schließen des Dialogs
+        self.job = job
+        self.finished.connect(self.deleteLater)
+
+    def run(self) -> None:
+        try:
+            self.finished_job.emit(self.job(), "")
+        except Exception as error:            # noqa: BLE001 – im Dialog melden statt lautlos abbrechen
+            self.finished_job.emit(None, f"{type(error).__name__}: {error}")
+
+
 def _rtt(ip: str, ports: list[int]) -> int | None:
     """Grobe Antwortzeit: TCP-Connect zu einem offenen Port (oder gängigen Ports) messen."""
     candidates = ports[:1] or [80, 443, 22, 445]
@@ -147,6 +163,7 @@ class NetworkScannerDialog(QDialog):
         self.setWindowTitle("Netzwerk-Scanner")
         self.resize(1080, 680)
         self.thread: ScannerThread | None = None
+        self._jobs: list[JobThread] = []
         self.devices: dict[str, Device] = {}
         self._build()
         self._autofill_target()
@@ -279,7 +296,7 @@ class NetworkScannerDialog(QDialog):
                                     use_ping=self.opt_ping.isChecked())
         self.thread.device.connect(self._on_device)
         self.thread.progress.connect(lambda d, t: self.progress.setValue(d))
-        self.thread.failed.connect(lambda msg: self.status.setText(msg))
+        self.thread.failed.connect(self._on_failed)
         self.thread.done.connect(self._on_done)
         self.thread.start()
 
@@ -315,6 +332,24 @@ class NetworkScannerDialog(QDialog):
         alive = sum(1 for d in self.devices.values() if d.alive)
         self.status.setText(f"{alive} Geräte gefunden")
         self.progress.setValue(self.progress.maximum())
+
+    def _on_failed(self, message: str) -> None:
+        self.start_button.setText("Scannen")
+        self.table.setSortingEnabled(True)
+        self.status.setText(f"Scan abgebrochen: {message}")
+
+    def _start_job(self, job, on_result) -> JobThread:
+        worker = JobThread(job, self.window_)
+
+        def finished(result, error: str) -> None:
+            if worker in self._jobs:
+                self._jobs.remove(worker)
+            on_result(result, error)
+
+        worker.finished_job.connect(finished)
+        self._jobs.append(worker)
+        worker.start()
+        return worker
 
     # ---- Tabelle --------------------------------------------------------------------------------
     def _visible_devices(self) -> list[Device]:
@@ -382,6 +417,9 @@ class NetworkScannerDialog(QDialog):
         if self.thread is not None and self.thread.isRunning():
             self.thread.cancel()
             self.thread.wait(2000)
+        for worker in list(self._jobs):          # laufen zu Ende (Timeout im Befehl), Ergebnis wird verworfen
+            worker.finished_job.disconnect()
+        self._jobs.clear()
         super().closeEvent(event)
 
     # ---- Host-Aktionen --------------------------------------------------------------------------
@@ -444,8 +482,12 @@ class NetworkScannerDialog(QDialog):
                     return
 
     def _ping(self, device: Device) -> None:
-        ok = scan.system_ping(device.ip, timeout=2.0)
-        self.status.setText(f"{device.ip}: {'erreichbar' if ok else 'keine Antwort'}")
+        self.status.setText(f"Ping an {device.ip} …")
+
+        def done(ok, error: str) -> None:
+            self.status.setText(f"Ping {device.ip}: Fehler – {error}" if error
+                                else f"{device.ip}: {'erreichbar' if ok else 'keine Antwort'}")
+        self._start_job(lambda: scan.system_ping(device.ip, timeout=2.0), done)
 
     def _traceroute(self, device: Device) -> None:
         cmd = ["tracert", "-d", "-h", "15", device.ip] if sys.platform.startswith("win") else \

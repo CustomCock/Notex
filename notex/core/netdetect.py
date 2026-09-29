@@ -69,9 +69,9 @@ def parse_ipconfig(output: str) -> list[Adapter]:
 
 def _run(command: list[str]) -> str:
     import subprocess
+    from notex.core import syscmd
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=8)
-        return result.stdout
+        return syscmd.run(command, timeout=8)[1]   # OEM-Codepage unter Windows, siehe core/syscmd.py
     except (OSError, subprocess.SubprocessError):
         return ""
 
