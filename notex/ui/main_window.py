@@ -2004,6 +2004,14 @@ class MainWindow(QMainWindow):
             else:
                 self.toast.show_message(f"„{tool.name if tool else command}“ ist gerade nicht verfügbar", "info")
 
+    def set_all_modules(self, on: bool) -> None:
+        """Alle Module an/aus – sofort, ohne Neustart; gespeichert über das Config-Autosave."""
+        changed = self.modules.set_all(on)
+        if changed:
+            self.toast.show_message(f"{len(changed)} Module {'aktiviert' if on else 'deaktiviert'}", "layout-grid")
+        else:
+            self.toast.show_message(f"Alle Module sind schon {'an' if on else 'aus'}", "info")
+
     def show_tool_overview(self) -> None:
         from notex.ui.tool_overview import ToolOverviewDialog
         ToolOverviewDialog(self).show()
@@ -3509,6 +3517,10 @@ class MainWindow(QMainWindow):
         self.registry.add("nav:goto", "Gehe zu Zeile", lambda: (self.show_palette("files"), self.palette.field.setText(":")), category="Navigation")
         self.registry.add("doc:templates", "Neue Datei aus Vorlage", lambda: self.new_from_template(), category="Datei",
                           shortcut="Ctrl+Shift+T", keywords="vorlage template neu dokument")
+        self.registry.add("modules:all_on", "Module: alle aktivieren", lambda: self.set_all_modules(True),
+                          category="Einstellungen", keywords="module alle an aktivieren einschalten werkzeuge")
+        self.registry.add("modules:all_off", "Module: alle deaktivieren", lambda: self.set_all_modules(False),
+                          category="Einstellungen", keywords="module alle aus deaktivieren ausschalten")
         self.registry.add("tools:overview", "Werkzeug-Übersicht", self.show_tool_overview, category="Werkzeuge",
                           shortcut="Ctrl+Shift+W", keywords="werkzeuge tools übersicht katalog")
         self.sidebar.tree.menu_providers.append(self._tools_tree_menu)   # Untermenü „Werkzeuge" im Baum

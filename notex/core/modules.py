@@ -96,6 +96,21 @@ class ModuleRegistry:
         for listener in list(self._listeners):
             listener(key, on)
 
+    def set_all(self, on: bool) -> list[str]:
+        """Alle Module an bzw. aus (sofort, ohne Neustart). Gibt die Schlüssel zurück, die sich geändert haben."""
+        changed = [m.key for m in MODULES if self.enabled(m.key) != on]
+        for key in changed:
+            self.set_enabled(key, on)
+        return changed
+
+    def summary(self) -> str:
+        """„all“, „none“ oder „some“ – für den Tri-State-Schalter „Alle Module“."""
+        count = sum(1 for m in MODULES if self.enabled(m.key))
+        return "all" if count == len(MODULES) else ("none" if count == 0 else "some")
+
+    def enabled_count(self) -> int:
+        return sum(1 for m in MODULES if self.enabled(m.key))
+
     def on_change(self, listener: Callable[[str, bool], None]) -> None:
         self._listeners.append(listener)
 

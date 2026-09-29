@@ -4,6 +4,11 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+- **Module: „Alle aktivieren“ / „Alle deaktivieren“** in Einstellungen → Module, dazu ein Tri-State-Schalter
+  „Alle Module“ (an / teils / aus) mit Zähler. Wirkt sofort ohne Neustart, wird gespeichert, „Abbrechen“ stellt
+  den vorherigen Stand her. Auch als Palette-Befehle „Module: alle aktivieren/deaktivieren“.
+
 ### Geändert
 - **Vorlagen nach Kategorien** (`Ctrl+Shift+T`): Auswahl mit Abschnitten (Ausbildung, Kunde/Einsatz, E-Mail,
   Tabellen, Planung & Notizen, Sicherheit & Forensik, Sonstiges), alphabetisch, mit Suche nach Name und Kategorie.

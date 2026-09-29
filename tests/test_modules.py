@@ -80,3 +80,29 @@ def test_show_all_files_follows_analysis_modules() -> None:
     config["modules"]["entropy"] = False
     config["tree_show_all"] = True
     assert show_all_files(config)
+
+
+def test_set_all_on_and_off_immediately() -> None:
+    """R4b: „Alle aktivieren/deaktivieren“ wirkt sofort über die Aktivatoren und landet in der Config."""
+    config: dict = {}
+    registry, actions, calls, seen = ModuleRegistry(config), ActionRegistry(), [], []
+    registry.on_change(lambda key, on: seen.append((key, on)))
+    registry.contribute("hex", feature(actions, calls))
+    assert registry.summary() == "some" and registry.enabled_count() == 4
+    changed = registry.set_all(True)
+    assert registry.summary() == "all" and len(changed) == len(MODULES) - 4 and "hex" not in changed
+    assert all(config["modules"][m.key] is True for m in MODULES)
+    assert registry.set_all(True) == []                       # nichts doppelt
+    changed = registry.set_all(False)
+    assert registry.summary() == "none" and len(changed) == len(MODULES)
+    assert actions.get("hex:open") is None and calls == ["an", "aus"]
+    assert all(config["modules"][m.key] is False for m in MODULES)
+    assert ("hex", False) in seen and len(seen) == (len(MODULES) - 4) + len(MODULES)
+
+
+def test_set_all_survives_reload() -> None:
+    import json
+    config: dict = {}
+    ModuleRegistry(config).set_all(True)
+    reloaded = ModuleRegistry(json.loads(json.dumps(config)))  # wie nach Neustart aus config.json
+    assert reloaded.summary() == "all"

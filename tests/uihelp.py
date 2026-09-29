@@ -52,6 +52,9 @@ def close_window(window) -> None:
     window.close()
     window.deleteLater()
     QApplication.processEvents()
+    # deleteLater wirklich ausführen – sonst sammeln sich alte Fenster samt App-weiten Event-Filtern an
+    from PySide6.QtCore import QEvent
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
 
 
 def wait_for(predicate, timeout: float = 10.0) -> bool:

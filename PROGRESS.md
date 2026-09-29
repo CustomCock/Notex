@@ -486,7 +486,20 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   **Dabei gefundene Fehler (behoben, mit Regressionstest):** Geräte-Scanner-Start entpackte `parse_targets`
   (Ziele, Warnungen) nicht → AttributeError, „Scannen tut nichts“; `refresh_ip_index` verwarf Anforderungen während
   eines laufenden Abgleichs. Manuelle Checkliste: `docs/TESTPLAN-WINDOWS.md` (Abschnitte A–F).
-- R4 Vorlagen sortieren + „Alle aktivieren“: offen.
+- **R4a Vorlagen nach Kategorien – erledigt.** `core/template_catalog.py` (Qt-frei): Kategorie je Vorlage
+  (Unterordner > `category:` im Fragebogen-YAML / feste Zuordnung `BUILTIN_CATEGORY` > Präfix `E-Mail-`/`Tabelle-` >
+  „Sonstiges“), Reihenfolge Ausbildung, Kunde/Einsatz, E-Mail, Tabellen, Planung & Notizen, Sicherheit & Forensik,
+  eigene (alphabetisch), Sonstiges; Titel alphabetisch mit Umlaut-Faltung; Suche = alle Wörter in Titel/Kategorie/
+  Dateiname. `ui/template_picker.py` ersetzt das Dropdown in „Neue Datei aus Vorlage“; Fragebögen stehen mit in der
+  Liste (Berichtsheft unter „Ausbildung“) und starten den Assistenten. **Entscheidung:** Kategorie wird berechnet,
+  nie Dateien verschoben (nichts geht verloren, eigene Ordnung per Unterordner). **Gefundener Fehler:** wurde
+  `templates/fragebogen/` vor `templates/` angelegt, kamen die Standardvorlagen nie → Reihenfolge in
+  `questionnaires_folder()` + Erststart-Erkennung in `ensure_defaults` (gelöschte bleiben gelöscht).
+- **R4b Module alle an/aus – erledigt.** `ModuleRegistry.set_all/summary/enabled_count`; Einstellungen → Module:
+  Tri-State „Alle Module“ + Knöpfe + Zähler (Einzelschalter werden mit blockSignals nachgezogen, kein Doppel-
+  Schalten); Palette `modules:all_on/all_off`. Persistenz über Config-Autosave, Abbrechen über den Snapshot.
+- Test-Infrastruktur: `close_window` führt `deleteLater` aus (Suite 86 s → 23 s; alte Fenster samt App-Filtern
+  sammelten sich an).
 
 ## Offen
 
@@ -553,7 +566,8 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Plan R läuft:** R1–R3 erledigt → als Nächstes R4 (Vorlagen nach Kategorien + Suche; Module „Alle aktivieren/deaktivieren“).
+**Plan R abgeschlossen** (R1–R4, siehe oben; Stand im CHANGELOG unter „Unveröffentlicht“). Version/Tag setzt der
+Besitzer. Offen beim Besitzer: manuelle Prüfung nach `docs/TESTPLAN-WINDOWS.md`.
 
 **Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.

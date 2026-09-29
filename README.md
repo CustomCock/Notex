@@ -338,6 +338,11 @@ Einstellungen → **Module** (`Ctrl+,`, oder „Einstellungen: Module“ in der 
 einzeln an und aus – sofort, ohne Neustart. Ein ausgeschaltetes Modul hat keine Menüeinträge, Befehle,
 Tastenkürzel, Panels, Hover oder Hintergrundarbeit und lädt seine Bibliotheken nicht.
 
+Ganz oben stehen **„Alle Module“** (Tri-State: an / teils / aus – ein Klick schaltet alle an bzw. aus) sowie die
+Knöpfe **Alle aktivieren** und **Alle deaktivieren** mit Zähler („12 von 15 aktiv“). Auch das wirkt sofort und wird
+gespeichert; „Abbrechen“ im Einstellungsdialog stellt den vorherigen Zustand wieder her. In der Command Palette:
+„Module: alle aktivieren“ / „Module: alle deaktivieren“.
+
 | Modul | Standard | Zusätzlich nötig |
 |---|---|---|
 | Variablen | an | – |
