@@ -158,8 +158,7 @@ def parse_nbstat_response(data: bytes) -> str | None:
                 offset += data[offset] + 1
             offset += 1
         offset += 2 + 2 + 4        # Typ + Klasse + TTL
-        rdlen = int.from_bytes(data[offset:offset + 2], "big")
-        offset += 2
+        offset += 2                # RDLENGTH (Länge ergibt sich aus der Namensanzahl)
         if offset >= len(data):
             return None
         num_names = data[offset]

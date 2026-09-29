@@ -537,7 +537,6 @@ class EditorTabs(QTabWidget):
         editor.read_only = False
         editor.document().setModified(False)
         self._refresh_title(editor)
-        index = self.indexOf(self.page_for(editor))
         self.refresh_icon(editor)
         self.file_opened.emit(new_path)
         self.file_saved.emit(new_path)
