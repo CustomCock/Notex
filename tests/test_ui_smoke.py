@@ -108,3 +108,38 @@ def test_toolbar_menu_activates_own_group_even_without_click(win):
     log_page = win.tabs.groups[0].currentWidget()
     assert "Log-Auswertung" in open_toolbar_menu(log_page)     # z. B. per Tastatur geöffnet
     assert win._current_file().name == "server.log"
+
+
+# ---- Menüaufbau: kein Leck, kein leeres Menü bei Fehlern ------------------------------------------------------------
+def test_tools_menu_rebuild_does_not_leak(win):
+    from PySide6.QtWidgets import QMenu
+    win.tabs.open_file(win.files["log"])
+    open_tools_menu(win)
+    QApplication.processEvents()
+    before = len(win.tools_menu.findChildren(QMenu))
+    for _ in range(30):
+        open_tools_menu(win)
+    from PySide6.QtCore import QEvent
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)   # deleteLater ausführen
+    QApplication.processEvents()
+    assert len(win.tools_menu.findChildren(QMenu)) <= before
+
+
+def test_tools_menu_survives_broken_entry(win, monkeypatch):
+    import sys
+    from notex.ui import main_window as mw
+    real_icon = mw.icon
+
+    def flaky(name, *a, **k):
+        if name == "radar":
+            raise RuntimeError("Icon kaputt")
+        return real_icon(name, *a, **k)
+    monkeypatch.setattr(mw, "icon", flaky)
+    errors = []
+    monkeypatch.setattr(sys, "excepthook", lambda *exc: errors.append(exc[1]))
+    win.tabs.open_file(win.files["log"])
+    names = open_tools_menu(win)
+    assert "Log-Auswertung" in names and "Prüfsummen" in names          # Rest bleibt benutzbar
+    texts = [a.text() for a in leaves(win.tools_menu)]
+    assert any("Fehler beim Aufbau" in t for t in texts)
+    assert errors and "Icon kaputt" in str(errors[0])                    # im Log/Toast gemeldet

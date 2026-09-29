@@ -1940,7 +1940,12 @@ class MainWindow(QMainWindow):
     def _build_tools_menu(self, menu, kind: str, only_applicable: bool = False) -> None:
         """Menü „Werkzeuge" (bzw. Toolbar-/Baum-Ableger) aus der Registry bauen – Kategorien als Untermenüs.
         Nicht passende Werkzeuge sind ausgegraut (Tooltip: warum); abgeschaltete Module erscheinen gar nicht."""
-        from notex.core import tools
+        import sys
+        from notex.core import errorlog, tools
+        for action in menu.actions():             # alte Untermenüs wirklich löschen (clear() lässt sie liegen)
+            submenu = action.menu()
+            if submenu is not None and submenu.parent() is menu:
+                submenu.deleteLater()
         menu.clear()
         menu.setToolTipsVisible(True)
         enabled = self._enabled_modules()
@@ -1948,25 +1953,37 @@ class MainWindow(QMainWindow):
         if not groups:
             action = menu.addAction("Keine Werkzeuge aktiv – Einstellungen → Module")
             action.setEnabled(False)
+        failed = False
         for _key, label, group_tools in groups:
             visible = [t for t in group_tools if tools.applies(t, kind)] if only_applicable else group_tools
             if not visible:
                 continue
             submenu = menu.addMenu(label)
             for tool in visible:
-                ok = tools.applies(tool, kind)
-                action = submenu.addAction(icon(tool.icon), tool.name + (f"\t{_native(tool.shortcut)}"
-                                                                         if tool.shortcut else ""))
-                action.setEnabled(ok)
-                if not ok:
-                    action.setToolTip("Passt nicht zur aktuellen Datei" if kind != "none"
-                                      else "Erst eine Datei öffnen oder im Baum auswählen")
-                else:
-                    action.setToolTip(tool.description)
-                action.triggered.connect(lambda _c=False, cmd=tool.command: self._run_tool(cmd))
+                try:                               # ein kaputter Eintrag darf nie das ganze Menü leeren
+                    self._add_tool_action(submenu, tool, kind)
+                except Exception:                  # noqa: BLE001 – melden (Log + Hinweis), Rest weiterbauen
+                    failed = True
+                    sys.excepthook(*sys.exc_info())
+        if failed:
+            action = menu.addAction(f"Fehler beim Aufbau – Details in logs/{errorlog.LOG_NAME}")
+            action.setEnabled(False)
         menu.addSeparator()
         menu.addAction(icon("layout-grid"), "Werkzeug-Übersicht …\t" + _native("Ctrl+Shift+W"),
                        self.show_tool_overview)
+
+    def _add_tool_action(self, submenu, tool, kind: str) -> None:
+        from notex.core import tools
+        ok = tools.applies(tool, kind)
+        action = submenu.addAction(icon(tool.icon), tool.name + (f"\t{_native(tool.shortcut)}"
+                                                                 if tool.shortcut else ""))
+        action.setEnabled(ok)
+        if not ok:
+            action.setToolTip("Passt nicht zur aktuellen Datei" if kind != "none"
+                              else "Erst eine Datei öffnen oder im Baum auswählen")
+        else:
+            action.setToolTip(tool.description)
+        action.triggered.connect(lambda _c=False, cmd=tool.command: self._run_tool(cmd))
 
     def _run_tool(self, command: str) -> None:
         entry = self.registry.get(command)
