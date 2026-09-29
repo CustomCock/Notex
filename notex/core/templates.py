@@ -244,12 +244,16 @@ def ensure_defaults(folder: Path, installed: list[str] | None = None) -> list[Pa
     LATER_TEMPLATES, die noch nicht in `installed` stehen (die Liste wird ergänzt)."""
     folder = Path(folder)
     created = []
-    if not folder.exists():
+    # Erststart – auch wenn templates/ nur existiert, weil vorher templates/fragebogen/ angelegt wurde
+    # (dann liegt dort keine einzige Vorlage und installiert wurde noch nichts)
+    first_run = not folder.exists() or (installed is not None and not installed and not list_templates(folder))
+    if first_run:
         folder.mkdir(parents=True, exist_ok=True)
         for name, text in DEFAULT_TEMPLATES.items():
             path = folder / name
-            path.write_text(text, encoding="utf-8")
-            created.append(path)
+            if not path.exists():
+                path.write_text(text, encoding="utf-8")
+                created.append(path)
         if installed is not None:
             installed.extend(n for n in LATER_TEMPLATES if n not in installed)
         return created

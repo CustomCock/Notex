@@ -2153,6 +2153,7 @@ class MainWindow(QMainWindow):
     def questionnaires_folder(self) -> Path:
         """Ordner mit Fragebögen (templates/fragebogen); mitgelieferte werden einmalig geschrieben."""
         from notex.core.questionnaires_builtin import BUILTIN
+        self.templates_folder()        # zuerst die Standardvorlagen – sonst gilt templates/ als „schon eingerichtet“
         folder = app_root() / "templates" / "fragebogen"
         try:
             folder.mkdir(parents=True, exist_ok=True)
@@ -2858,16 +2859,23 @@ class MainWindow(QMainWindow):
 
     def new_from_template(self, name: str | None = None) -> None:
         from datetime import datetime
-        from notex.core.templates import default_file_name, list_templates, render
+        from notex.core import template_catalog
+        from notex.core.templates import default_file_name, render
         folder = self.templates_folder()
-        names = [p.name for p in list_templates(folder)]
         if name is None:
-            if not names:
+            self.questionnaires_folder()                 # mitgelieferte Fragebögen sicherstellen
+            entries = template_catalog.scan(folder)
+            if not entries:
                 self.toast.show_message("Keine Vorlagen – Vorlagen-Ordner öffnen und .md/.txt ablegen", "info")
                 return
-            name = dialogs.choose(self, "Neue Datei aus Vorlage", "Vorlage:", names)
-            if name is None:
+            from notex.ui.template_picker import choose_template
+            entry = choose_template(self, entries, on_open_folder=self.open_templates_folder)
+            if entry is None:
                 return
+            if entry.kind == "questionnaire":           # Fragebogen (z. B. Berichtsheft) → Assistent
+                self.start_questionnaire(folder / entry.key)
+                return
+            name = entry.key
         try:
             template = (folder / name).read_text(encoding="utf-8-sig")
         except FileNotFoundError:
@@ -2929,13 +2937,16 @@ class MainWindow(QMainWindow):
 
     def _refresh_template_commands(self) -> None:
         """Jede Vorlage als eigener Befehl in der Command Palette („Vorlage: Besprechung“)."""
-        from notex.core.templates import list_templates
+        from notex.core import template_catalog
         for command in list(self.registry.all()):
             if command.id.startswith("template:"):
                 self.registry.remove(command.id)
-        for path in list_templates(self.templates_folder()):
-            self.registry.add(f"template:{path.name}", f"Vorlage: {path.stem}", lambda n=path.name: self.new_from_template(n),
-                              category="Datei", keywords="neu vorlage template")
+        for entry in template_catalog.scan(self.templates_folder()):
+            if entry.kind != "file":                    # Fragebögen: eigener Befehl „Fragebogen ausfüllen“
+                continue
+            self.registry.add(f"template:{entry.key}", f"Vorlage: {entry.category} › {entry.title}",
+                              lambda n=entry.key: self.new_from_template(n), category="Datei",
+                              keywords=f"neu vorlage template {entry.category} {entry.name}")
 
     # ---- Verschlüsselte Notizen ------------------------------------------------------------
     def eventFilter(self, watched, event) -> bool:

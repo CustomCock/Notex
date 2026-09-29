@@ -181,9 +181,18 @@ Undo-Schritt und speichert nicht.
 
 ## Vorlagen und „Neue Woche“
 
-Vorlagen sind `.md`- oder `.txt`-Dateien in `templates/` neben der App. Beim ersten Benutzen legt Notex
-drei an: Woche, Tagesnotiz, Besprechung. **Ctrl+Shift+T** erzeugt eine neue Datei aus einer Vorlage im
-gewählten Ordner; jede Vorlage steht auch als „Vorlage: …“ in der Command Palette.
+Vorlagen sind `.md`-, `.txt`-, `.csv`- oder `.yar`-Dateien in `templates/` neben der App. Beim ersten Benutzen
+legt Notex die mitgelieferten an (Woche, Tagesnotiz, Besprechung, E-Mail- und Tabellen-Vorlagen …).
+**Ctrl+Shift+T** öffnet die Vorlagen-Auswahl und erzeugt die neue Datei im gewählten Ordner.
+
+Die Auswahl zeigt die Vorlagen **nach Kategorien in Abschnitten**, darin alphabetisch: Ausbildung,
+Kunde/Einsatz, E-Mail, Tabellen, Planung & Notizen, Sicherheit & Forensik, Sonstiges. Das **Suchfeld** filtert
+nach Name und Kategorie (`mail termin`, `ausbildung`, `tabellen`); Enter nimmt den ersten Treffer. Die
+**Fragebögen** stehen mit in der Liste – z. B. das **Berichtsheft** (Ausbildungsnachweis) unter „Ausbildung“ – und
+starten beim Auswählen den Assistenten. Eigene Ordnung: ein **Unterordner** in `templates/` wird zur Kategorie
+(`templates/Kunde X/Protokoll.md` → Abschnitt „Kunde X“); Fragebögen können `category:` im YAML angeben. Dateien
+werden für die Einordnung nie verschoben. Jede Datei-Vorlage steht auch als „Vorlage: Kategorie › Name“ in der
+Command Palette.
 
 | Platzhalter | Ergebnis |
 |---|---|
@@ -1071,7 +1080,7 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Ctrl+F / Ctrl+H | Suchen / Ersetzen in der aktuellen Datei |
 | Ctrl+Shift+H | Ersetzen in Dateien (mit Vorschau und Häkchen) |
 | Ctrl+Shift+Y | Versionsverlauf der aktuellen Datei |
-| Ctrl+Shift+T | Neue Datei aus Vorlage |
+| Ctrl+Shift+T | Neue Datei aus Vorlage (Auswahl nach Kategorien, mit Suche) |
 | Datei › Fragebogen ausfüllen | Assistent für Berichtsheft/Systemcheck/Sicherheits-Check (auch aus Kalender .ics) |
 | Baum/Palette › Formatiert bearbeiten | Markdown-Notiz im WYSIWYG-Editor (Ctrl+B/I, Listen …), Quelltext-Umschalter |
 | Ctrl+Shift+W | Werkzeug-Übersicht (durchsuchbarer Katalog aller Werkzeuge) |

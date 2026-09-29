@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
 
 ## [Unveröffentlicht]
 
+### Geändert
+- **Vorlagen nach Kategorien** (`Ctrl+Shift+T`): Auswahl mit Abschnitten (Ausbildung, Kunde/Einsatz, E-Mail,
+  Tabellen, Planung & Notizen, Sicherheit & Forensik, Sonstiges), alphabetisch, mit Suche nach Name und Kategorie.
+  Fragebögen (Berichtsheft, Systemcheck, Sicherheits-Check) stehen mit in der Liste. Unterordner in `templates/`
+  werden zu eigenen Kategorien. Keine Vorlage wird verschoben; Palette-Einträge heißen „Vorlage: Kategorie › Name“.
+
 ### Behoben
 - **Nichts passiert mehr lautlos**: Der Windows-Build hat keine Konsole – Fehler in Menü-/Knopf-Aktionen verschwanden
   bisher spurlos („Klick tut nichts“). Jetzt erscheint ein Hinweis, und `logs/notex-fehler.log` hält Datei:Zeile und
@@ -18,6 +24,8 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   nicht mehr das ganze Menü. „IP-Übersicht“ und nicht verfügbare Werkzeuge melden sich mit Hinweis statt stumm.
 - **Geräte-Scanner: „Scannen“ tat nichts** – die Zielliste wurde falsch ausgewertet (Absturz direkt beim Start,
   im Windows-Build unsichtbar). Leeres oder ungültiges Ziel wird jetzt gemeldet.
+- **Standardvorlagen fehlten**, wenn zuerst „Fragebogen ausfüllen“ benutzt wurde (templates/ galt dann als schon
+  eingerichtet). Vom Nutzer gelöschte Vorlagen bleiben weiterhin gelöscht.
 - **IP-Übersicht „Aktualisieren“** kurz nach dem Start oder während eines Abgleichs wurde verworfen – wird nachgeholt.
 
 ### Tests
