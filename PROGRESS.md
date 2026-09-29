@@ -468,7 +468,16 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   5) Toasts statt stummer Rückkehr (`show_ip_overview`, unbekanntes Werkzeug).
   Tests: `test_errorlog`, `test_syscmd`, `test_network_ui`, `test_ui_smoke` (echtes Hauptfenster offscreen).
   **Nicht reproduzierbar unter Linux:** ein totes Menü ohne Split View – wäre jetzt als Hinweis + Logeintrag sichtbar.
-- R2 Aufräumen, R3 Netzwerk-Tests, R4 Vorlagen sortieren + „Alle aktivieren“: offen.
+- **R2 Vorsichtig aufräumen – erledigt** (Besitzer: ohne Kandidatenliste, selbstständig). Werkzeuge: ruff (F-Regeln),
+  vulture, AST-Duplikatsuche, Referenzsuche für docs/assets. Entfernt: ungenutzte Imports (32 + 4 in Tests),
+  platzhalterlose f-Strings, ungenutzte lokale Variablen, 12 nie referenzierte Helfer/Konstanten, ein toter
+  `if False`-Zweig (Link-Ziel anlegen). **Bewusst liegen gelassen:** Qt-Overrides (von vulture fälschlich gemeldet),
+  `convert.encode_hex` (symmetrisches Set), `crypto_notes.SUFFIX`/`grammar.PUBLIC_API` (dokumentieren Format/URL),
+  `register_command` (Erweiterungs-Haken), `spelling_page`/`_footer` (Referenzen gegen GC), 1–3-zeilige gleichnamige
+  Privat-Helfer (`_cell`, `_muted`, `_alpha`, `_pad` – Zusammenlegen brächte nur Kopplung), 46 nicht direkt
+  referenzierte Icons (~16 KB, Namen teils dynamisch), Screenshots (von tools/screenshot.py erzeugt),
+  docs/icon-varianten (Entscheidungsgrundlage M4). Kein Verhalten geändert, alle Tests grün.
+- R3 Netzwerk-Tests, R4 Vorlagen sortieren + „Alle aktivieren“: offen.
 
 ## Offen
 
@@ -535,7 +544,7 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Plan R läuft:** R1 erledigt → als Nächstes R2 (vorsichtig aufräumen: erst Kandidatenliste, dann STOP).
+**Plan R läuft:** R1 + R2 erledigt → als Nächstes R3 (Tests für alle Netzwerk-Werkzeuge + UI-Smoke + Windows-Checkliste).
 
 **Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.
