@@ -292,11 +292,11 @@ class NetworkScannerDialog(QDialog):
             return
         targets_text = self.target.text().strip()
         if not targets_text:
+            self.status.setText("Erst ein Ziel eingeben (z. B. 192.168.1.0/24)")
             return
-        try:
-            targets = scan.parse_targets(targets_text)
-        except scan.ScanError as error:
-            QMessageBox.warning(self, "Ziel", str(error))
+        targets, warnings = scan.parse_targets(targets_text)     # (Ziele, Warnungen) – nie eine Exception
+        if not targets:
+            self.status.setText("Keine gültigen Ziele. " + " ".join(warnings))
             return
         excluded = netdetect.parse_exclusions(self.exclude.text())
         if excluded:
@@ -318,7 +318,7 @@ class NetworkScannerDialog(QDialog):
         self.table.setSortingEnabled(False)
         self.progress.setRange(0, len(targets))
         self.progress.setValue(0)
-        self.status.setText(f"Scanne {len(targets)} Adressen …")
+        self.status.setText(f"Scanne {len(targets)} Adressen …" + (" · " + " ".join(warnings) if warnings else ""))
         self.start_button.setText("Stopp")
         self.thread = ScannerThread(targets, config, netbios=self.opt_netbios.isChecked(),
                                     use_ping=self.opt_ping.isChecked())

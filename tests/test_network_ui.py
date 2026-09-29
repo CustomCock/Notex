@@ -82,3 +82,14 @@ def test_traceroute_shows_output_window(dialog, monkeypatch):
     assert any("Traceroute zu 192.168.1.5" in w.windowTitle() for w in new)
     for w in new:
         w.close()
+
+
+def test_scan_start_with_invalid_or_empty_target_reports(dialog):
+    """Regression R3: parse_targets liefert (Ziele, Warnungen) – der Start warf vorher AttributeError (lautlos)."""
+    dialog.target.setText("")
+    dialog._toggle_scan()
+    assert "Erst ein Ziel" in dialog.status.text()
+    dialog.target.setText("kein-ziel-%%%")
+    dialog._toggle_scan()
+    assert "Keine gültigen Ziele" in dialog.status.text()
+    assert dialog.thread is None
