@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +93,3 @@ class ThemeStore:
 
     def export_file(self, theme: dict[str, Any], target: Path) -> None:
         Path(target).write_text(json.dumps(merge_theme(theme), indent=2, ensure_ascii=False), encoding="utf-8")
-
-    def copy_file(self, name: str, target: Path) -> None:
-        shutil.copyfile(self._path(name), target)

@@ -26,7 +26,6 @@ from notex.ui.toolbar import EditorToolbar
 from notex.ui.paper import EditorPage
 from notex.ui.widgets import EditorTabBar
 
-DIRTY_MARK = " ●"
 MIN_FONT_SIZE, MAX_FONT_SIZE = 8, 40
 
 

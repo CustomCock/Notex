@@ -51,13 +51,6 @@ def load_fonts() -> list[str]:
     return list(_loaded)
 
 
-load_bundled_fonts = load_fonts   # alter Name, weiter gültig
-
-
-def loaded_families() -> list[str]:
-    return list(_loaded)
-
-
 def sf_available() -> bool:
     installed = set(QFontDatabase.families())
     return any(family in installed for family in SF_FAMILIES)
@@ -66,10 +59,6 @@ def sf_available() -> bool:
 def ui_families() -> list[str]:
     """Auflösungsreihenfolge für die Oberfläche (und die Standard-Textschrift)."""
     return [f for f in SF_FAMILIES if f in set(QFontDatabase.families())] + FALLBACK_FAMILIES
-
-
-def resolved_ui_family() -> str:
-    return QFont(ui_families()).family() if hasattr(QFont, "setFamilies") else ui_families()[0]
 
 
 def available_families() -> list[str]:

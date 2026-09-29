@@ -25,9 +25,6 @@ DEFAULT_EXTENSIONS = [".txt", ".md", ".log", ".csv", ".json", ".py", ".ini", ".s
                       ".xml", ".html", ".css", ".js", ".sql"]
 
 # Anzeigeklassen (Theme-Tokens): keyword, string, comment, number, function, operator, tag, attribute, log_*
-STYLE_CLASSES = ["keyword", "string", "comment", "number", "function", "operator", "tag", "attribute",
-                 "log_error", "log_warn", "log_info", "log_debug", "log_time", "log_ip", "log_path"]
-
 # Zustände über Blockgrenzen: was am Zeilenende offen blieb
 STATE_NONE = 0
 STATE_TRIPLE_DQ = 1     # Python """ ... """

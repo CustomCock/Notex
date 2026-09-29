@@ -115,10 +115,6 @@ def _eq(a, b) -> bool:
     return str(a) == str(b)
 
 
-def visible_questions(questionnaire: Questionnaire, answers: dict) -> list:
-    return [q for q in questionnaire.all_questions() if is_visible(q, answers)]
-
-
 def missing_required(questionnaire: Questionnaire, answers: dict) -> list:
     """Pflichtfragen, die sichtbar aber unbeantwortet sind → Liste von (id, label)."""
     out = []

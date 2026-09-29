@@ -185,10 +185,6 @@ class LogView(QWidget):
         self._follow = True
         self.pause_button.setVisible(False)
 
-    @property
-    def following(self) -> bool:
-        return self._follow
-
     # ---- Filter --------------------------------------------------------------------------------------
     def _apply_filter(self) -> None:
         self.filter = LogFilter(level=self.level_box.currentData(), text=self.filter_field.text(),
