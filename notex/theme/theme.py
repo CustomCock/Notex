@@ -45,6 +45,7 @@ def load_stylesheet() -> str:
     tokens["img_chevron_up"] = _tinted_svg("chevron-up", COLORS.text_muted)
     tokens["img_chevron_right"] = _tinted_svg("chevron-right", COLORS.paper_muted)
     tokens["img_check"] = _tinted_svg("check", COLORS.bg)
+    tokens["img_minus"] = _tinted_svg("minus", COLORS.bg)              # Tri-State „teils“
     # Unbekannte Platzhalter bleiben stehen, damit man den Tippfehler im QSS sieht
     return _TOKEN.sub(lambda m: tokens.get(m.group(1), m.group(0)), qss)
 
