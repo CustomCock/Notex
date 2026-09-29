@@ -3320,13 +3320,12 @@ class MainWindow(QMainWindow):
                 if line:
                     target.goto_line(line)
             return
-        # Kaputter Link: Datei anlegen, Ordner wählbar (Standard: Ordner der aktuellen Datei)
+        # Kaputter Link: Datei im Ordner der aktuellen Datei anlegen (externe Datei: data/)
         default_folder = editor.path.parent if not self.tabs.is_external(editor.path) else self.root
         if not dialogs.confirm(self, "Link-Ziel anlegen", f"„{span.target}“ existiert noch nicht.",
                                yes="Datei anlegen", informative=f"Neue Datei {span.target}.md im Ordner {self.tabs.relative(default_folder) or 'data'}?"):
             return
-        from PySide6.QtWidgets import QFileDialog
-        folder = QFileDialog.getExistingDirectory(self, "Ordner für die neue Datei", str(default_folder)) if False else str(default_folder)
+        folder = str(default_folder)
         name = span.target.replace("\\", "/").rsplit("/", 1)[-1]
         new_path = Path(folder) / f"{name}.md"
         if "/" in span.target:
