@@ -16,6 +16,13 @@ Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](
   ausgegraut), bis man die Datei neu öffnete. Ein Klick ins Blatt – auch auf die Leiste – wählt jetzt dessen Gruppe.
 - **Werkzeuge-Menü**: alte Untermenüs werden beim Neuaufbau gelöscht (Speicherleck); ein fehlerhafter Eintrag leert
   nicht mehr das ganze Menü. „IP-Übersicht“ und nicht verfügbare Werkzeuge melden sich mit Hinweis statt stumm.
+- **Geräte-Scanner: „Scannen“ tat nichts** – die Zielliste wurde falsch ausgewertet (Absturz direkt beim Start,
+  im Windows-Build unsichtbar). Leeres oder ungültiges Ziel wird jetzt gemeldet.
+- **IP-Übersicht „Aktualisieren“** kurz nach dem Start oder während eines Abgleichs wurde verworfen – wird nachgeholt.
+
+### Tests
+- UI-Tests mit echtem Hauptfenster für alle Netzwerk-Werkzeuge und das Werkzeuge-Menü; die CI installiert jetzt
+  PySide6 und fährt sie auf Windows und Ubuntu. Manuelle Checkliste: `docs/TESTPLAN-WINDOWS.md`.
 
 ## [1.16.0] – 2026-09-28
 

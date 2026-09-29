@@ -477,7 +477,16 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Privat-Helfer (`_cell`, `_muted`, `_alpha`, `_pad` – Zusammenlegen brächte nur Kopplung), 46 nicht direkt
   referenzierte Icons (~16 KB, Namen teils dynamisch), Screenshots (von tools/screenshot.py erzeugt),
   docs/icon-varianten (Entscheidungsgrundlage M4). Kein Verhalten geändert, alle Tests grün.
-- R3 Netzwerk-Tests, R4 Vorlagen sortieren + „Alle aktivieren“: offen.
+- **R3 Netzwerk-Werkzeuge testen – erledigt.** Gemeinsame UI-Fixture (`tests/conftest.py` `win`, `tests/uihelp.py`).
+  `test_network_tools_ui.py`: Menü → jedes Netzwerk-Werkzeug öffnet ein Fenster; Port-Infos; IP-Übersicht mit
+  Konflikt; RDAP (Fake-Client, private IP nie abgefragt); PCAP gegen Fixture; Geräte-Scanner + Port-Scan per echtem
+  TCP-Connect gegen Listener auf 127.0.0.1; Q-Aktionen DNS (localhost)/Ping/Ports + Analysieren-Menü.
+  `test_ui_smoke.py`: 6 Szenarien des Ursprungsproblems. **CI:** installiert requirements.txt inkl. PySide6
+  (Linux: libegl1/libgl1/libxkbcommon0/libfontconfig1/libdbus-1-3/libenchant-2-2), `QT_QPA_PLATFORM=offscreen`.
+  **Dabei gefundene Fehler (behoben, mit Regressionstest):** Geräte-Scanner-Start entpackte `parse_targets`
+  (Ziele, Warnungen) nicht → AttributeError, „Scannen tut nichts“; `refresh_ip_index` verwarf Anforderungen während
+  eines laufenden Abgleichs. Manuelle Checkliste: `docs/TESTPLAN-WINDOWS.md` (Abschnitte A–F).
+- R4 Vorlagen sortieren + „Alle aktivieren“: offen.
 
 ## Offen
 
@@ -544,7 +553,7 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Plan R läuft:** R1 + R2 erledigt → als Nächstes R3 (Tests für alle Netzwerk-Werkzeuge + UI-Smoke + Windows-Checkliste).
+**Plan R läuft:** R1–R3 erledigt → als Nächstes R4 (Vorlagen nach Kategorien + Suche; Module „Alle aktivieren/deaktivieren“).
 
 **Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.

@@ -1208,6 +1208,13 @@ Fuzzy-Suche, Wiki-Links, Syntax-Lexing, Markdown-Renderer mit Sanitizer, den Zus
 geteilten Editors, den Versionsverlauf und das Format der verschlüsselten Notizen (Roundtrip,
 falsches Passwort, Manipulation, Nonce, Formatversion).
 
+Dazu kommen UI-Tests mit echtem Hauptfenster ohne Bildschirm (`QT_QPA_PLATFORM=offscreen`, gemeinsame Fixture in
+`tests/conftest.py` / `tests/uihelp.py`): Werkzeuge-Menü und Blatt-Leiste nach Tab-Wechsel, Teilen und Neuöffnen,
+jedes Netzwerk-Werkzeug (Scanner und Port-Scan per echtem TCP gegen 127.0.0.1, PCAP gegen
+`tests/fixtures/beispiel_traffic.pcap`, RDAP mit Fake-Client). Die CI fährt alles auf Windows und Ubuntu.
+Was sich nur von Hand prüfen lässt (echtes Netz, deutsche Windows-Konsole, EXE ohne Konsole), steht in
+[`docs/TESTPLAN-WINDOWS.md`](docs/TESTPLAN-WINDOWS.md).
+
 ### Design-System
 
 Alle Farben, Abstände (4-px-Raster), Radien (6/8 px), Schriftgrößen und Animationsdauern
