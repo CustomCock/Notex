@@ -143,3 +143,30 @@ def test_tools_menu_survives_broken_entry(win, monkeypatch):
     texts = [a.text() for a in leaves(win.tools_menu)]
     assert any("Fehler beim Aufbau" in t for t in texts)
     assert errors and "Icon kaputt" in str(errors[0])                    # im Log/Toast gemeldet
+
+
+# ---- Stille Rückgaben zeigen einen Hinweis ------------------------------------------------------------------------
+def _capture_toasts(win, monkeypatch):
+    messages = []
+    monkeypatch.setattr(win.toast, "show_message", lambda text, *a, **k: messages.append(text))
+    return messages
+
+
+def test_run_tool_with_module_off_shows_toast(win, monkeypatch):
+    messages = _capture_toasts(win, monkeypatch)
+    win.modules.set_enabled("scanner", False)
+    win._run_tool("scan:open")
+    assert messages and "ist aus" in messages[-1]
+
+
+def test_run_tool_unknown_command_shows_toast(win, monkeypatch):
+    messages = _capture_toasts(win, monkeypatch)
+    win._run_tool("gibt:es-nicht")
+    assert messages and "nicht verfügbar" in messages[-1]
+
+
+def test_ip_overview_without_index_shows_toast(win, monkeypatch):
+    messages = _capture_toasts(win, monkeypatch)
+    win.ip_index = None
+    win.show_ip_overview()
+    assert messages and "IP-Konflikte" in messages[-1]

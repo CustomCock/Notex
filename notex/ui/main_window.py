@@ -1614,6 +1614,7 @@ class MainWindow(QMainWindow):
     def show_ip_overview(self) -> None:
         from notex.ui.ip_dialog import IpOverviewDialog
         if self.ip_index is None:
+            self.toast.show_message("IP-Übersicht: Modul „IP-Konflikte“ ist aus (Einstellungen → Module)", "info")
             return
         dialog = IpOverviewDialog(self)
         self._analysis_dialogs.setdefault("ip_conflicts", []).append(dialog)
@@ -1994,6 +1995,8 @@ class MainWindow(QMainWindow):
             tool = tools.BY_COMMAND.get(command)
             if tool and tool.module and tool.module not in self._enabled_modules():
                 self.toast.show_message(f"Modul für „{tool.name}“ ist aus (Einstellungen → Module)", "info")
+            else:
+                self.toast.show_message(f"„{tool.name if tool else command}“ ist gerade nicht verfügbar", "info")
 
     def show_tool_overview(self) -> None:
         from notex.ui.tool_overview import ToolOverviewDialog

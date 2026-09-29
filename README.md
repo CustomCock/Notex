@@ -715,7 +715,7 @@ und listet die gefundenen Geräte mit **Status, Name, IP, MAC, Hersteller, Komme
   Namen, **Hersteller aus der Offline-OUI-Liste** (öffentliche IEEE-Daten; lokal verwaltete/zufällige MACs werden als
   solche gekennzeichnet). Profile **Schnell / Standard / Gründlich**, Ausschlussliste, Live-Filter.
 - **Aktionen je Gerät** (Rechtsklick/Doppelklick): im Browser öffnen, Remotedesktop (RDP), Freigaben (`\\host`), SSH,
-  Ping, Traceroute, Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-Herunterfahren/Neustart
+  Ping, Traceroute (im Hintergrund, Ergebnis in einem kopierbaren Fenster), Ports vertiefen, RDAP/ASN (nur öffentliche IPs), **Wake-on-LAN**, Remote-Herunterfahren/Neustart
   (Windows, mit deutlicher Bestätigung), Kommentar, Favoriten, IP/MAC/Name kopieren, an die IP-Übersicht.
 - **Spalten** ein-/ausblendbar (Rechtsklick auf den Kopf), sortierbar, Breiten werden gespeichert.
 - **Export**: CSV, JSON, Markdown, HTML, PDF.
@@ -909,7 +909,9 @@ Vorschau mitscrollt.
 Ansichten, gemeinsames Undo). Tabs lassen sich per Drag zwischen den Gruppen ziehen; wird ein Tab am
 rechten oder unteren Rand abgelegt, entsteht die zweite Gruppe. `Ctrl+Alt+\` stellt die Gruppen
 untereinander statt nebeneinander, `Ctrl+Alt+→` verschiebt den Tab in die andere Gruppe. Schließt der
-letzte Tab einer Gruppe, verschwindet sie. Die Aufteilung überlebt einen Neustart.
+letzte Tab einer Gruppe, verschwindet sie. Die Aufteilung überlebt einen Neustart. Aktiv ist die Gruppe, in die
+zuletzt geklickt wurde – auch ein Klick auf die Bearbeitungsleiste zählt; Menü „Werkzeuge“ und Leiste wirken immer
+auf dieses Blatt.
 
 ![Split View](docs/27-split-view.png)
 
@@ -1136,6 +1138,7 @@ Notex/
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
   history/        <- Versionsverlauf (entsteht beim ersten Speichern, darf gelöscht werden)
   templates/      <- Vorlagen (.md/.txt), beim ersten Benutzen mit drei Beispielen angelegt
+  logs/           <- notex-fehler.log: nur bei unerwarteten Fehlern (Datei:Zeile + Kurzmeldung, keine Inhalte)
   config.json     <- Einstellungen und Zustand (wird jede Sekunde bei Änderung gesichert)
   themes/, fonts/user/, user_dictionary.txt   <- eigene Themes, Schriften, Wörterbuch (optional)
   licenses/, docs/ENCRYPTION.md, LICENSE, THIRD_PARTY_LICENSES.md, CHANGELOG.md

@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Nichts passiert mehr lautlos**: Der Windows-Build hat keine Konsole – Fehler in Menü-/Knopf-Aktionen verschwanden
+  bisher spurlos („Klick tut nichts“). Jetzt erscheint ein Hinweis, und `logs/notex-fehler.log` hält Datei:Zeile und
+  eine Kurzmeldung fest (keine Inhalte).
+- **Ping, Traceroute, ipconfig, ARP auf deutschem Windows**: Die Ausgabe (OEM-Codepage cp850) wurde als cp1252
+  gelesen; schon „Ping-Statistik für“ ließ jeden Ping abstürzen. Scanner-Ping läuft jetzt im Hintergrund, ein
+  abgebrochener Scan setzt den Start-Knopf zurück.
+- **Traceroute** zeigt sein Ergebnis (Hintergrund, kopierbares Fenster) statt einer unsichtbaren Konsole.
+- **Werkzeuge-Menü/Blatt-Leiste in der geteilten Ansicht**: wirkten auf die Datei der anderen Gruppe (oft fast alles
+  ausgegraut), bis man die Datei neu öffnete. Ein Klick ins Blatt – auch auf die Leiste – wählt jetzt dessen Gruppe.
+- **Werkzeuge-Menü**: alte Untermenüs werden beim Neuaufbau gelöscht (Speicherleck); ein fehlerhafter Eintrag leert
+  nicht mehr das ganze Menü. „IP-Übersicht“ und nicht verfügbare Werkzeuge melden sich mit Hinweis statt stumm.
+
 ## [1.16.0] – 2026-09-28
 
 ### Hinzugefügt

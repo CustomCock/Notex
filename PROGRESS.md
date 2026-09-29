@@ -455,6 +455,21 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Modus des Berichtshefts ist über Tabelle + Vorschlags-Chips + ICS-Vorbefüllung abgedeckt, kein eigener Dialog.
 - Neue Qt-freie Tests: `test_richmd` (11), `test_questionnaire` (10), `test_ics` (6). Keine neuen Python-Abhängigkeiten.
 
+### Plan R (Fehlerbehebung + Aufräumen, ab 29.09.2026)
+- **R1 Netzwerk-Tools + totes Werkzeuge-Menü – erledigt.** Diagnose per Offscreen-Szenarien (20 Zustände):
+  0) gemeinsame Ursache: `--windowed`-Build ohne Exception-Hook → jeder Slot-Fehler lautlos. Neu `core/errorlog.py`
+     + `ui/error_hook.py` (sys/threading.excepthook → `logs/notex-fehler.log` + gedrosselter Toast).
+  1) Windows-Konsolenausgabe ist OEM (cp850), `text=True` las cp1252 → UnicodeDecodeError bei jedem deutschen Ping.
+     Neu `core/syscmd.py` (Bytes lesen, OEM dekodieren, errors=replace); Scanner-Ping im `JobThread`.
+  2) Traceroute: `scan.traceroute()` + Textfenster statt Popen ohne Ausgabe.
+  3) Split View: Leisten-Knöpfe sind NoFocus → aktive Gruppe blieb die andere → Menü/Leiste wirkten auf deren Datei.
+     EditorArea-Eventfilter (MouseButtonPress) + Leiste aktiviert ihre Gruppe beim Menü-Öffnen.
+  4) `_build_tools_menu`: Untermenüs per deleteLater (Leck), Einträge einzeln abgesichert (ein Fehler leerte das Menü).
+  5) Toasts statt stummer Rückkehr (`show_ip_overview`, unbekanntes Werkzeug).
+  Tests: `test_errorlog`, `test_syscmd`, `test_network_ui`, `test_ui_smoke` (echtes Hauptfenster offscreen).
+  **Nicht reproduzierbar unter Linux:** ein totes Menü ohne Split View – wäre jetzt als Hinweis + Logeintrag sichtbar.
+- R2 Aufräumen, R3 Netzwerk-Tests, R4 Vorlagen sortieren + „Alle aktivieren“: offen.
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -519,6 +534,8 @@ evtx (MIT, Rust-Wheels), dpkt (BSD). regex/PyYAML/cryptography wie bisher. Kein 
 rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
+
+**Plan R läuft:** R1 erledigt → als Nächstes R2 (vorsichtig aufräumen: erst Kandidatenliste, dann STOP).
 
 **Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.
