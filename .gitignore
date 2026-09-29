@@ -16,6 +16,7 @@ dist/
 config.json
 data/
 history/
+logs/
 templates/
 
 # Von build.py erzeugt

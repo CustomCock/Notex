@@ -77,6 +77,8 @@ def run() -> int:
         if send_to_running_instance(name, files):
             return 0
     window = create_window()
+    from notex.ui import error_hook
+    error_hook.install(window, app_root() / "logs")   # kein Fehler endet lautlos (Build ohne Konsole)
     server.open_requested.connect(lambda paths: window.open_external([Path(p) for p in paths], bring_front=True))
     app.aboutToQuit.connect(server.stop)
     window.show()
