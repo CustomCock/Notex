@@ -1,4 +1,4 @@
-# Notex
+# fckNotes
 
 Portabler Explorer + Editor für Textdateien unter Windows. Ein Ordner, eine EXE,
 keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich den Zustand.
