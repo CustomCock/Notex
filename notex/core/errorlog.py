@@ -13,7 +13,7 @@ import time
 import traceback
 from pathlib import Path
 
-LOG_NAME = "notex-fehler.log"
+LOG_NAME = "fehlerprotokoll.log"
 MAX_BYTES = 256 * 1024           # danach wird die alte Datei zu .1 (eine Generation reicht)
 MAX_MESSAGE = 200
 

@@ -24,10 +24,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from notex import APP_NAME, PROG_ID
+from notex import APP_NAME, EXE_FILE, LEGACY_EXE_FILES, PROG_ID, REG_KEY
 
 DEFAULT_PREFIX = r"Software"
-EXE_NAME = "Notex.exe"
+EXE_NAME = EXE_FILE
 SUPPORTED_EXTENSIONS = [".txt", ".md", ".log", ".csv", ".json", ".ini"]
 DEFAULT_EXTENSIONS = [".txt"]
 
@@ -171,7 +171,10 @@ class FileAssociation:
 
     @property
     def capabilities_key(self) -> str:
-        return f"{self.prefix}\\{APP_NAME}\\Capabilities"
+        return f"{self.prefix}\\{REG_KEY}\\Capabilities"
+
+    def _legacy_app_keys(self) -> list[str]:
+        return [f"{self.classes}\\Applications\\{name}" for name in LEGACY_EXE_FILES if name != EXE_NAME]
 
     @property
     def registered_apps_key(self) -> str:
@@ -190,14 +193,16 @@ class FileAssociation:
         reg.set_value(f"{self.progid_key}\\DefaultIcon", None, f"{self.exe_path},0")
         reg.set_value(f"{self.progid_key}\\shell\\open", None, f"Mit {APP_NAME} öffnen")
         reg.set_value(f"{self.progid_key}\\shell\\open\\command", None, self._command())
-        # Applications\\Notex.exe: „Öffnen mit“-Liste
+        # Applications\\<exe>: „Öffnen mit“-Liste (Einträge früherer EXE-Namen entfernen, sonst doppelt/verwaist)
+        for legacy in self._legacy_app_keys():
+            reg.delete_tree(legacy)
         reg.set_value(self.app_key, "FriendlyAppName", APP_NAME)
         reg.set_value(f"{self.app_key}\\DefaultIcon", None, f"{self.exe_path},0")
         reg.set_value(f"{self.app_key}\\shell\\open\\command", None, self._command())
         # Capabilities + RegisteredApplications: Standard-Apps
         reg.set_value(self.capabilities_key, "ApplicationName", APP_NAME)
         reg.set_value(self.capabilities_key, "ApplicationDescription", "Portabler Explorer + Editor für Textdateien")
-        reg.set_value(self.registered_apps_key, APP_NAME, self.capabilities_key.split("\\", 1)[1] if self.prefix.lower().startswith("software") else self.capabilities_key)
+        reg.set_value(self.registered_apps_key, REG_KEY, self.capabilities_key.split("\\", 1)[1] if self.prefix.lower().startswith("software") else self.capabilities_key)
         # Endungen: nur OpenWithProgids + SupportedTypes, bestehende Standard-Zuordnung bleibt
         for old in self.status().extensions:
             if old not in extensions:
@@ -213,7 +218,7 @@ class FileAssociation:
         self._notify()
 
     def _verb_key(self, ext: str) -> str:
-        return f"{self.classes}\\SystemFileAssociations\\{ext}\\shell\\{APP_NAME}"
+        return f"{self.classes}\\SystemFileAssociations\\{ext}\\shell\\{REG_KEY}"
 
     def _unlink_extension(self, ext: str) -> None:
         self.reg.delete_tree(self._verb_key(ext))
@@ -227,8 +232,10 @@ class FileAssociation:
             self._unlink_extension(ext)
         self.reg.delete_tree(self.progid_key)
         self.reg.delete_tree(self.app_key)
-        self.reg.delete_tree(f"{self.prefix}\\{APP_NAME}")
-        self.reg.delete_value(self.registered_apps_key, APP_NAME)
+        for legacy in self._legacy_app_keys():
+            self.reg.delete_tree(legacy)
+        self.reg.delete_tree(f"{self.prefix}\\{REG_KEY}")
+        self.reg.delete_value(self.registered_apps_key, REG_KEY)
         self._notify()
 
     def update_path(self) -> None:

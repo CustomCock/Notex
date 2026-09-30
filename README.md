@@ -1,24 +1,32 @@
 # fckNotes
 
+> **fckNotes hieß bisher Notex.** Deine Notizen, Einstellungen und auch verschlüsselte `.ntx`-Notizen öffnen
+> unverändert; wie du von einer Notex-Installation umsteigst, steht unter „Umstieg von Notex“.
+
 Portabler Explorer + Editor für Textdateien unter Windows. Ein Ordner, eine EXE,
 keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich den Zustand.
 
 ## Installation
 
-1. Aus den [Releases](https://github.com/CustomCock/Notex/releases) die Datei `Notex-vX.Y.Z.zip` laden.
-2. Entpacken, z. B. nach `C:\Apps\Notex` oder auf einen USB-Stick.
-3. `Notex.exe` starten. Beim ersten Start entstehen `data/` und `config.json` daneben.
+1. Aus den [Releases](https://github.com/CustomCock/fckNotes/releases) die Datei `fckNotes-vX.Y.Z.zip` laden.
+2. Entpacken, z. B. nach `C:\Apps\fckNotes` oder auf einen USB-Stick.
+3. `fckNotes.exe` starten. Beim ersten Start entstehen `data/` und `config.json` daneben.
 
 Mehr ist nicht nötig. SmartScreen warnt beim ersten Start, weil die EXE nicht signiert ist:
 „Weitere Informationen“ → „Trotzdem ausführen“. Die ZIP bitte komplett entpacken, nicht die
-`Notex.exe` direkt aus dem ZIP-Fenster starten: Windows legt sie dann in einen Temp-Ordner, und
-Notizen würden dort landen (Notex warnt in dem Fall beim Start).
+`fckNotes.exe` direkt aus dem ZIP-Fenster starten: Windows legt sie dann in einen Temp-Ordner, und
+Notizen würden dort landen (fckNotes warnt in dem Fall beim Start).
 
-**Update:** Notex schließen, im bestehenden Ordner `Notex.exe` und `_internal/` durch die aus der
+**Update:** fckNotes schließen, im bestehenden Ordner `fckNotes.exe` und `_internal/` durch die aus der
 neuen ZIP ersetzen (`licenses/`, `docs/`, `LICENSE`, `CHANGELOG.md` gleich mit). `data/`, `history/`,
 `templates/`, `config.json`, `themes/`, `fonts/user/` und `user_dictionary.txt` bleiben liegen. Wer den Ordner verschiebt oder
 neu entpackt, bekommt beim nächsten Start die Frage, ob die Windows-Dateizuordnung auf den neuen
 Pfad gesetzt werden soll (auch später möglich unter Einstellungen → System → „Pfad aktualisieren“).
+
+**Umstieg von Notex:** wie ein Update – im bestehenden Ordner `fckNotes.exe` und `_internal/` aus der neuen ZIP
+ablegen und die alte `Notex.exe` löschen. `data/`, `config.json` und alles andere bleiben. War die Windows-
+Dateizuordnung eingerichtet, beim ersten Start „Pfad aktualisieren“ bestätigen – dabei verschwindet auch der
+alte „Notex“-Eintrag aus „Öffnen mit“.
 
 ![Editor mit geöffneter Datei](docs/03-editor.png)
 
@@ -60,29 +68,29 @@ Standardschrift ist Inter; mit SF Pro in `fonts/user/` sieht die Oberfläche ent
 
 ## Linux
 
-Seit 1.4 gibt es auch einen Linux-Build: `Notex-vX.Y.Z-linux-x86_64.tar.gz` aus den Releases, gebaut auf
+Seit 1.4 gibt es auch einen Linux-Build: `fckNotes-vX.Y.Z-linux-x86_64.tar.gz` aus den Releases, gebaut auf
 Ubuntu 22.04 (läuft auf Distributionen mit glibc ≥ 2.35, z. B. Ubuntu 22.04+, Debian 12, Fedora 36+).
 
 ```bash
-tar -xzf Notex-v1.4.0-linux-x86_64.tar.gz -C ~/Apps
-~/Apps/Notex/Notex
+tar -xzf fckNotes-v1.4.0-linux-x86_64.tar.gz -C ~/Apps
+~/Apps/fckNotes/fckNotes
 ```
 
-- Portabel wie unter Windows: `data/`, `config.json`, `history/`, `templates/` liegen neben der Datei `Notex`.
+- Portabel wie unter Windows: `data/`, `config.json`, `history/`, `templates/` liegen neben der Datei `fckNotes`.
 - Qt braucht auf manchen Systemen noch `libxcb-cursor0` (Ubuntu/Debian: `sudo apt install libxcb-cursor0`).
 - Rechtschreibung nutzt Enchant/Hunspell des Systems, falls installiert (`libenchant-2-2`), sonst das
   eingebaute spylls mit den mitgelieferten Wörterbüchern.
 - **Einstellungen → System → „Im Anwendungsmenü registrieren“** legt `notex.desktop`, den MIME-Typ für
-  `.ntx` und das Icon in `~/.local/share` an – kein root, nichts systemweit. Danach steht Notex im Menü und
+  `.ntx` und das Icon in `~/.local/share` an – kein root, nichts systemweit. Danach steht fckNotes im Menü und
   unter „Öffnen mit“. Standardprogramm wird es nur, wenn man es selbst festlegt
-  (`xdg-mime default notex.desktop text/plain`). Nach dem Verschieben des Ordners fragt Notex beim Start
+  (`xdg-mime default notex.desktop text/plain`). Nach dem Verschieben des Ordners fragt fckNotes beim Start
   nach und registriert neu.
 - Die Windows-Dateizuordnung, die dunkle Titelleiste und die Taskleisten-Gruppierung sind Windows-only und
   werden unter Linux übersprungen.
 
 ## Dateien von außen und Dateizuordnung
 
-`Notex.exe "C:\pfad\datei.txt"` öffnet die Datei. Läuft Notex schon, übernimmt die laufende
+`fckNotes.exe "C:\pfad\datei.txt"` öffnet die Datei. Läuft fckNotes schon, übernimmt die laufende
 Instanz sie als Tab und holt das Fenster nach vorn. Markierst du mehrere Dateien im Explorer und
 drückst Enter, landen alle in einem Fenster. Dateien außerhalb von `data/` werden direkt am
 Originalort bearbeitet, nicht kopiert; sie erscheinen in der Seitenleiste unter „Geöffnet“ mit
@@ -90,14 +98,14 @@ Kontextmenü „In data/ kopieren“, „In data/ verschieben“ und „Im Explo
 tragen ein kleines Pfeil-Symbol. Schreibgeschützte Dateien melden sich in der Statusleiste,
 Speichern bietet dann „Speichern unter …“ an. **Ctrl+R** zeigt die zuletzt geöffneten Dateien.
 
-Damit ein Doppelklick auf `.txt` Notex startet, registrierst du es in den Einstellungen unter
-**System**: Dateitypen wählen (.txt ist vorausgewählt), „Notex für Dateitypen registrieren“.
-Das schreibt nur in HKCU (kein Admin) und überschreibt keine bestehende Zuordnung: Notex erscheint
-unter „Öffnen mit“, in den Windows-Standard-Apps und im Kontextmenü als „Mit Notex öffnen“
+Damit ein Doppelklick auf `.txt` fckNotes startet, registrierst du es in den Einstellungen unter
+**System**: Dateitypen wählen (.txt ist vorausgewählt), „fckNotes für Dateitypen registrieren“.
+Das schreibt nur in HKCU (kein Admin) und überschreibt keine bestehende Zuordnung: fckNotes erscheint
+unter „Öffnen mit“, in den Windows-Standard-Apps und im Kontextmenü als „Mit fckNotes öffnen“
 (unter Windows 11 im klassischen Menü unter „Weitere Optionen anzeigen“). Den Standard für
 `.txt` wählst du selbst in den Windows-Einstellungen; der Button „Windows-Standard-Apps öffnen“
 bringt dich direkt dorthin. „Registrierung entfernen“ räumt alles wieder restlos weg. Wird der
-Notex-Ordner verschoben, weist ein Hinweis beim Start darauf hin, und „Pfad aktualisieren“ schreibt
+fckNotes-Ordner verschoben, weist ein Hinweis beim Start darauf hin, und „Pfad aktualisieren“ schreibt
 den neuen Pfad. Aus dem Dev-Modus (`python main.py`) ist die Registrierung bewusst deaktiviert.
 
 ![Einstellungen System](docs/20-settings-system.png)
@@ -126,14 +134,14 @@ In jeder Textdatei verlinkt `[[notizen]]` auf die Datei `notizen.*` irgendwo in 
 `[[ordner/notizen]]` zielt explizit). `[[notizen|Anzeigetext]]` zeigt anderen Text,
 `[[notizen#Überschrift]]` springt zur Überschrift. Links sind im Akzent unterstrichen, kaputte
 Links gestrichelt und gedämpft. **Ctrl+Klick** öffnet das Ziel; bei einem kaputten Link bietet
-Notex an, die Datei anzulegen. Nach `[[` erscheint ein Vorschlags-Popup mit Dateien, nach `#`
+fckNotes an, die Datei anzulegen. Nach `[[` erscheint ein Vorschlags-Popup mit Dateien, nach `#`
 mit den Überschriften der Zieldatei (Enter oder Tab übernimmt). In Codeblöcken und Inline-Code
 zählen Links nicht.
 
 **Ctrl+Shift+K** zeigt das Backlinks-Panel (unter dem Blatt oder rechts, einstellbar): alle
 Dateien, die auf die aktuelle Datei verlinken, mit Zeile und Kontext, Klick springt hin.
 Darunter „Unverlinkte Erwähnungen“: Stellen, an denen der Dateiname als Text vorkommt, mit
-„verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt Notex „X Links in Y
+„verlinken“. Wird eine Datei oder ein Ordner umbenannt oder verschoben, fragt fckNotes „X Links in Y
 Dateien anpassen?“ mit Vorschau und schreibt die Links in allen betroffenen Dateien um, auch in
 offenen Tabs. Der Link-Index entsteht im Hintergrund und wird über den Watcher aktuell gehalten.
 
@@ -151,7 +159,7 @@ Das Suchfeld links versteht eine kleine Abfragesprache:
 
 Die Chips unter dem Feld schalten **`.*`** (regulärer Ausdruck, Python-Syntax) und **Wort** (nur ganze
 Wörter) zu. Eine ungültige Regex bekommt einen roten Rahmen und die Fehlermeldung als Tooltip. Jeder
-Regex-Treffer hat ein Zeitlimit von 0,25 s pro Zeile, damit ein Muster wie `(a|a)+$` Notex nicht
+Regex-Treffer hat ein Zeitlimit von 0,25 s pro Zeile, damit ein Muster wie `(a|a)+$` fckNotes nicht
 einfriert; die Suche bricht dann mit „Timeout“ ab.
 
 **Ctrl+Shift+H** öffnet „Ersetzen in Dateien“: gleicher Suchbegriff, Ersatztext (bei Regex mit `\1` für
@@ -182,7 +190,7 @@ Undo-Schritt und speichert nicht.
 ## Vorlagen und „Neue Woche“
 
 Vorlagen sind `.md`-, `.txt`-, `.csv`- oder `.yar`-Dateien in `templates/` neben der App. Beim ersten Benutzen
-legt Notex die mitgelieferten an (Woche, Tagesnotiz, Besprechung, E-Mail- und Tabellen-Vorlagen …).
+legt fckNotes die mitgelieferten an (Woche, Tagesnotiz, Besprechung, E-Mail- und Tabellen-Vorlagen …).
 **Ctrl+Shift+T** öffnet die Vorlagen-Auswahl und erzeugt die neue Datei im gewählten Ordner.
 
 Die Auswahl zeigt die Vorlagen **nach Kategorien in Abschnitten**, darin alphabetisch: Ausbildung,
@@ -213,13 +221,13 @@ anlegen“ steht im Menü Datei. Ordner, Dateiname und Vorlage stellt man unter 
 ## Bilder
 
 - **Einfügen:** Ctrl+V mit einem Bild in der Zwischenablage (z. B. Screenshot) oder Bilddateien auf eine
-  `.md` ziehen: Notex legt das Bild als Datei in `assets/` neben der Notiz ab (Name aus Notizname und
+  `.md` ziehen: fckNotes legt das Bild als Datei in `assets/` neben der Notiz ab (Name aus Notizname und
   Zeitstempel, Ordnername in Einstellungen → Editor) und fügt `![](assets/…png)` am Cursor ein. In
   verschlüsselte Notizen (`.ntx`) werden keine Bilder eingefügt – das Bild läge sonst unverschlüsselt daneben.
 - **Anzeigen:** `.png .jpg .jpeg .gif .webp .bmp .svg` erscheinen im Baum und öffnen in einem Bild-Tab:
   Einpassen oder 100 %, Zoom mit dem Mausrad, Verschieben mit gedrückter Maus, dunkler neutraler Hintergrund.
   Maße, Dateigröße, Format und Zoom stehen in der Statusleiste.
-- **Verschieben:** Wandert eine Notiz in einen anderen Ordner, fragt Notex, ob ihre Bilder aus `assets/`
+- **Verschieben:** Wandert eine Notiz in einen anderen Ordner, fragt fckNotes, ob ihre Bilder aus `assets/`
   mitkommen; Links werden angepasst, Bilder, die andere Notizen im alten Ordner auch nutzen, werden kopiert.
 - **Aufräumen:** „Unbenutzte Bilder finden …“ (Menü Datei, Command Palette) listet Bilder ohne Verweis mit
   Vorschau; nur Angekreuztes kommt in den Papierkorb. Gelöscht wird nie automatisch.
@@ -244,7 +252,7 @@ und im Datei-Baum ein Kontextmenü „Werkzeuge“ (jeweils nur die passenden).
 **Schnellzugriff** sind selbst angeheftete Ordner (Rechtsklick auf einen Ordner → „An Schnellzugriff anheften“).
 **Dieser PC** zeigt den persönlichen Ordner und die Laufwerke/Wurzeln – so lassen sich beliebige Dateien auf dem
 Rechner öffnen und mit den Werkzeugen untersuchen. Ein Klick auf einen Ort schaltet den Baum um. Versteckte Dateien
-blendet das Kontextmenü ein. Außerhalb des Notiz-Ordners warnt Notex vor Schreibzugriffen, in Systemordnern besonders
+blendet das Kontextmenü ein. Außerhalb des Notiz-Ordners warnt fckNotes vor Schreibzugriffen, in Systemordnern besonders
 deutlich – gelesen wird nie automatisch.
 
 **Neue Datei nach Typ** (Menü Datei bzw. Baum-Kontextmenü, je Typ auch in der Palette) legt Text, Markdown, CSV, JSON,
@@ -303,7 +311,7 @@ Grußformel/Signatur; Tabellen als CSV/Markdown, Benutzerlisten bewusst **ohne P
 
 ## Analyse per Rechtsklick
 
-Text markieren (oder mit dem Cursor auf einem Wort stehen) und rechtsklicken → Gruppe **Analysieren**. Notex erkennt
+Text markieren (oder mit dem Cursor auf einem Wort stehen) und rechtsklicken → Gruppe **Analysieren**. fckNotes erkennt
 den Typ der Markierung und bietet nur die passenden Aktionen; das Ergebnis erscheint in einer kompakten Karte neben
 der Markierung. Dieselben Aktionen stehen auch in der Command Palette („Analysieren: …“). Aktionen abgeschalteter
 Module erscheinen als „… – Modul aktivieren“.
@@ -375,13 +383,13 @@ Textbausteine mit Verknüpfung (Modul „Variablen“, Standard an). Einstellung
 Tabelle mit Name, Wert (auch mehrzeilig) und Beschreibung, Suche, Import/Export als JSON. Gespeichert wird in
 `variables.json` neben der App – **unverschlüsselt, also keine Passwörter oder Geheimnisse als Variablen**.
 
-- Schreibst du `§gruss`, steht in der Datei genau das. Notex zeigt im Editor den **Wert** im Lesefluss (dezent
+- Schreibst du `§gruss`, steht in der Datei genau das. fckNotes zeigt im Editor den **Wert** im Lesefluss (dezent
   hinterlegt); Hover zeigt Name und Wert. Ändert sich ein Wert, ändert sich die Anzeige überall sofort.
 - Namen: Buchstaben (auch Umlaute), Ziffern, Unterstrich – z. B. `§23`, `§gruss`, `§firma_tel`. Das Token endet am
   ersten anderen Zeichen und zählt nur, wenn genau dieser Name definiert ist (`§23a` bleibt normaler Text, `§234`
   ist §234 und nicht §23 + „4“). Nicht definierte Tokens sind normaler Text. Präfix einstellbar (Standard `§`).
 - Die Variable verhält sich wie **ein Zeichen**: Pfeiltasten springen darüber, Entf/Rücktaste löschen sie ganz.
-- Nach dem Präfix schlägt Notex passende Variablen vor (Enter übernimmt, Esc lässt den Text, wie er ist);
+- Nach dem Präfix schlägt fckNotes passende Variablen vor (Enter übernimmt, Esc lässt den Text, wie er ist);
   `Ctrl+Alt+V` fügt das Präfix ein und öffnet die Vorschläge.
 - **Rechtsklick** auf eine Variable: „Variable entfernen (als normalen Text behalten)“ – gespeichert als `\§23`,
   angezeigt als normales „§23“ –, „Durch Wert ersetzen“, „Variable bearbeiten …“. Auf einem entfernten Vorkommen:
@@ -435,7 +443,7 @@ Für `.json` und `.yaml`/`.yml` (Menü Bearbeiten → JSON/YAML oder Command Pal
   (z. B. `$.users[3].name`) und lässt sich mit „Pfad kopieren“ übernehmen. Kinder werden erst beim Aufklappen
   erzeugt, große Dateien bleiben flüssig. Bei ungültigem Inhalt zeigt der Baum den Fehler mit „Zur Stelle springen“.
 - **YAML** wird ausschließlich sicher gelesen und geschrieben (`safe_load`/`safe_dump` – keine Python-Objekte, kein
-  Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt Notex vorher.
+  Code). Beim Formatieren gehen Kommentare und Anker verloren; enthält die Datei Kommentare, fragt fckNotes vorher.
 - Verschlüsselte Notizen (`.ntx`) haben keine Baumansicht und keine Prüfung beim Tippen.
 
 | Baum | Fehler |
@@ -461,7 +469,7 @@ PDFs öffnen als eigener Tab (nur lesen):
   ```
 
   Ohne Teilung landet das Zitat in der Zwischenablage. Teilen geht jetzt auch aus einem PDF-Tab heraus (`Ctrl+\`).
-- Keine Formulare, keine Skripte, keine Link-Aktionen: Notex zeigt nur an und liest Text aus. Die Datei wird in den
+- Keine Formulare, keine Skripte, keine Link-Aktionen: fckNotes zeigt nur an und liest Text aus. Die Datei wird in den
   Speicher gelesen und gleich wieder geschlossen – umbenennen/verschieben geht auch, während der Tab offen ist.
   Passwortgeschützte PDFs fragen nach dem Passwort (es wird nirgends gespeichert).
 - Technik: QtPdf (PDFium), ohne QtWebEngine; der Build wächst dadurch um wenige MB.
@@ -515,7 +523,7 @@ Modul „Entropie“ (Standard aus). Rechtsklick auf eine Datei im Baum → **En
   aufgelistet. Hover zeigt Offset und Wert, Klick springt in die Hex-Ansicht.
 - Gesamtentropie mit Einschätzung: Text, gemischt/strukturiert, komprimiert oder verschlüsselt – oder „gemischt“
   mit Anteil, wenn nur Teile der Datei hohe Entropie haben (Hinweis auf eingebettete oder verschlüsselte Daten).
-- Kleine Blöcke unterschätzen die Entropie systematisch; Notex korrigiert das je Block (Miller–Madow), damit auch
+- Kleine Blöcke unterschätzen die Entropie systematisch; fckNotes korrigiert das je Block (Miller–Madow), damit auch
   1-KB-Blöcke aus Zufallsdaten über 7,5 liegen.
 - Gestreamt im Hintergrund mit Fortschritt und Abbrechen – auch für mehrere GB.
 
@@ -635,7 +643,7 @@ Notizen werden nie gelesen:
 **IP-Übersicht** (`Ctrl+Shift+Alt+I`, Menü Datei, Palette): nach Subnetz gruppiert (IPv4 /24, IPv6 /64),
 Konflikte (dieselbe IP bei verschiedenen Hosts; `fileserver` und `FileServer.corp.local` gelten als gleich) mit
 Warnsymbol und Tooltip, Doppelklick springt zur Stelle. Unten ein Subnetz eingeben (oder Gruppe anklicken) und
-optional Ausschlussbereiche wie den DHCP-Pool (`10.0.0.100-10.0.0.199, 10.0.0.1`): Notex zeigt nutzbare, belegte,
+optional Ausschlussbereiche wie den DHCP-Pool (`10.0.0.100-10.0.0.199, 10.0.0.1`): fckNotes zeigt nutzbare, belegte,
 ausgeschlossene und freie Adressen und kopiert die **nächste freie IP**.
 
 Im Editor werden Konflikt-IPs rot unterwellt, der Tooltip nennt die anderen Hosts. Das aktualisiert sich beim
@@ -659,10 +667,10 @@ bzw. Palette „RDAP / ASN abfragen“ (Markierung oder Wert unter dem Cursor, s
   AFRINIC, Registry der TLD). Die ASN zu einer IP kommt von der **RIPEstat Data API** (`stat.ripe.net`,
   „prefix-overview“): kostenlos, ohne Schlüssel, weltweite BGP-Sicht; der AS-Name zusätzlich per RDAP.
 - **Private und reservierte Adressen** (RFC 1918, Loopback, Link-Local, CGNAT, Dokumentationsnetze, Multicast, ULA …)
-  erkennt Notex lokal und fragt sie nie ab.
+  erkennt fckNotes lokal und fragt sie nie ab.
 - Ergebnisse bleiben für die Sitzung im Speicher (nichts auf Platte); je Server mindestens 1 s Abstand, „429 Too
   Many Requests“ wird mit Retry-After respektiert, Zeitlimit 10 s. Die Abfrage läuft im Hintergrund.
-- Aus verschlüsselten Notizen fragt Notex vor dem Senden nach.
+- Aus verschlüsselten Notizen fragt fckNotes vor dem Senden nach.
 
 ![RDAP-Karte](docs/60-rdap-card.png)
 
@@ -753,7 +761,7 @@ Der frühere Port-fokussierte Scan ist als **„Port-Scan“** in der Command Pa
 - **An IP-Übersicht geben**: nutzt das Ergebnis als zusätzliche Quelle für das Modul IP-Konflikte.
 - **Skript-Export**: den konfigurierten Scan als eigenständiges **PowerShell**- (nur .NET-Bordmittel) oder
   **Bash**-Skript (`/dev/tcp`, `timeout`, `ping`) speichern – gleiche Ziele/Ports, CSV-Ausgabe, mit
-  Ausführungshinweis im Header. Für Rechner ohne Notex.
+  Ausführungshinweis im Header. Für Rechner ohne fckNotes.
 
 **Ehrliche Grenzen**: Es ist ein **TCP-Connect-Scan** (voller Handshake, keine Admin-Rechte). Kein SYN-/Stealth-Scan,
 keine Betriebssystem-Erkennung, kein UDP. „Host aktiv?“ ist heuristisch (TCP-Anklopfen, optional `ping`); eine
@@ -846,15 +854,15 @@ Kursiv, Code, Link – dieselben Aktionen wie in der Bearbeitungsleiste) und Nac
   Wortart, Bedeutungen, Aussprache (IPA) und Herkunft. Ein Klick irgendwo auf die Karte öffnet den Artikel im
   Browser; unten wechselt „Wiktionary“/„Wikipedia“ die Quelle in derselben Karte. Unscharfe Begriffe laufen
   über die Suche, Begriffsklärungen erscheinen als anklickbare Liste. Esc, Klick daneben oder × schließt.
-- **Bei Google suchen: „Begriff“** (Ctrl+Alt+G) öffnet nur den Browser – Notex ruft dabei nichts ab. Statt
+- **Bei Google suchen: „Begriff“** (Ctrl+Alt+G) öffnet nur den Browser – fckNotes ruft dabei nichts ab. Statt
   Google lassen sich DuckDuckGo, Startpage oder eine eigene URL mit `{q}` einstellen.
 
 Nachgeschlagen wird nur bei dieser ausdrücklichen Aktion, nie beim bloßen Markieren, über die offiziellen
 Wikimedia-APIs (keine KI, kein Scraping) mit eigenem User-Agent, eine Anfrage nach der anderen, 5 s Timeout,
 Ergebnisse pro Sitzung zwischengespeichert. Sprache ist die Rechtschreib-Sprache des Tabs; findet sich nichts,
-versucht Notex die andere (Deutsch/Englisch). Offline, „nicht gefunden“ oder zu viele Anfragen zeigt die
+versucht fckNotes die andere (Deutsch/Englisch). Offline, „nicht gefunden“ oder zu viele Anfragen zeigt die
 Karte selbst an, jeweils mit „Bei Google suchen ↗“ als Ausweg. Aus verschlüsselten Notizen (`.ntx`) fragt
-Notex vor jedem Senden nach („In dieser Sitzung nicht mehr fragen“ möglich). Einstellungen → Nachschlagen:
+fckNotes vor jedem Senden nach („In dieser Sitzung nicht mehr fragen“ möglich). Einstellungen → Nachschlagen:
 online an/aus, Sprache (Automatisch/Deutsch/Englisch), Vorschaubilder (Standard aus), Suchmaschine.
 
 | Kontextmenü | Wikipedia | Wiktionary |
@@ -866,17 +874,17 @@ online an/aus, Sprache (Automatisch/Deutsch/Englisch), Vorschaubilder (Standard 
 | ![Begriffsklärung](docs/36-lookup-disambiguation.png) | ![Fehlerzustand](docs/37-lookup-error.png) |
 
 **Warum Wiktionary über die Action-API?** Die REST-Definition-API gibt es nur auf en.wiktionary und sie
-liefert weder Herkunft noch Aussprache. `action=parse&prop=wikitext` gibt es auf beiden Wikis gleich; Notex
+liefert weder Herkunft noch Aussprache. `action=parse&prop=wikitext` gibt es auf beiden Wikis gleich; fckNotes
 liest daraus Wortarten, Bedeutungen, IPA und Herkunft und wandelt das Wiki-Markup in lesbaren Text um.
 
 ## Updates
 
-Notex sieht höchstens einmal am Tag in der öffentlichen Release-Liste auf GitHub nach, ob es eine neuere
+fckNotes sieht höchstens einmal am Tag in der öffentlichen Release-Liste auf GitHub nach, ob es eine neuere
 Version gibt, und zeigt dann einen Hinweis. **Es wird nie etwas heruntergeladen oder installiert.**
 „Hilfe › Nach Updates suchen …“ prüft sofort und zeigt die Versionshinweise; „Release-Seite öffnen“
 öffnet den Browser, „Diese Version überspringen“ schweigt bis zur nächsten. Abschalten unter
 Einstellungen → System. Übertragen wird nur die normale HTTPS-Anfrage an api.github.com (IP-Adresse,
-User-Agent `Notex/<Version>`), keine Kennung und keine Nutzungsdaten.
+User-Agent `fckNotes/<Version>`), keine Kennung und keine Nutzungsdaten.
 
 ![Update verfügbar](docs/32-update.png)
 
@@ -1146,13 +1154,13 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 ## Ordnerstruktur der portablen App
 
 ```
-Notex/
-  Notex.exe
+fckNotes/
+  fckNotes.exe
   _internal/      <- Python + Qt, nicht anfassen
   data/           <- hier kommen deine Textdatei-Ordner rein (wird beim Start angelegt)
   history/        <- Versionsverlauf (entsteht beim ersten Speichern, darf gelöscht werden)
   templates/      <- Vorlagen (.md/.txt), beim ersten Benutzen mit drei Beispielen angelegt
-  logs/           <- notex-fehler.log: nur bei unerwarteten Fehlern (Datei:Zeile + Kurzmeldung, keine Inhalte)
+  logs/           <- fehlerprotokoll.log: nur bei unerwarteten Fehlern (Datei:Zeile + Kurzmeldung, keine Inhalte)
   config.json     <- Einstellungen und Zustand (wird jede Sekunde bei Änderung gesichert)
   themes/, fonts/user/, user_dictionary.txt   <- eigene Themes, Schriften, Wörterbuch (optional)
   licenses/, docs/ENCRYPTION.md, LICENSE, THIRD_PARTY_LICENSES.md, CHANGELOG.md
@@ -1194,8 +1202,8 @@ für die Volltextsuche (Default 5 MB).
 Voraussetzung: Python 3.12 (3.11 funktioniert auch).
 
 ```bat
-git clone https://github.com/customcock/notex.git
-cd notex
+git clone https://github.com/CustomCock/fckNotes.git
+cd fckNotes
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -1269,7 +1277,7 @@ build.py / build.bat    PyInstaller-Build
 python build.py
 ```
 
-oder Doppelklick auf `build.bat` (legt bei Bedarf ein venv an). Ergebnis: `dist/Notex/`.
+oder Doppelklick auf `build.bat` (legt bei Bedarf ein venv an). Ergebnis: `dist/fckNotes/`.
 Diesen Ordner kannst du komplett kopieren, z. B. auf einen USB-Stick.
 
 ## Release über GitHub Actions
@@ -1279,7 +1287,7 @@ die App auf `windows-latest` (ZIP) und `ubuntu-22.04` (tar.gz) und hängt beides
 Die Version steht zentral in `notex/__init__.py` und muss zum Tag passen.
 
 ```bat
-git tag -a v1.4.0 -m "Notex 1.4.0"
+git tag -a v1.4.0 -m "fckNotes 1.4.0"
 git push origin v1.4.0
 ```
 

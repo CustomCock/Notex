@@ -14,6 +14,7 @@ from PySide6.QtCore import QThread, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices, QImage, QTextDocument
 from PySide6.QtWidgets import QFrame, QTextBrowser
 
+from notex import APP_NAME
 from notex.core import fileops
 from notex.core.markdown import RenderOptions, render, stylesheet
 from notex.theme import tokens
@@ -35,7 +36,7 @@ class ImageFetcher(QThread):
 
     def run(self) -> None:
         try:
-            request = urllib.request.Request(self.url, headers={"User-Agent": "Notex"})
+            request = urllib.request.Request(self.url, headers={"User-Agent": f"{APP_NAME}"})
             with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:
                 content_type = response.headers.get("Content-Type", "")
                 if not content_type.startswith("image/"):

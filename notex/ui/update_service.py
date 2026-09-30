@@ -5,7 +5,7 @@ from PySide6.QtCore import QThread, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget
 
-from notex import APP_NAME, __version__
+from notex import APP_NAME, EXE_FILE, __version__
 from notex.core import update_check
 from notex.theme.tokens import SPACING
 
@@ -29,8 +29,8 @@ class UpdateDialog(QDialog):
         self.setMinimumWidth(460)
         title = QLabel(f"{APP_NAME} {release.version_text} ist verfügbar (installiert: {__version__}).")
         title.setWordWrap(True)
-        hint = QLabel("Notex lädt nichts selbst herunter. Auf der Release-Seite liegt die ZIP; beim Update nur "
-                      "Notex.exe und _internal/ ersetzen, data/ und config.json bleiben.")
+        hint = QLabel(f"{APP_NAME} lädt nichts selbst herunter. Auf der Release-Seite liegt die ZIP; beim Update nur "
+                      f"{EXE_FILE} und _internal/ ersetzen, data/ und config.json bleiben.")
         hint.setObjectName("SettingsNote")
         hint.setWordWrap(True)
         notes = QPlainTextEdit(release.notes or "Keine Versionshinweise.")

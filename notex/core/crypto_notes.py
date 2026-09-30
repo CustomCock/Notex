@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from cryptography.exceptions import InvalidTag, UnsupportedAlgorithm
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from notex import APP_NAME
 
 MAGIC = b"NOTEXENC"
 FORMAT_VERSION = 1
@@ -159,10 +160,10 @@ def is_ntx(data: bytes) -> bool:
 
 def parse_header(data: bytes) -> Header:
     if len(data) < HEADER_LEN + TAG_LEN or not is_ntx(data):
-        raise CorruptFile("Keine verschlüsselte Notex-Notiz (Kopf fehlt oder ist zu kurz)")
+        raise CorruptFile(f"Keine verschlüsselte {APP_NAME}-Notiz (Kopf fehlt oder ist zu kurz)")
     _magic, version, kdf, a, b, c, salt, nonce = _HEADER.unpack_from(data)
     if version != FORMAT_VERSION:
-        raise UnsupportedFormat(f"Formatversion {version} ist neuer als diese Notex-Version")
+        raise UnsupportedFormat(f"Formatversion {version} ist neuer als diese {APP_NAME}-Version")
     header = Header(version, kdf, (a, b, c), salt, nonce)
     _check_params(kdf, header.params)
     return header

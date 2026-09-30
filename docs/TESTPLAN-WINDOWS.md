@@ -5,11 +5,11 @@ Netz, deutsche Windows-Konsolenausgaben live, Fensterverhalten auf dem Desktop, 
 Diese Liste prüft genau das. Dauer: ca. 15 Minuten. Nur im **eigenen** Netz scannen.
 
 **Vorbereitung**
-- Frischer Build entpacken (Notex.exe), starten. Einstellungen → Module: Netzwerk-Scanner, Port-Infos,
+- Frischer Build entpacken (fckNotes.exe), starten. Einstellungen → Module: Netzwerk-Scanner, Port-Infos,
   IP-Konflikte, RDAP/ASN, PCAP-Übersicht einschalten.
 - In `data/` eine Datei `netz.md` anlegen mit zwei Zeilen: `10.0.0.5 fileserver` und `drucker: 10.0.0.5`.
 - Bei jedem Punkt gilt: **es muss sichtbar etwas passieren** (Fenster, Karte, Statuszeile oder Hinweis unten rechts).
-  „Nichts passiert“ ist immer ein Fehler → Inhalt von `logs\notex-fehler.log` mitschicken.
+  „Nichts passiert“ ist immer ein Fehler → Inhalt von `logs\fehlerprotokoll.log` mitschicken.
 
 ## A. Werkzeuge-Menü und Blatt-Leiste (Ursprungsproblem)
 
@@ -60,7 +60,7 @@ In `server.log` die IP `10.0.0.5` markieren (bzw. eine echte IP aus dem eigenen 
 | E2 | `Ctrl+Shift+Alt+I` | Subnetz 10.0.0.0/24 rot „1 im Konflikt“ (fileserver ↔ drucker) | |
 | E3 | In der IP-Übersicht **Aktualisieren** direkt nach dem Start klicken | Übersicht aktualisiert sich (früher: Klick wurde verworfen) | |
 | E4 | `Ctrl+Alt+R` mit `8.8.8.8` | Karte mit Netz/ASN (braucht Internet) | |
-| E5 | `Ctrl+Alt+R` mit `192.168.1.1` | Hinweis „… fragt Notex nie ab“, keine Anfrage | |
+| E5 | `Ctrl+Alt+R` mit `192.168.1.1` | Hinweis „… fragt fckNotes nie ab“, keine Anfrage | |
 | E6 | Eine `.pcap` im Baum wählen → `Ctrl+Shift+Alt+K` | Übersicht mit Paketzahl, Tabs Hosts/DNS/TCP gefüllt | |
 
 ## F. Fehler sichtbar
@@ -68,4 +68,4 @@ In `server.log` die IP `10.0.0.5` markieren (bzw. eine echte IP aus dem eigenen 
 | # | Schritt | Erwartet | ✓ |
 |---|---|---|---|
 | F1 | Modul „Netzwerk-Scanner“ ausschalten, Werkzeug-Übersicht → Netzwerk-Scanner | Hinweis „Modul … ist aus“ | |
-| F2 | Nach dem Test `logs\notex-fehler.log` ansehen | Datei fehlt oder ist leer. Falls nicht: Inhalt mitschicken (enthält nur Datei:Zeile + Kurzmeldung, keine Notizinhalte) | |
+| F2 | Nach dem Test `logs\fehlerprotokoll.log` ansehen | Datei fehlt oder ist leer. Falls nicht: Inhalt mitschicken (enthält nur Datei:Zeile + Kurzmeldung, keine Notizinhalte) | |

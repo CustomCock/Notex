@@ -14,6 +14,7 @@ from PySide6.QtGui import QIcon, QIconEngine, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QFileIconProvider
 
+from notex import APP_NAME
 from notex.theme.tokens import COLORS
 
 ICON_DIR = Path(__file__).resolve().parent.parent / "assets" / "icons"
@@ -25,7 +26,7 @@ def _svg_source(name: str) -> str:
     if not path.exists():
         # Ein fehlendes Icon darf nie eine Aktion abbrechen (Toast, Menü, Toolbar) – dann eben ein Kreis
         import sys
-        print(f"Notex: Icon fehlt: {path.name}", file=sys.stderr)
+        print(f"{APP_NAME}: Icon fehlt: {path.name}", file=sys.stderr)
         return ('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" '
                 'stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>')
     return path.read_text(encoding="utf-8")

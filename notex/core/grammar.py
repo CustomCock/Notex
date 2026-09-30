@@ -15,6 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from notex import APP_NAME
 
 PUBLIC_API = "https://api.languagetool.org"
 LANGUAGE_CODES = {"de": "de-DE", "en": "en-US", "both": "auto"}
@@ -87,7 +88,7 @@ class GrammarClient:
         request = urllib.request.Request(
             f"{self.server_url}/v2/check", data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json",
-                     "User-Agent": "Notex"},
+                     "User-Agent": f"{APP_NAME}"},
         )
         self._last_request = time.monotonic()
         try:

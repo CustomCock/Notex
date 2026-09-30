@@ -1,4 +1,4 @@
-"""Startet Notex offscreen mit Testdaten und speichert Screenshots wichtiger Zustände.
+"""Startet fckNotes offscreen mit Testdaten und speichert Screenshots wichtiger Zustände.
 
 Aufruf: python tools/screenshot.py [Zielordner]   (Default: docs/)
 Nutzt QT_QPA_PLATFORM=offscreen, braucht also keinen Bildschirm – läuft auch in CI.
@@ -38,6 +38,7 @@ from PySide6.QtCore import QPoint, QTimer  # noqa: E402
 from PySide6.QtGui import QImage, QPainter  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from notex import APP_NAME  # noqa: E402
 from notex.app import create_app, create_window  # noqa: E402
 from notex.core.theme_model import theme_from_preset  # noqa: E402
 from notex.theme.manager import theme_manager  # noqa: E402
@@ -47,11 +48,16 @@ from notex.theme.theme import style_menu  # noqa: E402
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs"
 OUT.mkdir(parents=True, exist_ok=True)
 
+# „Dieser PC" wie auf einem typischen Windows-Rechner zeigen – nicht die Laufwerke der Build-Umgebung
+from notex.core import places as _places  # noqa: E402
+_places.drive_places = lambda: [_places.Place("drive:C", "C:\\", Path.home(), "drive", "hard-drive"),
+                                _places.Place("drive:D", "D:\\", Path.home(), "drive", "hard-drive")]
+
 SPELL_SAMPLE = (
     "# Rechtschreibung\n\n"
-    "Notex prüft Wörter offline mit Hunspell. Ein Tippfehller wie dieser bekommt eine rote Wellenlinie,\n"
+    "fckNotes prüft Wörter offline mit Hunspell. Ein Tippfehller wie dieser bekommt eine rote Wellenlinie,\n"
     "und im Kontextmenü stehen Vorschläge. Das Wort das gerade getippt wird bleibt bis zur Pause unmarkiert.\n\n"
-    "URLs wie https://languagetool.org, Pfade wie C:\\Notex\\data und `inline_code` werden ausgelassen.\n\n"
+    "URLs wie https://languagetool.org, Pfade wie C:\\fckNotes\\data und `inline_code` werden ausgelassen.\n\n"
     "```python\nprint(\"in Codeblöcken wird nichts geprüft\")\n```\n\n"
     "Grammatik kommt von LanguageTool: Ich weiß daß es geht  hier.\n"
 )
@@ -97,7 +103,7 @@ CODE_SAMPLE = (
 )
 LOG_SAMPLE = (
     "2026-09-26 08:31:30 INFO  Server gestartet auf 127.0.0.1:8081\n"
-    "2026-09-26 08:31:32 DEBUG Konfiguration aus C:\\Apps\\Notex\\config.json geladen\n"
+    "2026-09-26 08:31:32 DEBUG Konfiguration aus C:\\Apps\\fckNotes\\config.json geladen\n"
     "2026-09-26 08:32:01 WARN  Langsame Antwort von 10.0.0.5 (1240 ms)\n"
     "2026-09-26 08:32:05 ERROR Verbindung zu 192.168.1.10:443 fehlgeschlagen: Timeout\n"
     "2026-09-26 08:32:06 ERROR Traceback in /var/log/app.log gespeichert\n"
@@ -117,29 +123,29 @@ PREVIEW_SAMPLE = (
 )
 
 SAMPLE = {
-    "Projekte/Notex/nachschlagen.md": (
+    "Projekte/fckNotes/nachschlagen.md": (
         "# Wörter zum Nachschlagen\n\nSerendipität ist ein schönes Wort für glückliche Zufallsfunde.\n\n"
         "Ein Haus am Fluss, eine Bank im Park.\n"),
-    "Projekte/Notex/vorschau.md": PREVIEW_SAMPLE,
-    "Projekte/Notex/rechtschreibung.md": SPELL_SAMPLE,
+    "Projekte/fckNotes/vorschau.md": PREVIEW_SAMPLE,
+    "Projekte/fckNotes/rechtschreibung.md": SPELL_SAMPLE,
     "Projekte/Python/snippets.py": CODE_SAMPLE,
-    "Projekte/Notex/server.log": LOG_SAMPLE,
+    "Projekte/fckNotes/server.log": LOG_SAMPLE,
     "Projekte/Python/wiki.md": WIKI_SAMPLE,
-    "Projekte/Notex/links.txt": (
+    "Projekte/fckNotes/links.txt": (
         "Lange Zeilen brechen um, nichts scrollt seitlich:\n\n"
-        "https://github.com/CustomCock/Notex/blob/main/notex/ui/editor.py#L120-L180?utm_source=readme&utm_campaign=portable_editor_2026\n\n"
+        "https://github.com/CustomCock/fckNotes/blob/main/notex/ui/editor.py#L120-L180?utm_source=readme&utm_campaign=portable_editor_2026\n\n"
         "SHA-256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n\n"
         "- Listenpunkte behalten beim Umbruch ihre Einrückung, auch wenn der Text so lang ist, dass er über mehrere Zeilen läuft und weiterläuft.\n"
-        "  - Verschachtelte Punkte ebenso, hier mit einem Windows-Pfad: C:\\Users\\Philipp\\Documents\\Notex\\data\\Projekte\\Notex\\links.txt\n"
+        "  - Verschachtelte Punkte ebenso, hier mit einem Windows-Pfad: C:\\Users\\Philipp\\Documents\\fckNotes\\data\\Projekte\\fckNotes\\links.txt\n"
         "1. Nummerierte Listen genauso, damit die Struktur beim Lesen erkennbar bleibt, egal wie schmal das Fenster gerade ist.\n"
     ),
-    "Projekte/Notex/README.md": "# Notex\n\nPortabler Explorer + Editor für Textdateien.\n\n## Ziele\n\n- portabel\n- schnell\n- ruhig im Design\n",
-    "Projekte/Notex/todo.txt": "[ ] Suche testen\n[x] Encoding-Erkennung\n[ ] Release taggen, siehe [[wiki]]\n[ ] Screenshot für README (wiki-Seite prüfen)\n",
-    "Projekte/Python/notizen.md": "# Python-Notizen\n\n## Dataclasses\n\nEin `@dataclass` erzeugt __init__, __repr__ und __eq__ automatisch.\nFrozen dataclasses sind unveränderlich – gut für Design-Tokens.\n\n## Pathlib\n\n`Path(__file__).resolve().parent` liefert den Ordner der Datei.\nDas ist die Grundlage für portable Apps: Root relativ zur EXE ermitteln.\n\n## Threads\n\nEin `threading.Event` ist die einfachste Art, einen Worker sauber abzubrechen.\nDie Suche in Notex prüft das Event einmal pro Datei.\n",
+    "Projekte/fckNotes/README.md": "# fckNotes\n\nPortabler Explorer + Editor für Textdateien.\n\n## Ziele\n\n- portabel\n- schnell\n- ruhig im Design\n",
+    "Projekte/fckNotes/todo.txt": "[ ] Suche testen\n[x] Encoding-Erkennung\n[ ] Release taggen, siehe [[wiki]]\n[ ] Screenshot für README (wiki-Seite prüfen)\n",
+    "Projekte/Python/notizen.md": "# Python-Notizen\n\n## Dataclasses\n\nEin `@dataclass` erzeugt __init__, __repr__ und __eq__ automatisch.\nFrozen dataclasses sind unveränderlich – gut für Design-Tokens.\n\n## Pathlib\n\n`Path(__file__).resolve().parent` liefert den Ordner der Datei.\nDas ist die Grundlage für portable Apps: Root relativ zur EXE ermitteln.\n\n## Threads\n\nEin `threading.Event` ist die einfachste Art, einen Worker sauber abzubrechen.\nDie Suche in fckNotes prüft das Event einmal pro Datei.\n",
     "Security/osint-checkliste.md": "# OSINT-Checkliste\n\n1. Domain: whois, DNS, Subdomains\n2. Personen: Usernames, Profile, Leaks\n3. Infrastruktur: Ports, Banner, Zertifikate\n\nImmer dokumentieren, welche Quelle welchen Fund geliefert hat.\n",
     "Security/lpic1-lernplan.md": "# LPIC-1 Lernplan\n\nWoche 1: Dateisystem, Pfade, Rechte\nWoche 2: Prozesse, Threads, Signale\nWoche 3: Shell, Pipes, Textwerkzeuge\nWoche 4: Pakete, Dienste, Logs\n",
     "Tagebuch/2026-09.txt": "26.09. Design-Phase gestartet. Tokens, Typografie, das Blatt.\n27.09. Komponenten: Baum, Tabs, Suche.\n",
-    "config-beispiel.ini": "[allgemein]\nname = Notex\nportabel = ja\n",
+    "config-beispiel.ini": "[allgemein]\nname = fckNotes\nportabel = ja\n",
 }
 
 
@@ -181,7 +187,7 @@ def compose(window, popup, name: str, offset: QPoint) -> None:
 
 def _sample_pdf(path: Path) -> None:
     """Kleines PDF mit Text und Lesezeichen (ohne Zusatzwerkzeug)."""
-    pages = [["Einleitung", "Notex liest PDFs nur und zeigt Lesezeichen links an. Markierter Text", "wird als Zitat mit Quelle in die Notiz im anderen Teil eingefuegt."],
+    pages = [["Einleitung", "fckNotes liest PDFs nur und zeigt Lesezeichen links an. Markierter Text", "wird als Zitat mit Quelle in die Notiz im anderen Teil eingefuegt."],
              ["Kapitel Zwei", "Hier steht das Suchwort Quokka einmal."], ["Kapitel Drei", "Schluss."]]
     n = len(pages)
     page_ids = [5 + i * 2 for i in range(n)]
@@ -225,7 +231,7 @@ def main() -> int:
         {"name": "adresse", "value": "Musterweg 1\n12345 Berlin", "description": "Postanschrift"},
         {"name": "gute_reise", "value": "Gute Reise und bis bald!", "description": ""}]}, ensure_ascii=False),
         encoding="utf-8")
-    (WORK / "user_dictionary.txt").write_text("Notex\nHunspell\nLanguageTool\n", encoding="utf-8")
+    (WORK / "user_dictionary.txt").write_text("fckNotes\nHunspell\nLanguageTool\n", encoding="utf-8")
     (WORK / "config.json").write_text(json.dumps({
         "grammar": {"enabled": True, "server_url": f"http://127.0.0.1:{httpd.server_port}"},
     }), encoding="utf-8")
@@ -242,13 +248,13 @@ def main() -> int:
     def s_empty():
         save(window, "01-empty-state")
         tree = window.sidebar.tree
-        tree.restore_expanded(["Projekte", "Projekte/Notex", "Projekte/Python", "Security"])
+        tree.restore_expanded(["Projekte", "Projekte/fckNotes", "Projekte/Python", "Security"])
         later(400, s_tree)
 
     def s_tree():
         save(window, "02-tree")
         window.tabs.open_file(data / "Projekte/Python/notizen.md")
-        window.tabs.open_file(data / "Projekte/Notex/todo.txt")
+        window.tabs.open_file(data / "Projekte/fckNotes/todo.txt")
         window.tabs.open_file(data / "Projekte/Python/notizen.md")
         window.sidebar.tree.select_path(data / "Projekte/Python/notizen.md")
         editor = window.tabs.current_editor()
@@ -275,10 +281,10 @@ def main() -> int:
 
     def s_menu():
         tree = window.sidebar.tree
-        index = tree.index_for(data / "Projekte/Notex/todo.txt")
+        index = tree.index_for(data / "Projekte/fckNotes/todo.txt")
         tree.setCurrentIndex(index)
         rect = tree.visualRect(index)
-        menu = tree.build_context_menu(data / "Projekte/Notex/todo.txt")
+        menu = tree.build_context_menu(data / "Projekte/fckNotes/todo.txt")
         menu.show()  # nur aufbauen, nicht exec() – sonst blockiert es
         origin = tree.viewport().mapTo(window, rect.center())
         compose(window, menu, "06-context-menu", origin + QPoint(24, 4))
@@ -325,13 +331,13 @@ def main() -> int:
         later(700, lambda: save(window, "17-toolbar-collapsed"))
         later(800, lambda: (window.tabs.toggle_toolbar(), window.resize(820, 700)))
         later(1300, lambda: save(window, "18-toolbar-overflow"))
-        later(1400, lambda: (window.resize(1280, 800), window.tabs.open_file(data / "Projekte/Notex/links.txt")))
+        later(1400, lambda: (window.resize(1280, 800), window.tabs.open_file(data / "Projekte/fckNotes/links.txt")))
         later(1900, lambda: save(window, "19-wrap-long-lines"))
         later(2000, s_spelling_open)
 
     def s_spelling_open():
-        editor = window.tabs.open_file(data / "Projekte/Notex/rechtschreibung.md")
-        window.sidebar.tree.select_path(data / "Projekte/Notex/rechtschreibung.md")
+        editor = window.tabs.open_file(data / "Projekte/fckNotes/rechtschreibung.md")
+        window.sidebar.tree.select_path(data / "Projekte/fckNotes/rechtschreibung.md")
         editor.goto_line(3, 0, 0)
         later(2800, lambda: s_spelling_menu(editor))
 
@@ -366,10 +372,10 @@ def main() -> int:
         later(1600, lambda: save(window, "23-wikilinks-backlinks"))
         later(1700, lambda: (window.set_backlinks_visible(False), window.tabs.open_file(data / "Projekte/Python/snippets.py")))
         later(2100, lambda: save(window, "24-syntax-python"))
-        later(2200, lambda: window.tabs.open_file(data / "Projekte/Notex/server.log"))
+        later(2200, lambda: window.tabs.open_file(data / "Projekte/fckNotes/server.log"))
         later(2600, lambda: save(window, "25-syntax-log"))
         # v1.2: Markdown-Vorschau geteilt
-        later(2700, lambda: (window.tabs.open_file(data / "Projekte/Notex/vorschau.md"), window.set_preview_mode("split")))
+        later(2700, lambda: (window.tabs.open_file(data / "Projekte/fckNotes/vorschau.md"), window.set_preview_mode("split")))
         later(3300, lambda: save(window, "26-markdown-preview"))
         later(3400, lambda: (window.set_preview_mode("edit"), window.tabs.open_file(data / "Projekte/Python/notizen.md"),
                              window.tabs.split(), window.tabs.open_file(data / "Projekte/Python/snippets.py")))
@@ -382,7 +388,7 @@ def main() -> int:
         def open_history():
             from notex.ui.history_dialog import HistoryDialog
             window._replace_dialog.close()
-            target = data / "Projekte/Notex/README.md"
+            target = data / "Projekte/fckNotes/README.md"
             editor = window.tabs.open_file(target)
             rel = window.tabs.relative(target)
             window.history.snapshot(rel, editor.toPlainText().replace("- schnell", "- schnell\n- klein"), now=time.time() - 3 * 86400)
@@ -409,7 +415,7 @@ def main() -> int:
         def open_update():
             from notex.core.update_check import Release
             from notex.ui.update_service import UpdateDialog
-            release = Release((1, 5, 0), "v1.5.0", "Notex 1.5.0", "https://github.com/CustomCock/Notex/releases/tag/v1.5.0",
+            release = Release((1, 5, 0), "v1.5.0", f"{APP_NAME} 1.5.0", "https://github.com/CustomCock/fckNotes/releases/tag/v1.5.0",
                               "2026-10-10T10:00:00Z", "## Neu\n- Beispielhafte Versionshinweise\n- Noch ein Punkt\n\n"
                               "**Full Changelog**: v1.4.0...v1.5.0")
             window._shot_update = UpdateDialog(window, release)
@@ -420,7 +426,7 @@ def main() -> int:
         def lookup_shots():
             from notex.core import lookup as lk
             window._shot_update.close()
-            editor = window.tabs.open_file(data / "Projekte/Notex/nachschlagen.md")
+            editor = window.tabs.open_file(data / "Projekte/fckNotes/nachschlagen.md")
             QApplication.processEvents()
             found = editor.document().find("Serendipität")
             editor.setTextCursor(found)
@@ -489,10 +495,10 @@ def main() -> int:
         (files / "preise.csv").write_text("Produkt;Preis;Menge;Lager\nÄpfel;3,50;10;Nord\nBirnen;12,00;2;Süd\n"
                                           "\"Kiwi; grün\";1,20;100;Nord\nMango;2,75;18;West\nFeigen;7,90;4;Süd\n",
                                           encoding="utf-8")
-        (files / "team.json").write_text('{"team":"Notex","users":[{"name":"Ada","rolle":"Admin","aktiv":true},'
+        (files / "team.json").write_text('{"team":"fckNotes","users":[{"name":"Ada","rolle":"Admin","aktiv":true},'
                                          '{"name":"Linus","tags":["kernel","git"],"alter":36}],"version":1.10}\n',
                                          encoding="utf-8")
-        (files / "kaputt.json").write_text('{\n  "name": "Notex",\n  "tags": ["a", "b",]\n}\n', encoding="utf-8")
+        (files / "kaputt.json").write_text('{\n  "name": "fckNotes",\n  "tags": ["a", "b",]\n}\n', encoding="utf-8")
         (files / "rechnung.pdf").write_bytes(b"MZ" + b"\x00" * 58 + b"\x40\x00\x00\x00" + b"PE\x00\x00"
                                              + bytes(range(256)) * 6 + b"This program cannot be run in DOS mode.")
         (files / "server.log").write_text("".join(
@@ -563,7 +569,7 @@ def main() -> int:
             if not window.tabs.is_split:
                 window.toggle_split()
             window.tabs.set_active(window.tabs.groups[1])
-            note = data / "Projekte/Notex/zitate.md"
+            note = data / "Projekte/fckNotes/zitate.md"
             note.write_text("# Zitate\n\nAus dem Bericht:\n", encoding="utf-8")
             editor = window.tabs.open_file(note)
             cursor = editor.textCursor()
@@ -587,7 +593,7 @@ def main() -> int:
             from PySide6.QtGui import QTextCursor
             if window.tabs.is_split:
                 window.toggle_split()
-            note = data / "Projekte/Notex/brief.md"
+            note = data / "Projekte/fckNotes/brief.md"
             note.write_text("# Brief an Frau Muster\n\nSehr geehrte Frau Muster,\n\nwie besprochen gilt §23 auch "
                             "für Ihr Projekt. Der Paragraph \\§23 im Gesetz ist etwas anderes.\n\nRückfragen gern "
                             "unter §firma_tel.\n\n§gruss\n§name\n\nAdresse: §adresse\n", encoding="utf-8")
@@ -643,7 +649,7 @@ def main() -> int:
             text = ("Setup-Protokoll: Verbindung zu http://update.example.com/v2/pkg herstellen. "
                     "Konfiguration in C:\\ProgramData\\Beispiel\\settings.ini, Kontakt support@example.com, "
                     "Server 192.168.20.14, HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run. ").encode()
-            blob = (b"MZ" + b"\x00" * 62 + text * 30 + "Unicode-Kennung: Notex-Probe".encode("utf-16-le")
+            blob = (b"MZ" + b"\x00" * 62 + text * 30 + "Unicode-Kennung: fckNotes-Probe".encode("utf-16-le")
                     + b"\x00" * 20_000 + noise + image + b"ANHANG hinter IEND" + b"\x00" * 64 + archive.getvalue()
                     + text * 10)
             sample = files / "probe.bin"
@@ -693,7 +699,7 @@ def main() -> int:
             photo = files / "urlaub.jpg"
             photo.write_bytes(jpeg())
             rule = files / "c2-beispiel.yar"
-            rule.write_text('rule C2_Beispiel : c2\n{\n    meta:\n        author = "Notex"\n    strings:\n'
+            rule.write_text('rule C2_Beispiel : c2\n{\n    meta:\n        author = "fckNotes"\n    strings:\n'
                             '        $url = "update.example.com" ascii nocase\n        $mz  = { 4D 5A }\n'
                             '        $reg = "CurrentVersion\\\\Run" ascii\n    condition:\n        $mz at 0 and any of '
                             '($url, $reg)\n}\n', encoding="utf-8")

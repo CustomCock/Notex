@@ -1,4 +1,4 @@
-# Notex – Hinweise für Arbeitssessions
+# fckNotes (vorher Notex) – Hinweise für Arbeitssessions
 
 - **Zuerst `PROGRESS.md` lesen.** Dort stehen Stand, offene Punkte, getroffene Entscheidungen und der nächste Schritt.
   Nach jedem Feature aktualisieren (erledigt / offen / Entscheidungen / nächster Schritt).
@@ -10,3 +10,6 @@
 - Tests: `QT_QPA_PLATFORM=offscreen python -m pytest -q`. Screenshots: `python tools/screenshot.py`.
 - Neue Abhängigkeiten nur begründet und gepinnt in `requirements.txt`; Build-Größe im Blick (ZIP ≈ 95 MB).
 - Keine Modellnamen in Commits, Code oder Doku.
+- Anzeigename nur über `APP_NAME`/`EXE_FILE` aus `notex/__init__.py` („fckNotes“, bis 1.17.0 „Notex“) – nie einen
+  Namen fest in sichtbare Texte schreiben; Repo-Adresse nur über `REPO`/`REPO_URL` (GitHub: CustomCock/fckNotes).
+  Interne Kennungen (`notex/`, `NOTEXENC`, `REG_KEY`, `PROG_ID`) bleiben.

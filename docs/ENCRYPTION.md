@@ -1,6 +1,6 @@
 # Verschlüsselte Notizen (`.ntx`)
 
-Notex kann einzelne Notizen mit einem Passwort verschlüsseln. Dieses Dokument beschreibt, was dabei
+fckNotes kann einzelne Notizen mit einem Passwort verschlüsseln. Dieses Dokument beschreibt, was dabei
 passiert, was geschützt ist und was nicht. Es richtet sich an alle, die wissen wollen, ob sie der
 Funktion vertrauen können.
 
@@ -8,11 +8,11 @@ Funktion vertrauen können.
 
 - **Algorithmen:** AES-256-GCM für den Inhalt, Argon2id (RFC 9106) für den Schlüssel aus dem Passwort.
 - **Keine eigene Kryptografie:** Alles kommt aus der Bibliothek [`cryptography`](https://cryptography.io)
-  (pyca), die OpenSSL nutzt. Notex setzt nur Bausteine zusammen und legt das Dateiformat fest.
+  (pyca), die OpenSSL nutzt. fckNotes setzt nur Bausteine zusammen und legt das Dateiformat fest.
 - **Klartext liegt nie auf der Platte.** Weder im Verlauf noch im Suchindex, nicht in `config.json`,
   keinem Log und keinem Toast.
 - **Ohne Passwort gibt es keinen Weg zurück.** Kein Generalschlüssel, keine Wiederherstellung, auch
-  nicht durch Notex.
+  nicht durch fckNotes.
 
 ## Benutzung
 
@@ -24,7 +24,7 @@ Funktion vertrauen können.
 | Sperren | Ctrl+Shift+L sperrt alle offenen verschlüsselten Notizen, automatisch nach 5 Minuten ohne Eingabe (Einstellungen → Editor) |
 | Passwort ändern | Datei → Passwort ändern … (verlangt das aktuelle Passwort, erzeugt ein neues Salt) |
 
-Beim Sperren werden ungespeicherte Änderungen zuerst verschlüsselt gespeichert. Danach leert Notex
+Beim Sperren werden ungespeicherte Änderungen zuerst verschlüsselt gespeichert. Danach leert fckNotes
 den Editor, den Undo-Verlauf und verwirft den Schlüssel.
 
 ## Dateiformat v1
@@ -51,17 +51,17 @@ Alle Zahlen Big Endian.
   (etwa 2³² Speichervorgänge pro Schlüssel).
 - **Standardparameter:** Argon2id mit 64 MiB, 3 Durchläufen und 4 Lanes (zweite Empfehlung aus
   RFC 9106), 16-Byte-Salt, 32-Byte-Schlüssel. Kann die installierte OpenSSL-Version kein Argon2id,
-  nimmt Notex scrypt mit N = 2¹⁷, r = 8 und p = 1. Die Parameter stehen in jeder Datei, damit spätere
+  nimmt fckNotes scrypt mit N = 2¹⁷, r = 8 und p = 1. Die Parameter stehen in jeder Datei, damit spätere
   Versionen sie erhöhen können, ohne alte Dateien zu brechen.
-- **Grenzen beim Lesen:** Bevor die Schlüsselableitung läuft, prüft Notex die Parameter
+- **Grenzen beim Lesen:** Bevor die Schlüsselableitung läuft, prüft fckNotes die Parameter
   (Argon2id ≤ 1 GiB Speicher und ≤ 64 Durchläufe, scrypt N ≤ 2²²). Eine manipulierte Datei kann so
   keinen Speicher- oder Rechenzeit-Angriff auslösen.
 - **Passwort:** Unicode-NFC-normalisiert, dann UTF-8. „Käse“ ergibt denselben Schlüssel, egal wie das
   „ä“ eingegeben wurde.
 
 Fehlerarten: „Falsches Passwort oder die Datei wurde verändert“ (GCM kann beides nicht unterscheiden),
-„keine verschlüsselte Notex-Notiz“ (Magic fehlt, Datei zu kurz, unzulässige Parameter) und
-„Formatversion ist neuer als diese Notex-Version“.
+„keine verschlüsselte fckNotes-Notiz“ (Magic fehlt, Datei zu kurz, unzulässige Parameter) und
+„Formatversion ist neuer als diese fckNotes-Version“.
 
 ## Wo Klartext nicht hinkommt
 
@@ -86,8 +86,8 @@ Fehlerarten: „Falsches Passwort oder die Datei wurde verändert“ (GCM kann b
   Python kann Speicher nicht zuverlässig überschreiben. Das Betriebssystem kann ihn in die
   Auslagerungsdatei oder den Ruhezustand schreiben. Wer das ausschließen will, braucht zusätzlich
   eine Festplattenverschlüsselung (BitLocker, LUKS).
-- **Zwischenablage:** Kopierter Text verlässt Notex. Windows-Zwischenablage-Verlauf und Cloud-Sync
-  sind außerhalb von Notex' Kontrolle.
+- **Zwischenablage:** Kopierter Text verlässt fckNotes. Windows-Zwischenablage-Verlauf und Cloud-Sync
+  sind außerhalb von fckNotes' Kontrolle.
 - **Beim Verschlüsseln einer vorhandenen Datei** lag der Klartext vorher schon auf der Platte. Der
   Papierkorb, SSD-Wear-Leveling, Backups und Schattenkopien können Reste behalten.
 - **Schwache Passwörter** schützt keine KDF. Argon2id verlangsamt das Raten, ein kurzes oder

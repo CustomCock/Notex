@@ -14,6 +14,7 @@ from datetime import date
 from html import escape
 from pathlib import Path
 
+from notex import APP_NAME
 from notex.core import csvdata, markdown, variables
 
 
@@ -22,7 +23,7 @@ class ExportMeta:
     title: str
     author: str = ""
     date: str = ""                       # ISO-Datum; leer = heute
-    footer: str = "Erstellt mit Notex"
+    footer: str = f"Erstellt mit {APP_NAME}"
     logo_data_uri: str = ""              # optionales eingebettetes Logo (data:-URI) für die Kopfzeile
 
     def date_or_today(self) -> str:

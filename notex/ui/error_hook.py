@@ -1,6 +1,6 @@
 """Globaler Exception-Hook: kein Fehler endet mehr lautlos (Windows-Build hat keine Konsole).
 
-Schreibt einen kurzen Eintrag nach <App-Ordner>/logs/notex-fehler.log (siehe core/errorlog.py) und zeigt
+Schreibt einen kurzen Eintrag nach <App-Ordner>/logs/fehlerprotokoll.log (siehe core/errorlog.py) und zeigt
 einen dezenten Hinweis im Hauptfenster. Hinweise werden gedrosselt, damit eine Fehlerserie nicht flutet.
 """
 from __future__ import annotations

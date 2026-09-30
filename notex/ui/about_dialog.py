@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from notex import APP_NAME, __version__
+from notex import APP_NAME, EXE_FILE, __version__
 from notex.theme.tokens import SPACING
 from notex.ui.empty_state import _logo
 
@@ -34,7 +34,7 @@ class AboutDialog(QDialog):
         version.setObjectName("EmptyHint")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         blurb = QLabel("Explorer + Editor für Textdateien. Alles liegt in einem Ordner:\n"
-                       "Notex.exe, data/, config.json, themes/, fonts/user/.")
+                       f"{EXE_FILE}, data/, config.json, themes/, fonts/user/.")
         blurb.setObjectName("EmptyHint")
         blurb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         credits = QLabel("\n".join(f"{name} – {license_}" for name, license_ in CREDITS))

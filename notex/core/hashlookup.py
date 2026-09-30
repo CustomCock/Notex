@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Callable
+from notex import APP_NAME
 
 SERVICE_NAME = "Nitrxgen MD5-Datenbank"
 SERVICE_HOST = "www.nitrxgen.net"
@@ -60,7 +61,7 @@ def parse_response(body: str) -> LookupResult:
 
 def _default_fetch(url: str, timeout: float) -> tuple[int, str]:
     import urllib.request
-    request = urllib.request.Request(url, headers={"User-Agent": "Notex-HashLookup"})
+    request = urllib.request.Request(url, headers={"User-Agent": f"{APP_NAME}-HashLookup"})
     with urllib.request.urlopen(request, timeout=timeout) as response:   # noqa: S310 – feste https-URL
         return response.status, response.read(1_000_000).decode("utf-8", "replace")
 

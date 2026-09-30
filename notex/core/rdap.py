@@ -17,12 +17,13 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Callable
+from notex import APP_NAME
 
 BOOTSTRAP = "https://data.iana.org/rdap/{kind}.json"
 RIPESTAT = "https://stat.ripe.net/data/prefix-overview/data.json?resource={ip}&sourceapp=notex"
 TIMEOUT = 10
 MIN_INTERVAL = 1.0          # Sekunden zwischen zwei Anfragen an denselben Host
-USER_AGENT = "Notex (RDAP-Abfrage auf Nutzerwunsch)"
+USER_AGENT = f"{APP_NAME} (RDAP-Abfrage auf Nutzerwunsch)"
 
 Fetch = Callable[[str], tuple[int, dict, bytes]]     # URL → (Status, Header, Body)
 
