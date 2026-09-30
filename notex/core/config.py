@@ -52,6 +52,7 @@ DEFAULTS: dict[str, Any] = {
     "line_numbers": True,
     "markdown_view": "edit",      # Ansicht beim Öffnen von .md: "edit" | "preview" | "split"
     "preview_sync_scroll": True,  # Vorschau scrollt mit dem Editor (geteilte Ansicht)
+    "preview_mermaid": True,      # ```mermaid-Blöcke als Diagramm zeichnen (Vorschau)
     "theme": default_theme(), # das aktive Theme, komplett (Presets/Dateien sind nur Vorlagen)
     "spellcheck": {
         "enabled": True,

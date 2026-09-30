@@ -10,11 +10,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QMarginsF, QRectF, Qt
+from PySide6.QtCore import QMarginsF, QRectF, Qt, QUrl
 from PySide6.QtGui import QFont, QPainter, QPageLayout, QPageSize, QPdfWriter, QPixmap, QTextDocument
 from PySide6.QtWidgets import QMessageBox
 
 from notex.core import export
+from notex.ui.diagram_image import svg_to_image
 
 # Für Qt-Rich-Text (QTextDocument) taugliches CSS – ohne flex/@page, dafür die Inhalts-Stile.
 QT_CSS = """
@@ -44,7 +45,7 @@ def export_html(out_path: Path, content: str, kind: str, meta: export.ExportMeta
 def export_pdf(out_path: Path, content: str, kind: str, meta: export.ExportMeta,
                name: str = "", base_dir: str = "", values: dict[str, str] | None = None,
                prefix: str = "§", logo_path: Path | None = None) -> None:
-    body = export.body_html(content, kind, name=name, base_dir=base_dir, values=values, prefix=prefix)
+    body, diagrams = export.body_parts(content, kind, name=name, base_dir=base_dir, values=values, prefix=prefix)
 
     writer = QPdfWriter(str(out_path))
     writer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
@@ -75,6 +76,9 @@ def export_pdf(out_path: Path, content: str, kind: str, meta: export.ExportMeta,
     base_font = QFont("Inter")
     base_font.setPointSize(11)
     doc.setDefaultFont(base_font)
+    for key, diagram in diagrams.items():           # Mermaid-Diagramme als hochaufgelöste Bilder (3× für den Druck)
+        doc.addResource(QTextDocument.ResourceType.ImageResource.value, QUrl(f"notex-mermaid:{key}"),
+                        svg_to_image(diagram.svg, diagram.width, diagram.height, 3.0, "#ffffff"))
     doc.setHtml(body)
     doc.setPageSize(QRectF(0, 0, doc_w, doc_h).size())
     page_count = max(1, doc.pageCount())

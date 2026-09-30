@@ -122,7 +122,16 @@ PREVIEW_SAMPLE = (
     "![Logo](https://example.org/logo.png)\n"
 )
 
+MERMAID_SAMPLE = (
+    "# Ablauf Log-Auswertung\n\n```mermaid\nflowchart LR\n  L[Logdatei] --> P{Format?}\n"
+    "  P -- auth.log --> A[Anmeldungen]\n  P -- .evtx --> E[Windows-Ereignisse]\n  P -- sonst --> G[Stufen & Muster]\n"
+    "  A & E & G --> R([Report])\n```\n\n```mermaid\nsequenceDiagram\n  actor N as Nutzer\n"
+    "  participant F as fckNotes\n  participant D as Datei\n  N->>F: Ctrl+Shift+Alt+L\n  F->>+D: lesen (Hintergrund)\n"
+    "  D-->>-F: Zeilen\n  F-->>N: Karte mit Auffälligkeiten\n```\n"
+)
+
 SAMPLE = {
+    "Projekte/fckNotes/diagramme.md": MERMAID_SAMPLE,
     "Projekte/fckNotes/nachschlagen.md": (
         "# Wörter zum Nachschlagen\n\nSerendipität ist ein schönes Wort für glückliche Zufallsfunde.\n\n"
         "Ein Haus am Fluss, eine Bank im Park.\n"),
@@ -847,8 +856,13 @@ def main() -> int:
                     dialog.tabs.setCurrentWidget(dialog.t_hosts)
                     compose(window, dialog, "63-pcap", window.mapFromGlobal(dialog.geometry().topLeft()))
                     dialog.close()
-                    finish()
+                    mermaid_shot()
                 later_rel(1200, grab)
+
+            def mermaid_shot():
+                window.tabs.open_file(data / "Projekte/fckNotes/diagramme.md")
+                window.set_preview_mode("split")
+                later_rel(900, lambda: (save(window, "71-mermaid"), window.set_preview_mode("edit"), finish()))
             ip_shot()
 
         def finish():

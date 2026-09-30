@@ -517,6 +517,22 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   „Dieser PC“ im Skript fest auf C:\ / D:\ statt der Laufwerke der Build-Umgebung). 64–70 stammen aus einmaligen
   Skripten und enthalten keinen App-Namen – unverändert.
 
+### Mermaid-Diagramme (30.09.2026, Besitzer: „soll Mermaid anzeigen können“)
+- Vorher: nicht vorhanden (```mermaid wurde als Codeblock gezeigt). Jetzt: `notex/core/mermaid/` (Qt-frei) –
+  `render(source, colors) → Diagram(svg, width, height)`, `render_safe` wirft nie (Fehlerbox mit Zeilennummer).
+  Parser je Typ (`flowchart`, `sequence`, `classdiagram`, `state`, `er`, `pie`, `gantt`), gemeinsames
+  Sugiyama-Layout `layout.py` (Zyklen brechen, Ränge mit Label-Dummies, Baryzentrum-Sortierung, Cluster rekursiv
+  mit eigener Richtung, Kanten dürfen an Cluster andocken), `svg.py` (Theme aus den Vorschaufarben, Textbreiten-
+  Tabelle, Pfeilspitzen als Polygone – Qts SVG-Tiny kennt kein `<marker>`), `examples.py` (Palette).
+- Einbindung: `markdown.render_fence` → `<img src="notex-mermaid:<sha1>">` + `RenderResult.diagrams`;
+  Vorschau liefert das Bild über `loadResource` (`ui/diagram_image.svg_to_image`, HiDPI), rendert bei
+  Breitenänderung neu; HTML-Export bettet `data:image/svg+xml;base64` ein, PDF-Export legt die Bilder (3×) als
+  `QTextDocument`-Ressourcen an. Rechtsklick → PNG/SVG speichern (.ntx nur nach Rückfrage). Palette
+  `md:mermaid`, Config `preview_mermaid` (Standard an).
+- Tests: `tests/test_mermaid.py` (53, Qt-frei: Parser, Layout ohne Überlappung/Cluster-Einschluss, SVG
+  wohlgeformt und ohne script/foreignObject/href/url(), Fehler, Limits, Markdown/Export), `tests/test_mermaid_ui.py`
+  (Vorschau-Bild, PNG/SVG, PDF mit Bild, Einstellung, Palette, .ntx-Rückfrage).
+
 ## Offen
 
 ### Block C – 1.3.0
@@ -530,6 +546,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 - Grammatik braucht einen LanguageTool-Server. Kontextmenü unter Windows 11 nur im klassischen Menü.
 - Windows-spezifische Teile (Registry, DWM-Titelleiste, EXE-Build) sind in der Linux-Entwicklungsumgebung nur per Fake-Registry testbar.
 - Vorschau: Qt-Rich-Text statt Browser (Teilmenge von CSS), Scroll-Sync proportional statt zeilengenau.
+- Mermaid: eigenes Layout, nicht pixelgleich zu mermaid.js; eine Kante von außen zu einem inneren Knoten eines Subgraphen kann einen Nachbarknoten kreuzen. Nicht ausgewertet: click/linkStyle/Icons/`%%{init}%%`-Themes. Weitere Typen (mindmap, gitGraph, journey …) nur als Hinweis.
 - Split View: höchstens zwei Gruppen; Tab-Drag startet, wenn der Tab senkrecht aus der Leiste gezogen wird.
 - Regex-Timeout gilt pro Zeile (0,25 s), nicht für die ganze Suche.
 
@@ -561,6 +578,7 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | Wiktionary-Quelle | Action-API `action=parse&prop=wikitext` für de und en, eigener Parser je Sprache | REST-Definition-API nur für en und ohne Herkunft/IPA; Action-API ist MediaWiki-Kern und auf beiden Wikis gleich |
 | Wikipedia-Quelle | REST `page/summary` (+ `redirect=true`), bei 404 `opensearch` → bester Treffer, Begriffsklärung über Wikitext-Bullets | summary liefert Beschreibung/Auszug/Bild kompakt; die Optionen einer Begriffsklärung stehen nur im Seiteninhalt |
 | Websuche | nur `QDesktopServices.openUrl`, nie ein Abruf durch Notex | Vorgabe: keine Scraping-/Such-API |
+| Mermaid | eigener Renderer in reinem Python → SVG → QSvgRenderer, statt mermaid.js | mermaid.js braucht einen Browser/JS-Engine (QtWebEngine ausgeschlossen, +~100 MB, Angriffsfläche); Node/CLI wäre extern und nicht offline-portabel; keine neue Abhängigkeit |
 
 ## Abschluss Blöcke F–K
 
@@ -591,6 +609,9 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 - **O (1.16.0)** WYSIWYG-Markdown + Fragebögen/Vorlagen – **erledigt**.
 
 - **P (Inventar/Docusnap-artig) ist ZURÜCKGESTELLT** (Entscheidung Besitzer 27.09.2026): vorerst NICHT bauen.
+
+**Mermaid-Diagramme erledigt** (auf dem Arbeitsbranch, CHANGELOG unter „Unveröffentlicht“). Beim nächsten Release
+`__version__` auf 1.18.0 setzen und den CHANGELOG-Abschnitt benennen – sonst meldet die App wieder die alte Nummer.
 
 Keine offenen Blöcke auf Entwicklerseite – auf neue Wünsche des Besitzers warten.
 

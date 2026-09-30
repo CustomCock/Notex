@@ -925,6 +925,45 @@ Vorschau mitscrollt.
 
 ![Markdown-Vorschau](docs/26-markdown-preview.png)
 
+## Mermaid-Diagramme
+
+Codeblöcke mit ```` ```mermaid ```` erscheinen in der Vorschau, im HTML- und im PDF-Export als Diagramm. Gezeichnet
+wird **offline mit einem eigenen Renderer** (reines Python → SVG → Qts SVG-Renderer): kein Browser, kein
+JavaScript, keine Netzverbindung, keine neue Abhängigkeit.
+
+````
+```mermaid
+flowchart LR
+  A[Idee] --> B{Machbar?}
+  B -- Ja --> C[Umsetzen]
+  B -- Nein --> D[Verwerfen]
+```
+````
+
+| Typ | Erste Zeile | Unterstützt |
+|---|---|---|
+| Flussdiagramm | `flowchart TD` / `graph LR` | Formen `[ ]` `( )` `{ }` `([ ])` `(( ))` `[( )]` `{{ }}` `[/ /]` `>…]` u. a., Pfeile `-->` `---` `-.->` `==>` `--o` `--x` `<-->`, Beschriftungen (`-- Text -->`, `-->|Text|`), Ketten und `&`, `subgraph … end` (verschachtelt, eigene `direction`), `classDef`/`class`/`:::`/`style` |
+| Sequenz | `sequenceDiagram` | `participant`/`actor` mit `as`, alle Pfeilarten, `activate`/`+`/`-`, `Note left of/right of/over`, `loop`/`alt`/`else`/`opt`/`par`/`critical`/`break`/`rect`, `autonumber` |
+| Klassen | `classDiagram` | Klassen mit Attributen/Methoden, `<<Interface>>`, Generics `~T~`, alle Beziehungen mit Kardinalitäten und Text, `namespace` |
+| Zustände | `stateDiagram-v2` | `[*]`, zusammengesetzte Zustände, `<<fork>>`/`<<join>>`/`<<choice>>`, Notizen, `direction` |
+| ER | `erDiagram` | Entitäten mit Attributen (`PK`/`FK`/`UK`, Kommentar), Krähenfuß-Kardinalitäten, `--`/`..` |
+| Kreis | `pie` | `title`, `showData`, Werte mit Komma oder Punkt |
+| Gantt | `gantt` | `dateFormat`, `axisFormat`, `excludes weekends`, `section`, `done`/`active`/`crit`/`milestone`, `after`/`until`, Dauer `3d`/`2w`/`12h` |
+
+- **Fehler** im Diagramm zeigen eine rote Box mit Zeilennummer und darunter den Quelltext – die Vorschau bleibt
+  nie leer. Andere Typen (mindmap, gitGraph, journey …) melden sich mit einem Hinweis.
+- Breite Diagramme werden auf die Vorschaubreite verkleinert; Farben folgen dem Theme (hell/dunkel).
+- **Rechtsklick** auf ein Diagramm: „Diagramm als PNG speichern …“ / „… als SVG speichern …“ (bei `.ntx` erst nach
+  Rückfrage, weil das Bild Inhalt der verschlüsselten Notiz zeigt).
+- **Einfügen:** Command Palette › „Mermaid-Diagramm einfügen …“ fragt den Typ und setzt ein Startbeispiel an den Cursor.
+- **Ausschalten:** Einstellungen › Editor › Markdown-Vorschau › „Mermaid-Diagramme zeichnen“ – dann erscheint der
+  Block als Code.
+- Grenzen: Das Layout ist ein eigenes, einfacheres als das von mermaid.js – Diagramme sehen ähnlich, aber nicht
+  pixelgleich aus. Nicht ausgewertet werden `click`/Links, `linkStyle`, Icons, Markdown in Beschriftungen
+  (nur als Text) und Themes aus `%%{init}%%`; höchstens 400 Elemente pro Diagramm.
+
+![Mermaid-Diagramme in der geteilten Ansicht](docs/71-mermaid.png)
+
 ## Split View
 
 `Ctrl+\` teilt den Editor in zwei Tab-Gruppen, die aktuelle Datei erscheint in beiden (ein Dokument, zwei
@@ -1098,6 +1137,8 @@ Alternativ per Docker: `docker run -d -p 8081:8010 erikvl87/languagetool` (dann 
 | Baum/Palette › Formatiert bearbeiten | Markdown-Notiz im WYSIWYG-Editor (Ctrl+B/I, Listen …), Quelltext-Umschalter |
 | Ctrl+Shift+W | Werkzeug-Übersicht (durchsuchbarer Katalog aller Werkzeuge) |
 | Datei › Neue Datei nach Typ | Text/Markdown/CSV/JSON/YAML/HTML/Python/Shell/INI mit Startinhalt und Zeilenende (auch je Typ in der Palette) |
+| Palette › Mermaid-Diagramm einfügen | Startbeispiel (Fluss, Sequenz, Klassen, Zustände, ER, Kreis, Gantt) an den Cursor einer .md-Notiz |
+| Rechtsklick auf Diagramm (Vorschau) | Mermaid-Diagramm als PNG oder SVG speichern |
 | Datei › Exportieren | Aktuelle Notiz als PDF oder HTML (Variablen aufgelöst; .ntx nur nach Rückfrage; auch in der Palette) |
 | Alt+W | Neue Woche (Wochenplan der aktuellen KW) |
 | Ctrl+Shift+Alt+N | Neue verschlüsselte Notiz |
@@ -1180,7 +1221,8 @@ für die Volltextsuche (Default 5 MB).
 - Rechtschreibung kennt nur Deutsch und Englisch; weitere Hunspell-Wörterbücher lassen sich nach
   `notex/dictionaries/` legen, werden aber nicht in der Oberfläche angeboten.
 - Die Markdown-Vorschau nutzt Qts Rich-Text-Engine, kein Browser: CSS wird nur teilweise
-  unterstützt (z. B. keine abgerundeten Codeblöcke, keine Fußnoten, kein Mermaid/LaTeX).
+  unterstützt (z. B. keine abgerundeten Codeblöcke, keine Fußnoten, kein LaTeX). Mermaid zeichnet ein
+  eigener Renderer (7 Diagrammtypen, Layout ähnlich, aber nicht pixelgleich zu mermaid.js).
   Scroll-Sync arbeitet proportional, nicht zeilengenau.
 - Der geteilte Editor hat höchstens zwei Gruppen.
 - Regex-Timeout gilt pro Zeile; eine Suche über viele Dateien mit einem gerade noch schnellen

@@ -4,15 +4,18 @@ Sicherheit: setOpenLinks(False) – kein Link öffnet sich von selbst. Externe L
 Klick an den System-Browser, externe Bilder werden nur nach Klick auf „Bild laden“ geholt
 (eigener Thread, Größenlimit). loadResource() liefert ausschließlich lokale Bilder aus dem
 Notizordner und bereits freigegebene externe Bilder – alles andere bleibt leer.
+Mermaid-Diagramme (```mermaid) rendert der Kern offline zu SVG; hier werden sie nur als Bild gezeichnet
+(notex-mermaid:<Schlüssel>), passend zur Breite verkleinert und per Rechtsklick als PNG/SVG speicherbar.
 """
 from __future__ import annotations
 
+import re
 import urllib.request
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QUrl, Qt, Signal
-from PySide6.QtGui import QDesktopServices, QImage, QTextDocument
-from PySide6.QtWidgets import QFrame, QTextBrowser
+from PySide6.QtCore import QThread, QTimer, QUrl, Qt, Signal
+from PySide6.QtGui import QDesktopServices, QImage, QTextCursor, QTextDocument
+from PySide6.QtWidgets import QFileDialog, QFrame, QTextBrowser
 
 from notex import APP_NAME
 from notex.core import fileops
@@ -53,6 +56,7 @@ class MarkdownPreview(QTextBrowser):
     open_requested = Signal(str)     # "rel/pfad#Überschrift" aus notex-open:
     toggle_requested = Signal(int)   # 0-basierte Zeile einer Aufgabe
     scrolled = Signal(float)         # Scroll-Anteil 0..1 (für Sync mit dem Editor)
+    mermaid_enabled = True           # Einstellung „Mermaid-Diagramme anzeigen“ (für alle Vorschauen)
 
     def __init__(self, root: Path) -> None:
         super().__init__()
@@ -65,6 +69,7 @@ class MarkdownPreview(QTextBrowser):
         self.setLineWrapMode(QTextBrowser.LineWrapMode.WidgetWidth)
         self.document().setDocumentMargin(SPACING.xs)
         self._text = ""
+        self._path: Path | None = None
         self._base_dir = ""
         self._font_family = ""
         self._font_size = tokens.FONT_SIZE.editor
@@ -73,6 +78,13 @@ class MarkdownPreview(QTextBrowser):
         self._images: dict[str, QImage] = {}
         self._errors: dict[str, str] = {}
         self._fetchers: list[ImageFetcher] = []
+        self._diagrams: dict = {}                     # Schlüssel → mermaid.Diagram (aktueller Stand)
+        self._diagram_images: dict[str, QImage] = {}
+        self._rendered_width = 0
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(150)
+        self._resize_timer.timeout.connect(self.render_now)
         self.anchorClicked.connect(self._on_anchor)
         self.verticalScrollBar().valueChanged.connect(self._on_scrolled)
         self._update_margins()
@@ -80,6 +92,7 @@ class MarkdownPreview(QTextBrowser):
     # ---- Inhalt --------------------------------------------------------------------------
     def set_source(self, text: str, path: Path) -> None:
         self._text = text
+        self._path = path
         try:
             self._base_dir = path.parent.relative_to(self.root).as_posix() if fileops.is_within(path, self.root) else ""
         except ValueError:
@@ -103,15 +116,20 @@ class MarkdownPreview(QTextBrowser):
 
     def colors(self) -> dict[str, str]:
         c = {"text": COLORS.paper_text, "muted": COLORS.paper_muted, "accent": COLORS.accent,
-             "code_bg": COLORS.paper_line, "border": COLORS.paper_muted, "danger": COLORS.danger}
+             "code_bg": COLORS.paper_line, "border": COLORS.paper_muted, "danger": COLORS.danger,
+             "bg": COLORS.paper}
         c.update(tokens.SYNTAX)
         return c
 
     def render_now(self) -> None:
         bar = self.verticalScrollBar()
         fraction = bar.value() / bar.maximum() if bar.maximum() else 0.0
-        options = RenderOptions(colors=self.colors(), loaded_images=set(self._images), base_dir=self._base_dir)
+        self._rendered_width = self._diagram_width()
+        options = RenderOptions(colors=self.colors(), loaded_images=set(self._images), base_dir=self._base_dir,
+                                diagrams=MarkdownPreview.mermaid_enabled, max_diagram_width=self._rendered_width)
         result = render(self._text, options)
+        self._diagrams = result.diagrams
+        self._diagram_images = {k: v for k, v in self._diagram_images.items() if k in self._diagrams}
         body = result.html
         for url, error in self._errors.items():
             body = body.replace('>Bild laden</a>', f'>Bild laden</a> <span style="color:{COLORS.danger}">({error})</span>', 1) \
@@ -127,8 +145,18 @@ class MarkdownPreview(QTextBrowser):
         self.viewport().update()
 
     # ---- Ressourcen: nur lokale Bilder aus dem Notizordner und freigegebene externe -----------
+    def _diagram_width(self) -> int:
+        return max(160, self.viewport().width() - 2 * round(self.document().documentMargin()) - 12)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._diagrams and abs(self._diagram_width() - self._rendered_width) > 16:
+            self._resize_timer.start()           # breite Diagramme an die neue Breite anpassen
+
     def loadResource(self, type_: int, name: QUrl):
         key = name.toString()
+        if key.startswith("notex-mermaid:"):
+            return self._diagram_image(key[len("notex-mermaid:"):])
         if key.startswith("notex-file:"):
             path = self.root / key[len("notex-file:"):]
             if fileops.is_within(path, self.root) and path.is_file():
@@ -143,6 +171,72 @@ class MarkdownPreview(QTextBrowser):
         if key in self._images:
             return self._images[key]
         return QImage()   # nichts anderes wird je geladen (kein http, kein file:, kein qrc:)
+
+    def _diagram_image(self, key: str) -> QImage:
+        from notex.ui.diagram_image import svg_to_image
+        diagram = self._diagrams.get(key)
+        if diagram is None:
+            return QImage()
+        if key not in self._diagram_images:
+            scale = max(1.0, self.devicePixelRatioF())
+            self._diagram_images[key] = svg_to_image(diagram.svg, diagram.width, diagram.height, scale)
+        return self._diagram_images[key]
+
+    # ---- Diagramm speichern (Rechtsklick) --------------------------------------------------
+    def diagram_at(self, pos) -> str | None:
+        cursor = self.cursorForPosition(pos)
+        for _ in range(2):
+            fmt = cursor.charFormat()
+            if fmt.isImageFormat():
+                name = fmt.toImageFormat().name()
+                if name.startswith("notex-mermaid:"):
+                    return name[len("notex-mermaid:"):]
+            cursor.movePosition(QTextCursor.MoveOperation.NextCharacter)
+        return None
+
+    def contextMenuEvent(self, event) -> None:
+        menu = self.createStandardContextMenu(event.pos())
+        key = self.diagram_at(event.pos())
+        if key and key in self._diagrams:
+            first = menu.actions()[0] if menu.actions() else None
+            png = menu.addAction("Diagramm als PNG speichern …")
+            svg = menu.addAction("Diagramm als SVG speichern …")
+            png.triggered.connect(lambda: self.save_diagram(key, "png"))
+            svg.triggered.connect(lambda: self.save_diagram(key, "svg"))
+            if first is not None:
+                menu.removeAction(png)
+                menu.removeAction(svg)
+                menu.insertAction(first, png)
+                menu.insertAction(first, svg)
+                menu.insertSeparator(first)
+        menu.exec(event.globalPos())
+
+    def save_diagram(self, key: str, kind: str, path: str | None = None) -> bool:
+        from notex.ui.diagram_image import svg_to_image
+        diagram = self._diagrams.get(key)
+        if diagram is None:
+            return False
+        if path is None:
+            if self._path is not None and fileops.is_encrypted_path(self._path):
+                from notex.ui import dialogs
+                if not dialogs.confirm(self, "Diagramm aus verschlüsselter Notiz speichern",
+                                       "Das Bild zeigt Inhalt dieser verschlüsselten Notiz und wird unverschlüsselt "
+                                       "gespeichert.", informative="Nur fortfahren, wenn der Zielort sicher ist.",
+                                       yes="Trotzdem speichern", danger=True):
+                    return False
+            stem = re.sub(r'[\\/:*?"<>|]+', "-", diagram.title or "diagramm").strip(" .-") or "diagramm"
+            suggestion = str(self.root / f"{stem}.{kind}")
+            path, _ = QFileDialog.getSaveFileName(self, "Diagramm speichern", suggestion,
+                                                  "PNG-Bild (*.png)" if kind == "png" else "SVG-Grafik (*.svg)")
+            if not path:
+                return False
+        try:
+            if kind == "svg":
+                Path(path).write_text(diagram.svg, encoding="utf-8")
+                return True
+            return svg_to_image(diagram.svg, diagram.width, diagram.height, 2.0, COLORS.paper).save(path, "PNG")
+        except OSError:
+            return False
 
     # ---- Klicks ----------------------------------------------------------------------------
     def _on_anchor(self, url: QUrl) -> None:

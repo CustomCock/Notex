@@ -13,6 +13,7 @@ Eigene URL-Schemata für die Vorschau (verarbeitet die UI, nie ein Browser):
   notex-open:<relativer Pfad>[#Überschrift]   relative Markdown-Links und [[Wiki-Links]]
   notex-toggle:<Zeile>                          Checkbox einer Aufgabe umschalten (0-basiert)
   notex-load:<URL>                              externes Bild nachladen
+  notex-mermaid:<Schlüssel>                     Mermaid-Diagramm (SVG aus RenderResult.diagrams, offline gerendert)
 """
 from __future__ import annotations
 
@@ -40,6 +41,8 @@ class RenderOptions:
     loaded_images: set[str] = field(default_factory=set)   # externe Bild-URLs, die der Nutzer freigegeben hat
     base_dir: str = ""      # Ordner der Datei (relativ zum Notizordner, "" = Wurzel) für relative Pfade
     max_source_chars: int = 2_000_000
+    diagrams: bool = True           # ```mermaid als Diagramm zeigen (sonst als Code)
+    max_diagram_width: int = 0      # > 0: breitere Diagramme proportional verkleinern (Anzeigebreite)
 
 
 @dataclass
@@ -48,6 +51,7 @@ class RenderResult:
     external_images: list[str] = field(default_factory=list)   # URLs, die als Platzhalter gerendert wurden
     task_lines: list[int] = field(default_factory=list)        # 0-basierte Zeilen mit Checkbox
     truncated: bool = False
+    diagrams: dict = field(default_factory=dict)               # Schlüssel → mermaid.Diagram (für notex-mermaid:)
 
 
 def slugify(heading: str) -> str:
@@ -229,8 +233,27 @@ class _Renderer:
         return f'<a href="notex-toggle:{line}" style="color:{self.color("accent")};text-decoration:none">{glyph}</a> '
 
     # -- Blöcke --
+    def render_mermaid(self, source: str) -> str:
+        import hashlib
+        from notex.core import mermaid
+        diagram, error = mermaid.render_safe(source, self.o.colors)
+        key = hashlib.sha1((source + repr(sorted(self.o.colors.items()))).encode("utf-8")).hexdigest()[:16]
+        self.result.diagrams[key] = diagram
+        width, height = diagram.width, diagram.height
+        if self.o.max_diagram_width and width > self.o.max_diagram_width:
+            height = height * self.o.max_diagram_width / width
+            width = self.o.max_diagram_width
+        alt = html.escape(diagram.title or "Mermaid-Diagramm", quote=True)
+        out = (f'<p align="center"><img src="notex-mermaid:{key}" width="{round(width)}" height="{round(height)}" '
+               f'alt="{alt}"></p>\n')
+        if error:                                       # Code darunter zeigen, damit man den Fehler findet
+            out += f'<pre style="background-color:{self.color("code_bg")}">{html.escape(source.rstrip())}</pre>\n'
+        return out
+
     def render_fence(self, token: Token) -> str:
         info = (token.info or "").strip().split()[:1]
+        if info and info[0].lower() == "mermaid" and self.o.diagrams:
+            return self.render_mermaid(token.content)
         lexer = _fence_lexer(info[0].lower() if info else "")
         lines_html: list[str] = []
         state = syntax.STATE_NONE
