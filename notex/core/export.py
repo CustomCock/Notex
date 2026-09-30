@@ -81,16 +81,38 @@ def _csv_table(text: str, name: str = "") -> str:
     return "\n".join(out)
 
 
+# Diagramme im Export immer hell (Papier), unabhängig vom App-Theme
+EXPORT_COLORS = {"bg": "#ffffff", "text": "#1f2328", "muted": "#6b7280", "accent": "#3f5876", "danger": "#b42318"}
+EXPORT_DIAGRAM_WIDTH = 680          # ≈ Satzbreite A4 in 96-dpi-Pixeln
+
+
+def body_parts(content: str, kind: str, name: str = "", base_dir: str = "",
+               values: dict[str, str] | None = None, prefix: str = "§") -> tuple[str, dict]:
+    """Inhalts-Körper als HTML plus Mermaid-Diagramme (Schlüssel → Diagram) für notex-mermaid:-Bilder."""
+    content = resolve(content, values, prefix)
+    if kind == "markdown":
+        result = markdown.render(content, markdown.RenderOptions(base_dir=base_dir, colors=dict(EXPORT_COLORS),
+                                                                 max_diagram_width=EXPORT_DIAGRAM_WIDTH))
+        return result.html, result.diagrams
+    if kind == "csv":
+        return _csv_table(content, name), {}
+    # Text und alles andere: unverändert als vorformatierter Block
+    return f"<pre>{escape(content)}</pre>", {}
+
+
 def body_html(content: str, kind: str, name: str = "", base_dir: str = "",
               values: dict[str, str] | None = None, prefix: str = "§") -> str:
     """Nur der Inhalts-Körper als HTML (für die PDF-Ausgabe mit Qt bzw. zum Einbetten)."""
-    content = resolve(content, values, prefix)
-    if kind == "markdown":
-        return markdown.render(content, markdown.RenderOptions(base_dir=base_dir)).html
-    if kind == "csv":
-        return _csv_table(content, name)
-    # Text und alles andere: unverändert als vorformatierter Block
-    return f"<pre>{escape(content)}</pre>"
+    return body_parts(content, kind, name, base_dir, values, prefix)[0]
+
+
+def embed_diagrams(html: str, diagrams: dict) -> str:
+    """notex-mermaid:-Verweise durch eingebettete SVG-Daten ersetzen (eigenständige HTML-Datei)."""
+    import base64
+    for key, diagram in diagrams.items():
+        data = base64.b64encode(diagram.svg.encode("utf-8")).decode("ascii")
+        html = html.replace(f'src="notex-mermaid:{key}"', f'src="data:image/svg+xml;base64,{data}"')
+    return html
 
 
 def kind_for(name: str) -> str:
@@ -106,7 +128,8 @@ def kind_for(name: str) -> str:
 def to_html_document(content: str, kind: str, meta: ExportMeta, name: str = "", base_dir: str = "",
                      values: dict[str, str] | None = None, prefix: str = "§", css: str | None = None) -> str:
     """Vollständiges HTML-Dokument mit Kopf (Logo/Titel/Meta), Inhalt und Fußzeile."""
-    body = body_html(content, kind, name=name, base_dir=base_dir, values=values, prefix=prefix)
+    body, diagrams = body_parts(content, kind, name=name, base_dir=base_dir, values=values, prefix=prefix)
+    body = embed_diagrams(body, diagrams)
     logo = f'<img src="{escape(meta.logo_data_uri)}" alt="">' if meta.logo_data_uri else ""
     meta_bits = [meta.date_or_today()]
     if meta.author:

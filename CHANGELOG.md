@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an fckNotes (bis 1.17.0: Notex). Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+- **Mermaid-Diagramme**: ```` ```mermaid ````-Blöcke erscheinen in der Markdown-Vorschau, im HTML-Export (als
+  eingebettetes SVG) und im PDF-Export als Diagramm. Eigener Offline-Renderer in reinem Python (kein Browser,
+  kein JavaScript, kein Netz, keine neue Abhängigkeit) für Flussdiagramme (inkl. verschachtelter Subgraphen),
+  Sequenz-, Klassen-, Zustands- und ER-Diagramme, Kreis- und Gantt-Diagramme. Fehler zeigen eine Box mit
+  Zeilennummer plus Quelltext; nicht unterstützte Typen einen Hinweis. Farben folgen dem Theme.
+- Rechtsklick auf ein Diagramm in der Vorschau: **als PNG oder SVG speichern** (bei `.ntx` nur nach Rückfrage).
+- Command Palette: **„Mermaid-Diagramm einfügen …“** setzt ein Startbeispiel des gewählten Typs an den Cursor.
+- Einstellung „Mermaid-Diagramme zeichnen“ (Einstellungen › Editor › Markdown-Vorschau, Standard an).
+
 ## [1.17.1] – 2026-09-30
 
 ### Umbenannt

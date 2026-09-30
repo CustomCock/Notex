@@ -24,6 +24,7 @@ from notex.ui.editor import Editor
 from notex.ui.grammar_service import GrammarService
 from notex.ui.toolbar import EditorToolbar
 from notex.ui.paper import EditorPage
+from notex.ui.preview import MarkdownPreview
 from notex.ui.widgets import EditorTabBar
 
 MIN_FONT_SIZE, MAX_FONT_SIZE = 8, 40
@@ -334,6 +335,7 @@ class EditorTabs(QTabWidget):
             toolbar = EditorToolbar(self.editor_actions, self, is_markdown=path.suffix.lower() == ".md")
             toolbar.set_expanded(self.toolbar_visible, animate=False)
             editor.set_line_numbers(self.line_numbers)
+            MarkdownPreview.mermaid_enabled = bool(self.config.get("preview_mermaid", True))
             page = EditorPage(editor, self.paper_mode, toolbar, root=self.root)
             page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
             self.wire_page(page)
@@ -921,8 +923,13 @@ class EditorTabs(QTabWidget):
         return mode
 
     def apply_preview_settings(self) -> None:
+        mermaid = bool(self.config.get("preview_mermaid", True))
+        changed = mermaid != MarkdownPreview.mermaid_enabled
+        MarkdownPreview.mermaid_enabled = mermaid
         for page in self.pages():
             page.sync_scroll = bool(self.config.get("preview_sync_scroll", True))
+            if changed and page.preview is not None:
+                page.preview.render_now()
 
     def grammar_note(self) -> str:
         return self.grammar.note if self.config.get("grammar", {}).get("enabled") else ""

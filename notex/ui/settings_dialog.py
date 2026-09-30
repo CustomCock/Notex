@@ -394,6 +394,10 @@ class SettingsDialog(QDialog):
         self.sync_scroll_box.toggled.connect(lambda on: (self.config.__setitem__("preview_sync_scroll", on),
                                                          self.window_.tabs.apply_preview_settings()) if not self._loading else None)
         page.row("", self.sync_scroll_box)
+        self.mermaid_box = QCheckBox("Mermaid-Diagramme zeichnen (```mermaid-Blöcke)")
+        self.mermaid_box.toggled.connect(lambda on: (self.config.__setitem__("preview_mermaid", on),
+                                                     self.window_.tabs.apply_preview_settings()) if not self._loading else None)
+        page.row("", self.mermaid_box)
         page.note("Ctrl+Shift+V wechselt Bearbeiten → Vorschau → Geteilt. Die Vorschau lädt nie von selbst aus dem "
                   "Internet: externe Bilder erscheinen als „Bild laden“, externe Links öffnen den Browser erst auf Klick.")
 
@@ -738,6 +742,7 @@ class SettingsDialog(QDialog):
         self._update_history_size()
         self.split_box.setCurrentIndex(max(0, self.split_box.findData(cfg.get("split", {}).get("orientation", "horizontal"))))
         self.sync_scroll_box.setChecked(bool(cfg.get("preview_sync_scroll", True)))
+        self.mermaid_box.setChecked(bool(cfg.get("preview_mermaid", True)))
         self.syntax_box.setChecked(bool(cfg.get("syntax_highlighting", True)))
         for ext, chip in self.syntax_chips.items():
             chip.setChecked(ext in cfg.get("syntax_extensions", []))

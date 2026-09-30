@@ -1296,6 +1296,30 @@ class MainWindow(QMainWindow):
             return None
         return editor
 
+    def insert_mermaid(self, kind: str | None = None) -> bool:
+        """Beispiel-Mermaid-Block (Typ wählen) an der Cursorposition einer .md-Notiz einfügen."""
+        from PySide6.QtWidgets import QInputDialog
+        from notex.core.mermaid.examples import EXAMPLES, insertion
+        editor = self.tabs.current_editor()
+        if editor is None or self._in_data_view() or editor.isReadOnly() or getattr(editor, "locked", False):
+            self.toast.show_message("Erst eine beschreibbare Markdown-Notiz öffnen", "info")
+            return False
+        if editor.path is None or editor.path.suffix.lower() not in (".md", ".markdown"):
+            self.toast.show_message("Mermaid-Diagramme gibt es nur in Markdown-Notizen (.md)", "info")
+            return False
+        if kind is None:
+            labels = [label for label, _ in EXAMPLES.values()]
+            chosen, ok = QInputDialog.getItem(self, "Mermaid-Diagramm einfügen", "Diagrammtyp:", labels, 0, False)
+            if not ok:
+                return False
+            kind = list(EXAMPLES)[labels.index(chosen)]
+        cursor = editor.textCursor()
+        before = cursor.block().text()[:cursor.positionInBlock()]
+        editor.insert_text(insertion(kind, before))
+        if not self.config.get("preview_mermaid", True):
+            self.toast.show_message("Hinweis: Mermaid-Diagramme sind in den Einstellungen ausgeschaltet", "info")
+        return True
+
     def insert_evidence_hashes(self) -> None:
         """Datei wählen, MD5/SHA-1/SHA-256 im Hintergrund berechnen, als Zeilen in „## Prüfsummen“ einfügen."""
         from PySide6.QtWidgets import QFileDialog, QProgressDialog
@@ -3508,6 +3532,8 @@ class MainWindow(QMainWindow):
                           keywords="json yaml jsonpath pfad kopieren baum")
         self.registry.add("file:live", "Live verfolgen (Log) ein/aus", lambda: self.toggle_live(), category="Datei",
                           shortcut="Ctrl+Shift+Alt+F", keywords="tail follow log live mitlesen logdatei")
+        self.registry.add("md:mermaid", "Mermaid-Diagramm einfügen …", lambda: self.insert_mermaid(), category="Bearbeiten",
+                          keywords="mermaid diagramm flowchart fluss sequenz klasse zustand er pie kreis gantt uml")
         self.registry.add("pdf:quote", "PDF: Markierung als Zitat in Notiz einfügen", self.quote_from_pdf, category="PDF",
                           shortcut="Ctrl+Shift+Alt+Q", keywords="pdf zitat quote markierung notiz quelle")
         self.registry.add("pdf:outline", "PDF: Lesezeichen ein/aus", self.toggle_pdf_outline, category="PDF",
