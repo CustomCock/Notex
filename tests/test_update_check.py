@@ -10,7 +10,7 @@ from notex.core.update_check import (CHECK_INTERVAL, fetch_releases, is_newer, l
 
 def rel(tag, draft=False, pre=False, url=None, body="Neu: X"):
     return {"tag_name": tag, "name": f"Notex {tag}", "draft": draft, "prerelease": pre, "body": body,
-            "html_url": url or f"https://github.com/CustomCock/Notex/releases/tag/{tag}",
+            "html_url": url or f"https://github.com/CustomCock/fckNotes/releases/tag/{tag}",
             "published_at": "2026-09-26T10:00:00Z"}
 
 

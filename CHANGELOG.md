@@ -1,16 +1,24 @@
 # Changelog
 
-Alle nennenswerten Änderungen an Notex. Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
+Alle nennenswerten Änderungen an fckNotes (bis 1.17.0: Notex). Format angelehnt an [Keep a Changelog](https://keepachangelog.com/de/).
 
-## [Unveröffentlicht]
+## [1.17.1] – 2026-09-30
 
 ### Umbenannt
-- **Notex heißt vorläufig „fckNotes“** (der alte Name ist geschützt). Fenstertitel, Menüs, Dialoge, EXE
-  (`fckNotes.exe`), Release-ZIP, Export-Fußzeile und User-Agent tragen den neuen Namen; ein späterer Wechsel ist
+- **Notex heißt jetzt „fckNotes“** (der alte Name ist geschützt), das GitHub-Repo heißt `CustomCock/fckNotes`.
+  Fenstertitel, Menüs, Dialoge, EXE (`fckNotes.exe`), Release-ZIP, Export-Fußzeile und User-Agent tragen den neuen Namen; ein späterer Wechsel ist
   eine Zeile (`APP_NAME` in `notex/__init__.py`). **Unverändert und kompatibel:** verschlüsselte `.ntx`-Notizen
-  (Dateikennung `NOTEXENC`), `data/`/`config.json`, Python-Paket `notex/`, Repo-URL, Registry-Schlüssel der
+  (Dateikennung `NOTEXENC`), `data/`/`config.json`, Python-Paket `notex/`, Registry-Schlüssel der
   Dateizuordnung. Beim ersten Start meldet sich die Dateizuordnung als veraltet – „Pfad aktualisieren“ entfernt
   dabei auch den alten „Notex“-Eintrag aus „Öffnen mit“. Fehlerprotokoll heißt jetzt `logs/fehlerprotokoll.log`.
+
+### Behoben
+- **Versionsnummer**: Das Release 1.17.0 meldete intern noch 1.16.0 – der Update-Check hätte dort dauerhaft
+  „1.17.0 verfügbar“ angezeigt. Ab 1.17.1 stimmt die Nummer wieder mit dem Release überein.
+- Update-Check, Links und User-Agent zeigen auf das umbenannte Repo (`REPO` in `notex/__init__.py`).
+- Screenshots in `docs/` neu erzeugt (neuer Name; „Dieser PC“ zeigt typische Windows-Laufwerke).
+
+## [1.17.0] – 2026-09-29
 
 ### Hinzugefügt
 - **Module: „Alle aktivieren“ / „Alle deaktivieren“** in Einstellungen → Module, dazu ein Tri-State-Schalter

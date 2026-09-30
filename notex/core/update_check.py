@@ -17,7 +17,9 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-REPO = "CustomCock/Notex"
+from notex import REPO as PACKAGE_REPO
+
+REPO = PACKAGE_REPO
 API_URL = f"https://api.github.com/repos/{REPO}/releases?per_page=20"
 RELEASES_PAGE = f"https://github.com/{REPO}/releases"
 CHECK_INTERVAL = 24 * 3600

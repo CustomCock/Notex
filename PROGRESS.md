@@ -41,6 +41,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
 | 1.14.0 | Block Q: Analyse per Rechtsklick (Typ-Erkennung, Karte, Netz-/Hash-/Umwandeln-Aktionen) | fertig, Tests grün, lokal getaggt |
 | 1.15.0 | Block N: Geräte-Scanner (Advanced-IP-Scanner-artig), OUI-Hersteller, NetBIOS, Host-Aktionen, Export | fertig, Tests grün, lokal getaggt |
 | 1.16.0 | Block O: WYSIWYG-Markdown, Fragebogen-Engine + Assistent, Berichtsheft (ICS), Systemcheck, Sicherheits-Check, E-Mail-/Tabellen-Vorlagen | fertig, Tests grün, lokal getaggt |
+| 1.17.0 | Plan R: Netzwerk-Tools/Werkzeuge-Menü repariert, Aufräumen, Netzwerk-Tests + CI mit PySide6, Vorlagen nach Kategorien, Module alle an/aus | released vom Besitzer (Tag v1.17.0; meldet intern noch 1.16.0) |
+| 1.17.1 | Umbenennung zu fckNotes (Repo CustomCock/fckNotes), Versionsnummer korrigiert, Screenshots neu | fertig auf dem Arbeitsbranch, Tag durch Besitzer |
 
 ## Erledigt
 
@@ -502,7 +504,8 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   sammelten sich an).
 
 ### Umbenennung (29.09.2026, Besitzer)
-- „Notex“ ist geschützt → **vorläufiger Anzeigename „fckNotes“**, bis der Besitzer einen freien Namen hat.
+- „Notex“ ist geschützt → **Anzeigename „fckNotes“**; der Besitzer hat am 30.09.2026 auch das GitHub-Repo in
+  `CustomCock/fckNotes` umbenannt (GitHub leitet die alte Adresse weiter). `REPO`/`REPO_URL` in `notex/__init__.py`.
 - **Entscheidung:** nur der Anzeigename wechselt. `notex/__init__.py`: `APP_NAME` (sichtbar), `EXE_NAME`/`EXE_FILE`
   (Build, Texte), dazu **stabile interne Kennungen** `APP_ID`, `PROG_ID`, `REG_KEY = "Notex"` (Registry) und
   `LEGACY_EXE_FILES` (alter „Öffnen mit“-Eintrag wird beim Registrieren/Entfernen aufgeräumt). Alle sichtbaren
@@ -510,8 +513,9 @@ davon wird gelöscht; der Besitzer entscheidet, wie damit umgegangen wird (siehe
   Paket. **Nie ändern:** `.ntx`-Magic `NOTEXENC`, Paketname `notex/`, `REPO` im Update-Check, Scan-JSON-Schlüssel
   `notex_scan`, Linux-Desktop-ID `notex.desktop`, Env `NOTEX_ROOT`.
 - Nächster Namenswechsel: `APP_NAME` ändern, README/CHANGELOG-Titel anpassen, Screenshots neu erzeugen.
-  Die Screenshots in `docs/` zeigen noch „Notex“ (werden mit `python tools/screenshot.py` neu erzeugt, sobald der
-  endgültige Name feststeht).
+  Screenshots 01–63 am 30.09.2026 mit `python tools/screenshot.py` neu erzeugt (Demo-Daten mit neuem Namen,
+  „Dieser PC“ im Skript fest auf C:\ / D:\ statt der Laufwerke der Build-Umgebung). 64–70 stammen aus einmaligen
+  Skripten und enthalten keinen App-Namen – unverändert.
 
 ## Offen
 
@@ -578,8 +582,8 @@ rdap, scanner, logs, pcap. Standardmäßig an: variables, hex, ports, ioc.
 
 ## Nächster Schritt
 
-**Plan R abgeschlossen** (R1–R4, siehe oben; Stand im CHANGELOG unter „Unveröffentlicht“). Version/Tag setzt der
-Besitzer. Offen beim Besitzer: manuelle Prüfung nach `docs/TESTPLAN-WINDOWS.md`.
+**Plan R abgeschlossen und als 1.17.0 veröffentlicht.** Umbenennung = 1.17.1 (Arbeitsbranch, `__version__` =
+1.17.1) – wartet auf Merge nach `main` und Tag v1.17.1 durch den Besitzer. Offen beim Besitzer: manuelle Prüfung nach `docs/TESTPLAN-WINDOWS.md`.
 
 **Plan Q → N → O abgeschlossen** (1.14.0 / 1.15.0 / 1.16.0), alle lokal getaggt, CI grün, kein Release (Besitzer).
 - **Q (1.14.0)** Kontextmenü-Analyse für markierten Text – **erledigt**.

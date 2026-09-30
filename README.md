@@ -1,15 +1,14 @@
 # fckNotes
 
-> **Name vorläufig.** Die App hieß bisher **Notex**; bis ein freier Name gefunden ist, heißt sie fckNotes.
-> Intern (Python-Paket `notex/`, Repo-URL, Kennung der verschlüsselten `.ntx`-Notizen) bleibt alles gleich –
-> bestehende Notizen, auch verschlüsselte, öffnen unverändert.
+> **fckNotes hieß bisher Notex.** Deine Notizen, Einstellungen und auch verschlüsselte `.ntx`-Notizen öffnen
+> unverändert; wie du von einer Notex-Installation umsteigst, steht unter „Umstieg von Notex“.
 
 Portabler Explorer + Editor für Textdateien unter Windows. Ein Ordner, eine EXE,
 keine Installation: `data/` daneben ist dein Notizbaum, `config.json` merkt sich den Zustand.
 
 ## Installation
 
-1. Aus den [Releases](https://github.com/CustomCock/Notex/releases) die Datei `fckNotes-vX.Y.Z.zip` laden.
+1. Aus den [Releases](https://github.com/CustomCock/fckNotes/releases) die Datei `fckNotes-vX.Y.Z.zip` laden.
 2. Entpacken, z. B. nach `C:\Apps\fckNotes` oder auf einen USB-Stick.
 3. `fckNotes.exe` starten. Beim ersten Start entstehen `data/` und `config.json` daneben.
 
@@ -1203,8 +1202,8 @@ für die Volltextsuche (Default 5 MB).
 Voraussetzung: Python 3.12 (3.11 funktioniert auch).
 
 ```bat
-git clone https://github.com/customcock/notex.git
-cd notex
+git clone https://github.com/CustomCock/fckNotes.git
+cd fckNotes
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements-dev.txt
